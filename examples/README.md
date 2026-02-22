@@ -56,8 +56,8 @@ npx tsx examples/07-verification.ts
 Set `MODEL_ID` in your `.env` to use a different model:
 
 ```
-MODEL_ID=gpt-4o
-OPENAI_API_KEY=sk-...
+MODEL_ID=claude-sonnet-4-5
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 Supported models include any model supported by LangChain's `initChatModel`:

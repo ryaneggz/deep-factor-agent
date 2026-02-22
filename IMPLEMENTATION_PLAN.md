@@ -11,11 +11,11 @@
 
 All planned spec work is fully implemented, tested, and type-checked. This covers the core library (types, stop conditions, agent loop, middleware, factory, human-in-the-loop, context management, tool adapter, barrel exports, and 129-test suite) as well as the full examples suite (7 runnable examples spanning basic usage, tools, streaming, stop conditions, middleware, human-in-the-loop, and verification). See commit history for the detailed implementation record.
 
-### Recently completed P3 items
+### Audit (2026-02-22)
 
-- **#11 Tool name conflict handling** — `composeMiddleware` now accepts an optional `ComposeMiddlewareOptions` second parameter with an `onConflict` callback. When two middleware provide a tool with the same name, `onConflict(toolName, middlewareName)` is called. Defaults to `console.warn` for backwards compatibility. Exported as `ComposeMiddlewareOptions` from barrel. 1 new test added.
+Full spec compliance audit performed. Found and fixed one discrepancy:
 
-- **#12 `estimateTokens` heuristic limitations** — `estimateTokens` now has a doc comment explaining the `Math.ceil(text.length / 3.5)` heuristic's inaccuracy for CJK/emoji/code and its limited blast radius (summarization timing only). `ContextManagementConfig` accepts an optional `tokenEstimator` function; `ContextManager` uses it when provided, falling back to `estimateTokens`. 3 new tests added.
+- **README.md configuration snippet** — `examples/README.md` Configuration section showed `MODEL_ID=gpt-4o` / `OPENAI_API_KEY=sk-...` instead of spec-required `MODEL_ID=claude-sonnet-4-5` / `ANTHROPIC_API_KEY=sk-ant-...`. Fixed to match SPEC-01 exactly.
 
 ---
 
