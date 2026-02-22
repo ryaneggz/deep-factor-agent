@@ -1,5 +1,5 @@
+import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import type { ToolSet } from "ai";
 
 export const requestHumanInputSchema = z.object({
   question: z.string().describe("The question to ask the human"),
@@ -20,20 +20,21 @@ export const requestHumanInputSchema = z.object({
     .describe("Options for multiple_choice format"),
 });
 
-export const requestHumanInput = {
-  description:
-    "Request input or approval from a human. Use when you need clarification, confirmation, or a decision.",
-  parameters: requestHumanInputSchema,
-  execute: async (args: z.infer<typeof requestHumanInputSchema>) => {
-    // The actual pause mechanism is handled by the agent loop.
-    // This tool's execute function returns the args so the loop can detect it.
-    return {
+export const requestHumanInput = tool(
+  async (args: z.infer<typeof requestHumanInputSchema>) => {
+    return JSON.stringify({
       requested: true,
       question: args.question,
       context: args.context,
       urgency: args.urgency,
       format: args.format,
       choices: args.choices,
-    };
+    });
   },
-} as unknown as ToolSet[string];
+  {
+    name: "requestHumanInput",
+    description:
+      "Request input or approval from a human. Use when you need clarification, confirmation, or a decision.",
+    schema: requestHumanInputSchema,
+  },
+);

@@ -1,66 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DeepFactorAgent, addUsage } from "./agent.js";
 import { maxIterations } from "./stop-conditions.js";
-import type {
-  AgentResult,
-  PendingResult,
-  TokenUsage,
-  DeepFactorAgentSettings,
-} from "./types.js";
-
-// Mock the AI SDK
-vi.mock("ai", () => {
-  return {
-    generateText: vi.fn(),
-    streamText: vi.fn(),
-    stepCountIs: vi.fn(() => () => true),
-  };
-});
-
-import { generateText, streamText } from "ai";
-
-const mockGenerateText = vi.mocked(generateText);
-const mockStreamText = vi.mocked(streamText);
+import { tool } from "@langchain/core/tools";
+import { AIMessage } from "@langchain/core/messages";
+import { z } from "zod";
+import type { TokenUsage } from "./types.js";
 
 function makeMockModel() {
-  return {
-    specificationVersion: "v1" as const,
-    provider: "test",
-    modelId: "test-model",
-    doGenerate: vi.fn(),
-  } as any;
+  const model: any = {
+    invoke: vi.fn(),
+    bindTools: vi.fn(),
+    stream: vi.fn(),
+    modelName: "test-model",
+  };
+  model.bindTools.mockReturnValue(model);
+  return model;
 }
 
-function makeDefaultResult(text = "Test response") {
-  return {
-    text,
-    steps: [
-      {
-        toolCalls: [],
-        toolResults: [],
-        text,
-        usage: {
-          inputTokens: 100,
-          outputTokens: 50,
-          totalTokens: 150,
-        },
-      },
-    ],
-    toolCalls: [],
-    toolResults: [],
-    totalUsage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
+function makeAIMessage(
+  content = "Test response",
+  options: {
+    tool_calls?: Array<{ name: string; args: Record<string, any>; id: string }>;
+    usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
+  } = {},
+) {
+  return new AIMessage({
+    content,
+    tool_calls: options.tool_calls ?? [],
+    usage_metadata: options.usage ?? {
+      input_tokens: 100,
+      output_tokens: 50,
+      total_tokens: 150,
     },
-    usage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    finishReason: "stop",
-    response: { messages: [] },
-  };
+  });
 }
 
 beforeEach(() => {
@@ -107,16 +79,14 @@ describe("addUsage", () => {
 
 describe("DeepFactorAgent", () => {
   describe("constructor", () => {
-    it("throws for string model IDs", () => {
-      expect(
-        () =>
-          new DeepFactorAgent({
-            model: "test-model" as any,
-          }),
-      ).toThrow("String model IDs are not supported");
+    it("accepts string model IDs", () => {
+      const agent = new DeepFactorAgent({
+        model: "test-model",
+      });
+      expect(agent).toBeDefined();
     });
 
-    it("creates agent with LanguageModel instance", () => {
+    it("creates agent with BaseChatModel instance", () => {
       const agent = new DeepFactorAgent({
         model: makeMockModel(),
       });
@@ -126,10 +96,11 @@ describe("DeepFactorAgent", () => {
 
   describe("loop()", () => {
     it("returns AgentResult with stopReason 'completed' for single iteration", async () => {
-      mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
       });
 
       const result = await agent.loop("Hello");
@@ -141,10 +112,11 @@ describe("DeepFactorAgent", () => {
     });
 
     it("records user message as first event in thread", async () => {
-      mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
       });
 
       const result = await agent.loop("Hello World");
@@ -157,17 +129,13 @@ describe("DeepFactorAgent", () => {
     });
 
     it("aggregates token usage across iterations", async () => {
-      // First iteration: verifier rejects
-      mockGenerateText.mockResolvedValueOnce(
-        makeDefaultResult("First attempt") as any,
-      );
-      // Second iteration: verifier accepts
-      mockGenerateText.mockResolvedValueOnce(
-        makeDefaultResult("Second attempt") as any,
-      );
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(makeAIMessage("First attempt"))
+        .mockResolvedValueOnce(makeAIMessage("Second attempt"));
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
         verifyCompletion: vi
           .fn()
           .mockResolvedValueOnce({ complete: false, reason: "Not done yet" })
@@ -175,20 +143,17 @@ describe("DeepFactorAgent", () => {
       });
 
       const result = await agent.loop("Do something");
-      expect(result.usage.inputTokens).toBe(200); // 100 * 2
-      expect(result.usage.outputTokens).toBe(100); // 50 * 2
-      expect(result.usage.totalTokens).toBe(300); // 150 * 2
+      expect(result.usage.inputTokens).toBe(200);
+      expect(result.usage.outputTokens).toBe(100);
+      expect(result.usage.totalTokens).toBe(300);
       expect(result.iterations).toBe(2);
     });
 
     it("multi-iteration with verification feedback", async () => {
-      mockGenerateText
-        .mockResolvedValueOnce(
-          makeDefaultResult("First response") as any,
-        )
-        .mockResolvedValueOnce(
-          makeDefaultResult("Fixed response") as any,
-        );
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(makeAIMessage("First response"))
+        .mockResolvedValueOnce(makeAIMessage("Fixed response"));
 
       const verifyFn = vi
         .fn()
@@ -199,7 +164,7 @@ describe("DeepFactorAgent", () => {
         .mockResolvedValueOnce({ complete: true });
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
         verifyCompletion: verifyFn,
       });
 
@@ -208,7 +173,6 @@ describe("DeepFactorAgent", () => {
       expect(result.iterations).toBe(2);
       expect(verifyFn).toHaveBeenCalledTimes(2);
 
-      // Check that feedback was injected
       const feedbackEvents = result.thread.events.filter(
         (e) =>
           e.type === "message" &&
@@ -219,12 +183,13 @@ describe("DeepFactorAgent", () => {
     });
 
     it("handles error recovery - one error then success", async () => {
-      mockGenerateText
+      const mockModel = makeMockModel();
+      mockModel.invoke
         .mockRejectedValueOnce(new Error("Network error"))
-        .mockResolvedValueOnce(makeDefaultResult() as any);
+        .mockResolvedValueOnce(makeAIMessage());
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
       });
 
       const result = await agent.loop("Test error recovery");
@@ -240,13 +205,14 @@ describe("DeepFactorAgent", () => {
     });
 
     it("exits with max_errors after 3 consecutive errors", async () => {
-      mockGenerateText
+      const mockModel = makeMockModel();
+      mockModel.invoke
         .mockRejectedValueOnce(new Error("Error 1"))
         .mockRejectedValueOnce(new Error("Error 2"))
         .mockRejectedValueOnce(new Error("Error 3"));
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
       });
 
       const result = await agent.loop("Test max errors");
@@ -260,10 +226,11 @@ describe("DeepFactorAgent", () => {
     });
 
     it("stop condition triggered", async () => {
-      mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
         stopWhen: maxIterations(1),
         verifyCompletion: async () => ({
           complete: false,
@@ -277,33 +244,30 @@ describe("DeepFactorAgent", () => {
     });
 
     it("records tool calls and results as events", async () => {
-      const resultWithTools = {
-        ...makeDefaultResult(),
-        steps: [
-          {
-            toolCalls: [
-              {
-                toolCallId: "tc_1",
-                toolName: "search",
-                input: { query: "test" },
-              },
-            ],
-            toolResults: [
-              {
-                toolCallId: "tc_1",
-                toolName: "search",
-                output: { results: ["found"] },
-              },
-            ],
-            text: "Found results",
-          },
-        ],
-      };
+      const searchTool = tool(
+        async (args: { query: string }) =>
+          JSON.stringify({ results: ["found"] }),
+        {
+          name: "search",
+          description: "Search for something",
+          schema: z.object({ query: z.string() }),
+        },
+      );
 
-      mockGenerateText.mockResolvedValueOnce(resultWithTools as any);
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [
+              { name: "search", args: { query: "test" }, id: "tc_1" },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Found results"));
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
+        tools: [searchTool],
       });
 
       const result = await agent.loop("Search for something");
@@ -325,10 +289,11 @@ describe("DeepFactorAgent", () => {
     });
 
     it("thread is included in result", async () => {
-      mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
       });
 
       const result = await agent.loop("Test thread");
@@ -339,13 +304,14 @@ describe("DeepFactorAgent", () => {
     });
 
     it("invokes onIterationStart and onIterationEnd callbacks", async () => {
-      mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
       const onStart = vi.fn();
       const onEnd = vi.fn();
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
         onIterationStart: onStart,
         onIterationEnd: onEnd,
       });
@@ -356,18 +322,17 @@ describe("DeepFactorAgent", () => {
     });
 
     it("no verifyCompletion means single iteration mode", async () => {
-      mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
-        // no verifyCompletion
+        model: mockModel,
       });
 
       const result = await agent.loop("Single iteration");
       expect(result.iterations).toBe(1);
       expect(result.stopReason).toBe("completed");
 
-      // Completion event should be present
       const completionEvents = result.thread.events.filter(
         (e) => e.type === "completion",
       );
@@ -376,21 +341,20 @@ describe("DeepFactorAgent", () => {
   });
 
   describe("stream()", () => {
-    it("returns a streaming result", () => {
-      const mockStreamResult = {
-        textStream: (async function* () {
-          yield "chunk1";
-          yield "chunk2";
+    it("returns a streaming result", async () => {
+      const mockModel = makeMockModel();
+      mockModel.stream.mockReturnValueOnce(
+        (async function* () {
+          yield { content: "chunk1" };
+          yield { content: "chunk2" };
         })(),
-        text: Promise.resolve("chunk1chunk2"),
-      };
-      mockStreamText.mockReturnValueOnce(mockStreamResult as any);
+      );
 
       const agent = new DeepFactorAgent({
-        model: makeMockModel(),
+        model: mockModel,
       });
 
-      const result = agent.stream("Test stream");
+      const result = await agent.stream("Test stream");
       expect(result).toBeDefined();
     });
   });

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
 import {
   composeMiddleware,
   todoMiddleware,
@@ -22,7 +24,9 @@ function makeThread(): AgentThread {
   };
 }
 
-function makeCtx(overrides: Partial<MiddlewareContext> = {}): MiddlewareContext {
+function makeCtx(
+  overrides: Partial<MiddlewareContext> = {},
+): MiddlewareContext {
   return {
     thread: makeThread(),
     iteration: 1,
@@ -35,16 +39,29 @@ describe("composeMiddleware", () => {
   it("merges tools from multiple middleware", () => {
     const mw1: AgentMiddleware = {
       name: "mw1",
-      tools: { tool_a: { description: "A", parameters: {}, execute: async () => "a" } } as any,
+      tools: [
+        tool(async () => "a", {
+          name: "tool_a",
+          description: "A",
+          schema: z.object({}),
+        }),
+      ],
     };
     const mw2: AgentMiddleware = {
       name: "mw2",
-      tools: { tool_b: { description: "B", parameters: {}, execute: async () => "b" } } as any,
+      tools: [
+        tool(async () => "b", {
+          name: "tool_b",
+          description: "B",
+          schema: z.object({}),
+        }),
+      ],
     };
 
     const composed = composeMiddleware([mw1, mw2]);
-    expect(Object.keys(composed.tools)).toContain("tool_a");
-    expect(Object.keys(composed.tools)).toContain("tool_b");
+    const toolNames = composed.tools.map((t) => t.name);
+    expect(toolNames).toContain("tool_a");
+    expect(toolNames).toContain("tool_b");
   });
 
   it("later middleware wins on tool name conflicts with warning", () => {
@@ -52,15 +69,28 @@ describe("composeMiddleware", () => {
 
     const mw1: AgentMiddleware = {
       name: "mw1",
-      tools: { shared_tool: { description: "V1", parameters: {}, execute: async () => "v1" } } as any,
+      tools: [
+        tool(async () => "v1", {
+          name: "shared_tool",
+          description: "V1",
+          schema: z.object({}),
+        }),
+      ],
     };
     const mw2: AgentMiddleware = {
       name: "mw2",
-      tools: { shared_tool: { description: "V2", parameters: {}, execute: async () => "v2" } } as any,
+      tools: [
+        tool(async () => "v2", {
+          name: "shared_tool",
+          description: "V2",
+          schema: z.object({}),
+        }),
+      ],
     };
 
     const composed = composeMiddleware([mw1, mw2]);
-    expect((composed.tools as any).shared_tool.description).toBe("V2");
+    const sharedTool = composed.tools.find((t) => t.name === "shared_tool");
+    expect(sharedTool!.description).toBe("V2");
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("shared_tool"),
     );
@@ -115,7 +145,7 @@ describe("composeMiddleware", () => {
     const composed = composeMiddleware([mw]);
     await composed.beforeIteration(makeCtx());
     await composed.afterIteration(makeCtx(), {});
-    expect(Object.keys(composed.tools)).toHaveLength(0);
+    expect(composed.tools).toHaveLength(0);
   });
 });
 
@@ -128,27 +158,30 @@ describe("todoMiddleware", () => {
   it("provides write_todos and read_todos tools", () => {
     const mw = todoMiddleware();
     expect(mw.tools).toBeDefined();
-    expect(Object.keys(mw.tools!)).toContain("write_todos");
-    expect(Object.keys(mw.tools!)).toContain("read_todos");
+    const toolNames = mw.tools!.map((t) => t.name);
+    expect(toolNames).toContain("write_todos");
+    expect(toolNames).toContain("read_todos");
   });
 
   it("write_todos tool returns success with todos", async () => {
     const mw = todoMiddleware();
-    const writeTool = (mw.tools as any).write_todos;
-    const result = await writeTool.execute({
+    const writeTool = mw.tools!.find((t) => t.name === "write_todos")!;
+    const result = await writeTool.invoke({
       todos: [{ id: "1", text: "Test task", status: "pending" }],
     });
-    expect(result.success).toBe(true);
-    expect(result.todos).toHaveLength(1);
-    expect(result.todos[0].text).toBe("Test task");
+    const parsed = JSON.parse(result as string);
+    expect(parsed.success).toBe(true);
+    expect(parsed.todos).toHaveLength(1);
+    expect(parsed.todos[0].text).toBe("Test task");
   });
 
   it("read_todos tool returns todos array", async () => {
     const mw = todoMiddleware();
-    const readTool = (mw.tools as any).read_todos;
-    const result = await readTool.execute();
-    expect(result.todos).toBeDefined();
-    expect(Array.isArray(result.todos)).toBe(true);
+    const readTool = mw.tools!.find((t) => t.name === "read_todos")!;
+    const result = await readTool.invoke({});
+    const parsed = JSON.parse(result as string);
+    expect(parsed.todos).toBeDefined();
+    expect(Array.isArray(parsed.todos)).toBe(true);
   });
 });
 
@@ -204,7 +237,6 @@ describe("errorRecoveryMiddleware", () => {
 
     const lastEvent = thread.events[1];
     if (lastEvent.type === "message") {
-      // 500 chars + "... [truncated]" + surrounding message
       expect(lastEvent.content).toContain("[truncated]");
       expect(lastEvent.content.length).toBeLessThan(1000);
     }

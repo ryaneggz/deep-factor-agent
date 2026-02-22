@@ -1,60 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { AIMessage } from "@langchain/core/messages";
 import { createDeepFactorAgent } from "./create-agent.js";
 import { DeepFactorAgent } from "./agent.js";
 
-// Mock the AI SDK
-vi.mock("ai", () => {
-  return {
-    generateText: vi.fn(),
-    streamText: vi.fn(),
-    stepCountIs: vi.fn(() => () => true),
-  };
-});
-
-import { generateText, streamText } from "ai";
-
-const mockGenerateText = vi.mocked(generateText);
-const mockStreamText = vi.mocked(streamText);
-
 function makeMockModel() {
-  return {
-    specificationVersion: "v1" as const,
-    provider: "test",
-    modelId: "test-model",
-    doGenerate: vi.fn(),
-  } as any;
+  const model: any = {
+    invoke: vi.fn(),
+    bindTools: vi.fn(),
+    stream: vi.fn(),
+    modelName: "test-model",
+  };
+  model.bindTools.mockReturnValue(model);
+  return model;
 }
 
-function makeDefaultResult(text = "Test response") {
-  return {
-    text,
-    steps: [
-      {
-        toolCalls: [],
-        toolResults: [],
-        text,
-        usage: {
-          inputTokens: 100,
-          outputTokens: 50,
-          totalTokens: 150,
-        },
-      },
-    ],
-    toolCalls: [],
-    toolResults: [],
-    totalUsage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
+function makeAIMessage(content = "Test response") {
+  return new AIMessage({
+    content,
+    usage_metadata: {
+      input_tokens: 100,
+      output_tokens: 50,
+      total_tokens: 150,
     },
-    usage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    finishReason: "stop",
-    response: { messages: [] },
-  };
+  });
 }
 
 beforeEach(() => {
@@ -91,10 +59,11 @@ describe("createDeepFactorAgent", () => {
   });
 
   it("loop() returns AgentResult with mocked model", async () => {
-    mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+    const mockModel = makeMockModel();
+    mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
     });
 
     const result = await agent.loop("Hello");
@@ -105,29 +74,29 @@ describe("createDeepFactorAgent", () => {
     expect(result.stopReason).toBe("completed");
   });
 
-  it("stream() returns streaming result with mocked model", () => {
-    const mockStreamResult = {
-      textStream: (async function* () {
-        yield "chunk";
+  it("stream() returns streaming result with mocked model", async () => {
+    const mockModel = makeMockModel();
+    mockModel.stream.mockReturnValueOnce(
+      (async function* () {
+        yield { content: "chunk" };
       })(),
-      text: Promise.resolve("chunk"),
-    };
-    mockStreamText.mockReturnValueOnce(mockStreamResult as any);
+    );
 
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
     });
 
-    const result = agent.stream("Hello");
+    const result = await agent.stream("Hello");
     expect(result).toBeDefined();
   });
 
   it("custom settings override defaults", async () => {
-    mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+    const mockModel = makeMockModel();
+    mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
     const customMiddleware = { name: "custom" };
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       instructions: "Custom instructions",
       middleware: [customMiddleware],
     });
@@ -137,18 +106,20 @@ describe("createDeepFactorAgent", () => {
   });
 
   it("applies default maxIterations(10) stop condition", async () => {
-    // Make generateText keep returning results with verification failing
+    const mockModel = makeMockModel();
     for (let i = 0; i < 11; i++) {
-      mockGenerateText.mockResolvedValueOnce(makeDefaultResult() as any);
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
     }
 
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
-      verifyCompletion: async () => ({ complete: false, reason: "not done" }),
+      model: mockModel,
+      verifyCompletion: async () => ({
+        complete: false,
+        reason: "not done",
+      }),
     });
 
     const result = await agent.loop("Test default stop");
-    // Should stop at iteration 10 due to default maxIterations(10)
     expect(result.stopReason).toBe("stop_condition");
     expect(result.iterations).toBeLessThanOrEqual(10);
   });
@@ -188,5 +159,13 @@ describe("barrel exports", () => {
 
     // Human-in-the-loop
     expect(exports.requestHumanInput).toBeDefined();
+
+    // Type guard
+    expect(exports.isPendingResult).toBeDefined();
+
+    // Tool adapter utilities
+    expect(exports.createLangChainTool).toBeDefined();
+    expect(exports.toolArrayToMap).toBeDefined();
+    expect(exports.findToolByName).toBeDefined();
   });
 });

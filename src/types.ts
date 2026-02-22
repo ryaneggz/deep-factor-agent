@@ -1,4 +1,5 @@
-import type { LanguageModel, ToolSet } from "ai";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 
 // --- Event Types ---
 
@@ -119,7 +120,7 @@ export type StopCondition = (ctx: StopConditionContext) => StopConditionResult;
 // --- Verification ---
 
 export interface VerifyContext {
-  result: unknown;
+  result: string;
   iteration: number;
   thread: AgentThread;
   originalPrompt: string;
@@ -149,7 +150,7 @@ export interface MiddlewareContext {
 
 export interface AgentMiddleware {
   name: string;
-  tools?: ToolSet;
+  tools?: StructuredToolInterface[];
   beforeIteration?: (ctx: MiddlewareContext) => Promise<void>;
   afterIteration?: (
     ctx: MiddlewareContext,
@@ -160,9 +161,9 @@ export interface AgentMiddleware {
 // --- Agent Settings ---
 
 export interface DeepFactorAgentSettings<
-  TTools extends ToolSet = ToolSet,
+  TTools extends StructuredToolInterface[] = StructuredToolInterface[],
 > {
-  model: LanguageModel | string;
+  model: BaseChatModel | string;
   tools?: TTools;
   instructions?: string;
   stopWhen?: StopCondition | StopCondition[];
@@ -181,15 +182,22 @@ export interface AgentResult {
   thread: AgentThread;
   usage: TokenUsage;
   iterations: number;
-  stopReason:
-    | "completed"
-    | "stop_condition"
-    | "max_errors"
-    | "human_input_needed";
+  stopReason: "completed" | "stop_condition" | "max_errors";
   stopDetail?: string;
 }
 
-export interface PendingResult extends AgentResult {
+export interface PendingResult {
+  response: string;
+  thread: AgentThread;
+  usage: TokenUsage;
+  iterations: number;
   stopReason: "human_input_needed";
-  resume: (humanResponse: string) => Promise<AgentResult>;
+  stopDetail?: string;
+  resume: (humanResponse: string) => Promise<AgentResult | PendingResult>;
+}
+
+export function isPendingResult(
+  r: AgentResult | PendingResult,
+): r is PendingResult {
+  return r.stopReason === "human_input_needed";
 }

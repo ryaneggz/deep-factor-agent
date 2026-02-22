@@ -14,9 +14,12 @@
 ## Operational Notes
 
 - ESM only (`"type": "module"` in package.json)
-- Vercel AI SDK v6 uses `stopWhen` + `stepCountIs(n)`, NOT old `maxSteps`
-- `LanguageModel` type is a union including strings -- check `typeof model === "object"` before `.modelId`
-- `stream()` return type needs explicit annotation to avoid TS4053
+- LangChain `BaseChatModel` is the model type; `initChatModel` resolves string IDs lazily
+- Tools use LangChain `tool()` factory from `@langchain/core/tools` — returns `StructuredToolInterface`
+- Messages use LangChain classes: `HumanMessage`, `AIMessage`, `SystemMessage`, `ToolMessage`
+- `stream()` is async, returns `AsyncIterable<AIMessageChunk>`
+- Agent loop manually handles tool calling (bind tools, invoke, check tool_calls, execute, loop)
+- Token usage from `response.usage_metadata` (`input_tokens`, `output_tokens`, `total_tokens`)
 
 ### Codebase Patterns
 
@@ -27,4 +30,5 @@
 - Context management in `src/context-manager.ts` (ContextManager, estimateTokens)
 - Factory function in `src/create-agent.ts` (createDeepFactorAgent)
 - Human-in-the-loop in `src/human-in-the-loop.ts` (requestHumanInput tool)
+- Tool adapter utilities in `src/tool-adapter.ts` (createLangChainTool, findToolByName, toolArrayToMap)
 - Tests co-located: `src/*.test.ts`

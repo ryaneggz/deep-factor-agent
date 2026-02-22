@@ -1,10 +1,18 @@
-import type { LanguageModel, ToolSet } from "ai";
-import { generateText, streamText, stepCountIs } from "ai";
-import type { ModelMessage } from "@ai-sdk/provider-utils";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import {
+  HumanMessage,
+  AIMessage,
+  SystemMessage,
+  ToolMessage,
+} from "@langchain/core/messages";
+import type { BaseMessage } from "@langchain/core/messages";
+import type { StructuredToolInterface } from "@langchain/core/tools";
+import { initChatModel } from "langchain/chat_models/universal";
 import { composeMiddleware } from "./middleware.js";
 import type { ComposedMiddleware } from "./middleware.js";
 import { evaluateStopConditions } from "./stop-conditions.js";
 import { ContextManager } from "./context-manager.js";
+import { findToolByName } from "./tool-adapter.js";
 import type {
   AgentThread,
   AgentResult,
@@ -18,7 +26,6 @@ import type {
   ErrorEvent,
   CompletionEvent,
   HumanInputRequestedEvent,
-  HumanInputReceivedEvent,
   AgentMiddleware,
   MiddlewareContext,
 } from "./types.js";
@@ -41,24 +48,27 @@ export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
   };
 }
 
-function extractUsage(sdkUsage: {
-  inputTokens?: number | undefined;
-  outputTokens?: number | undefined;
-  totalTokens?: number | undefined;
-  inputTokenDetails?: {
-    cacheReadTokens?: number | undefined;
-    cacheWriteTokens?: number | undefined;
-  };
-}): TokenUsage {
+function extractUsage(response: AIMessage): TokenUsage {
+  const meta = (response as any).usage_metadata;
   return {
-    inputTokens: sdkUsage.inputTokens ?? 0,
-    outputTokens: sdkUsage.outputTokens ?? 0,
-    totalTokens: sdkUsage.totalTokens ?? 0,
-    cacheReadTokens:
-      sdkUsage.inputTokenDetails?.cacheReadTokens ?? undefined,
-    cacheWriteTokens:
-      sdkUsage.inputTokenDetails?.cacheWriteTokens ?? undefined,
+    inputTokens: meta?.input_tokens ?? 0,
+    outputTokens: meta?.output_tokens ?? 0,
+    totalTokens: meta?.total_tokens ?? 0,
   };
+}
+
+function extractTextContent(content: string | unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((block: any) => {
+        if (typeof block === "string") return block;
+        if (block.type === "text") return block.text;
+        return JSON.stringify(block);
+      })
+      .join("");
+  }
+  return JSON.stringify(content);
 }
 
 function compactError(error: unknown, maxLen = 500): string {
@@ -80,8 +90,11 @@ function createThread(): AgentThread {
   };
 }
 
-export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
-  private model: LanguageModel;
+export class DeepFactorAgent<
+  TTools extends StructuredToolInterface[] = StructuredToolInterface[],
+> {
+  private modelOrString: BaseChatModel | string;
+  private resolvedModel: BaseChatModel | undefined;
   private tools: TTools;
   private instructions: string;
   private stopConditions: StopCondition[];
@@ -94,18 +107,19 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
   private modelId: string;
 
   constructor(settings: DeepFactorAgentSettings<TTools>) {
+    this.modelOrString = settings.model;
+
     if (typeof settings.model === "string") {
-      throw new Error(
-        "String model IDs are not supported. Please pass a LanguageModel instance.",
-      );
+      this.modelId = settings.model;
+    } else {
+      this.modelId =
+        (settings.model as any).modelName ??
+        (settings.model as any).model ??
+        (settings.model as any).name ??
+        "unknown";
     }
-    this.model = settings.model;
-    this.modelId =
-      typeof settings.model === "object" &&
-      "modelId" in settings.model
-        ? settings.model.modelId
-        : "unknown";
-    this.tools = (settings.tools ?? {}) as TTools;
+
+    this.tools = (settings.tools ?? []) as TTools;
     this.instructions = settings.instructions ?? "";
     this.verifyCompletion = settings.verifyCompletion;
     this.interruptOn = settings.interruptOn ?? [];
@@ -129,20 +143,27 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
     this.contextManager = new ContextManager(settings.contextManagement);
   }
 
-  private buildMessages(thread: AgentThread): {
-    system: string | undefined;
-    messages: ModelMessage[];
-  } {
-    const messages: ModelMessage[] = [];
+  private async ensureModel(): Promise<BaseChatModel> {
+    if (this.resolvedModel) return this.resolvedModel;
+    if (typeof this.modelOrString === "string") {
+      this.resolvedModel = await initChatModel(this.modelOrString);
+      return this.resolvedModel;
+    }
+    this.resolvedModel = this.modelOrString;
+    return this.resolvedModel;
+  }
+
+  private buildMessages(thread: AgentThread): BaseMessage[] {
+    const messages: BaseMessage[] = [];
 
     // Build context injection from summaries
     const contextInjection =
       this.contextManager.buildContextInjection(thread);
-    let system: string | undefined;
     if (this.instructions || contextInjection) {
-      system = [contextInjection, this.instructions]
+      const system = [contextInjection, this.instructions]
         .filter(Boolean)
         .join("\n\n");
+      messages.push(new SystemMessage(system));
     }
 
     // Convert thread events to messages
@@ -150,32 +171,18 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
       switch (event.type) {
         case "message": {
           if (event.role === "user") {
-            messages.push({ role: "user", content: event.content });
+            messages.push(new HumanMessage(event.content));
           } else if (event.role === "assistant") {
-            messages.push({ role: "assistant", content: event.content });
+            messages.push(new AIMessage(event.content));
           } else if (event.role === "system") {
-            // System messages injected as user messages with context marker
-            messages.push({
-              role: "user",
-              content: `[System]: ${event.content}`,
-            });
+            messages.push(new HumanMessage(`[System]: ${event.content}`));
           }
           break;
         }
-        case "tool_call": {
-          // Tool calls are part of assistant messages - we'll let the SDK handle multi-step
-          // They are included through the response.messages history
-          break;
-        }
-        case "tool_result": {
-          // Tool results are part of tool messages - handled by SDK
-          break;
-        }
         case "human_input_received": {
-          messages.push({
-            role: "user",
-            content: `[Human Response]: ${event.response}`,
-          });
+          messages.push(
+            new HumanMessage(`[Human Response]: ${event.response}`),
+          );
           break;
         }
         case "summary": {
@@ -187,77 +194,10 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
       }
     }
 
-    return { system, messages };
-  }
-
-  private appendResultEvents(
-    thread: AgentThread,
-    result: {
-      text: string;
-      steps: Array<{
-        toolCalls: Array<{
-          toolCallId: string;
-          toolName: string;
-          input?: unknown;
-          args?: unknown;
-        }>;
-        toolResults: Array<{
-          toolCallId: string;
-          toolName?: string;
-          output?: unknown;
-          result?: unknown;
-        }>;
-        text: string;
-      }>;
-    },
-    iteration: number,
-  ): void {
-    const now = Date.now();
-
-    for (const step of result.steps) {
-      // Record tool calls
-      for (const tc of step.toolCalls) {
-        const toolCallEvent: ToolCallEvent = {
-          type: "tool_call",
-          toolName: tc.toolName,
-          toolCallId: tc.toolCallId,
-          args: (tc.input ?? tc.args ?? {}) as Record<string, unknown>,
-          timestamp: now,
-          iteration,
-        };
-        thread.events.push(toolCallEvent);
-      }
-
-      // Record tool results
-      for (const tr of step.toolResults) {
-        const toolResultEvent: ToolResultEvent = {
-          type: "tool_result",
-          toolCallId: tr.toolCallId,
-          result: tr.output ?? tr.result,
-          timestamp: now,
-          iteration,
-        };
-        thread.events.push(toolResultEvent);
-      }
-    }
-
-    // Record assistant message
-    if (result.text) {
-      const messageEvent: AgentMessageEvent = {
-        type: "message",
-        role: "assistant",
-        content: result.text,
-        timestamp: now,
-        iteration,
-      };
-      thread.events.push(messageEvent);
-    }
-
-    thread.updatedAt = now;
+    return messages;
   }
 
   private isPendingHumanInput(thread: AgentThread): boolean {
-    // Check if the last relevant event is a human input request without a response
     const requestEvents = thread.events.filter(
       (e) => e.type === "human_input_requested",
     );
@@ -267,22 +207,10 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
     return requestEvents.length > responseEvents.length;
   }
 
-  private getLastHumanInputRequest(
-    thread: AgentThread,
-  ): HumanInputRequestedEvent | undefined {
-    for (let i = thread.events.length - 1; i >= 0; i--) {
-      if (thread.events[i].type === "human_input_requested") {
-        return thread.events[i] as HumanInputRequestedEvent;
-      }
-    }
-    return undefined;
-  }
-
   private checkInterruptOn(
     thread: AgentThread,
     iteration: number,
   ): string | null {
-    // Check if any tool call in the current iteration matches interruptOn list
     if (this.interruptOn.length === 0) return null;
 
     for (let i = thread.events.length - 1; i >= 0; i--) {
@@ -308,6 +236,8 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
     prompt: string,
     startIteration: number,
   ): Promise<AgentResult | PendingResult> {
+    const model = await this.ensureModel();
+
     // Push initial user message (only if this is the first call, not a resume)
     if (startIteration === 1) {
       thread.events.push({
@@ -329,10 +259,10 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
     let lastResponse = "";
 
     // Merge middleware tools with user tools
-    const allTools = {
+    const allTools: StructuredToolInterface[] = [
       ...this.tools,
       ...this.composedMiddleware.tools,
-    } as ToolSet;
+    ];
 
     while (true) {
       // Callback
@@ -343,7 +273,7 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
         thread,
         iteration,
         settings: {
-          model: this.model,
+          model: this.modelOrString,
           tools: this.tools,
           instructions: this.instructions,
         } as DeepFactorAgentSettings,
@@ -352,66 +282,152 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
 
       // Context management: check if summarization needed
       if (this.contextManager.needsSummarization(thread)) {
-        await this.contextManager.summarize(thread, this.model);
+        await this.contextManager.summarize(thread, model);
       }
 
       // Build messages from thread
-      const { system, messages } = this.buildMessages(thread);
+      const messages = this.buildMessages(thread);
 
       try {
-        const result = await generateText({
-          model: this.model,
-          system,
-          messages,
-          tools: allTools,
-          stopWhen: stepCountIs(20),
-        });
+        // Bind tools and run inner tool-calling loop
+        const modelWithTools =
+          allTools.length > 0 && model.bindTools
+            ? model.bindTools(allTools)
+            : model;
 
-        // Append events
-        this.appendResultEvents(thread, result as any, iteration);
-
-        // Extract and accumulate usage
-        const iterUsage = extractUsage(result.totalUsage);
-        totalUsage = addUsage(totalUsage, iterUsage);
-
-        lastResponse = result.text;
-
-        // Handle todoMiddleware: store todos in thread metadata
-        for (const step of result.steps) {
-          for (const tr of step.toolResults as any[]) {
-            if (tr.toolName === "write_todos" && tr.output?.todos) {
-              thread.metadata.todos = tr.output.todos;
-            }
-            if (tr.toolName === "read_todos") {
-              // Inject current todos into the result
-              (tr as any).output = {
-                todos: thread.metadata.todos ?? [],
-              };
-            }
-          }
-        }
-
-        // Check for requestHumanInput tool call
+        let stepCount = 0;
+        let iterationUsage: TokenUsage = {
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+        };
         let humanInputRequested = false;
-        for (const step of result.steps) {
-          for (const tc of step.toolCalls as any[]) {
-            if (tc.toolName === "requestHumanInput") {
-              const args = tc.input ?? tc.args ?? {};
+        let lastAIResponse: AIMessage | null = null;
+
+        while (stepCount < 20) {
+          const response = (await modelWithTools.invoke(
+            messages,
+          )) as AIMessage;
+          messages.push(response);
+          lastAIResponse = response;
+
+          // Accumulate usage from this step
+          const stepUsage = extractUsage(response);
+          iterationUsage = addUsage(iterationUsage, stepUsage);
+
+          const toolCalls = response.tool_calls ?? [];
+          if (toolCalls.length === 0) break;
+
+          // Record and execute tool calls
+          const now = Date.now();
+          for (const tc of toolCalls) {
+            // Record tool call event
+            const toolCallEvent: ToolCallEvent = {
+              type: "tool_call",
+              toolName: tc.name,
+              toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
+              args: (tc.args ?? {}) as Record<string, unknown>,
+              timestamp: now,
+              iteration,
+            };
+            thread.events.push(toolCallEvent);
+
+            // Check for requestHumanInput
+            if (tc.name === "requestHumanInput") {
+              const args = (tc.args ?? {}) as Record<string, unknown>;
               const hirEvent: HumanInputRequestedEvent = {
                 type: "human_input_requested",
-                question: args.question ?? "",
-                context: args.context,
-                urgency: args.urgency,
-                format: args.format,
-                choices: args.choices,
-                timestamp: Date.now(),
+                question: (args.question as string) ?? "",
+                context: args.context as string | undefined,
+                urgency: args.urgency as
+                  | "low"
+                  | "medium"
+                  | "high"
+                  | undefined,
+                format: args.format as
+                  | "free_text"
+                  | "yes_no"
+                  | "multiple_choice"
+                  | undefined,
+                choices: args.choices as string[] | undefined,
+                timestamp: now,
                 iteration,
               };
               thread.events.push(hirEvent);
               humanInputRequested = true;
+              // Don't execute the tool, just break
+              break;
+            }
+
+            // Check interruptOn before executing
+            if (this.interruptOn.includes(tc.name)) {
+              // Don't execute - will be handled after the inner loop
+              continue;
+            }
+
+            // Find and execute the tool
+            const foundTool = findToolByName(allTools, tc.name);
+            if (foundTool) {
+              const toolResult = await foundTool.invoke(tc.args);
+              const resultStr =
+                typeof toolResult === "string"
+                  ? toolResult
+                  : JSON.stringify(toolResult);
+
+              // Handle todoMiddleware special cases
+              if (tc.name === "write_todos") {
+                try {
+                  const parsed = JSON.parse(resultStr);
+                  if (parsed.todos) {
+                    thread.metadata.todos = parsed.todos;
+                  }
+                } catch {
+                  // ignore parse errors
+                }
+              }
+
+              // Record tool result event
+              const toolResultEvent: ToolResultEvent = {
+                type: "tool_result",
+                toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
+                result: resultStr,
+                timestamp: now,
+                iteration,
+              };
+              thread.events.push(toolResultEvent);
+
+              messages.push(
+                new ToolMessage({
+                  tool_call_id: tc.id ?? `call_${stepCount}_${tc.name}`,
+                  content: resultStr,
+                }),
+              );
             }
           }
+
+          if (humanInputRequested) break;
+          stepCount++;
         }
+
+        // Extract response text
+        if (lastAIResponse) {
+          lastResponse = extractTextContent(lastAIResponse.content);
+        }
+
+        // Record assistant message
+        if (lastResponse) {
+          const messageEvent: AgentMessageEvent = {
+            type: "message",
+            role: "assistant",
+            content: lastResponse,
+            timestamp: Date.now(),
+            iteration,
+          };
+          thread.events.push(messageEvent);
+        }
+
+        // Accumulate usage
+        totalUsage = addUsage(totalUsage, iterationUsage);
 
         // Reset consecutive errors on success
         consecutiveErrors = 0;
@@ -419,11 +435,11 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
         // Middleware: afterIteration
         await this.composedMiddleware.afterIteration(
           middlewareCtx,
-          result,
+          lastAIResponse,
         );
 
         // Callback
-        this.onIterationEnd?.(iteration, result);
+        this.onIterationEnd?.(iteration, lastAIResponse);
 
         // Evaluate stop conditions
         const stopResult = evaluateStopConditions(this.stopConditions, {
@@ -593,8 +609,8 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  stream(prompt: string): ReturnType<typeof streamText> {
+  async stream(prompt: string): Promise<AsyncIterable<any>> {
+    const model = await this.ensureModel();
     const thread = createThread();
 
     // Push initial user message
@@ -606,19 +622,18 @@ export class DeepFactorAgent<TTools extends ToolSet = ToolSet> {
       iteration: 0,
     });
 
-    const allTools = {
+    const allTools: StructuredToolInterface[] = [
       ...this.tools,
       ...this.composedMiddleware.tools,
-    } as ToolSet;
+    ];
 
-    const { system, messages } = this.buildMessages(thread);
+    const messages = this.buildMessages(thread);
 
-    return streamText({
-      model: this.model,
-      system,
-      messages,
-      tools: allTools,
-      stopWhen: stepCountIs(20),
-    });
+    const modelWithTools =
+      allTools.length > 0 && model.bindTools
+        ? model.bindTools(allTools)
+        : model;
+
+    return modelWithTools.stream(messages);
   }
 }

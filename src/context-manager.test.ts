@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { AIMessage } from "@langchain/core/messages";
 import { ContextManager, estimateTokens } from "./context-manager.js";
 import type { AgentThread, SummaryEvent, MessageEvent } from "./types.js";
 
@@ -53,7 +54,6 @@ describe("ContextManager", () => {
       const cm = new ContextManager();
       const tokens = cm.estimateThreadTokens(thread);
 
-      // Each event serialized to JSON, then estimated
       const expected = events.reduce(
         (sum, e) => sum + estimateTokens(JSON.stringify(e)),
         0,
@@ -85,7 +85,6 @@ describe("ContextManager", () => {
 
     it("returns true when exceeding threshold", () => {
       const cm = new ContextManager({ maxContextTokens: 10 });
-      // Create events that will exceed 10 tokens when serialized
       const events: MessageEvent[] = Array.from({ length: 20 }, (_, i) => ({
         type: "message" as const,
         role: "user" as const,
@@ -101,24 +100,12 @@ describe("ContextManager", () => {
   describe("summarize", () => {
     it("replaces old iteration events with SummaryEvent entries", async () => {
       const mockModel = {
-        doGenerate: vi.fn().mockResolvedValue({
-          text: "Summary of iteration",
-          usage: { promptTokens: 10, completionTokens: 5 },
-          finishReason: "stop",
-          response: {
-            id: "test",
-            modelId: "test",
-            timestamp: new Date(),
-          },
-        }),
-        specificationVersion: "v1",
-        provider: "test",
-        modelId: "test-model",
+        invoke: vi.fn().mockResolvedValue(
+          new AIMessage({ content: "Summary of iteration" }),
+        ),
       };
 
-      // Mock generateText by mocking the model
       const events: MessageEvent[] = [];
-      // 5 iterations (0-4), keepRecentIterations=3 means iterations 0 and 1 should be summarized
       for (let i = 0; i < 5; i++) {
         events.push({
           type: "message",
@@ -139,25 +126,20 @@ describe("ContextManager", () => {
       const thread = makeThread(events);
       const cm = new ContextManager({ keepRecentIterations: 3 });
 
-      // We can't easily mock generateText, so let's test the logic by using a very small context
-      // The summarize method will fail on generateText since it's a mock, but should fallback gracefully
       const result = await cm.summarize(thread, mockModel as any);
 
-      // Old iterations (0 and 1) should be replaced with summaries
       const summaryEvents = result.events.filter(
         (e) => e.type === "summary",
       ) as SummaryEvent[];
       expect(summaryEvents.length).toBeGreaterThan(0);
 
-      // Recent iterations (2, 3, 4) should be preserved
       const recentEvents = result.events.filter(
         (e) => e.type !== "summary" && e.iteration > 1,
       );
-      expect(recentEvents.length).toBe(6); // 3 iterations * 2 events each
+      expect(recentEvents.length).toBe(6);
     });
 
     it("preserves recent iterations unchanged", async () => {
-      // Only 2 iterations with keepRecentIterations=3 -- nothing to summarize
       const events: MessageEvent[] = [
         {
           type: "message",

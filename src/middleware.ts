@@ -1,4 +1,5 @@
-import type { ToolSet } from "ai";
+import { tool } from "@langchain/core/tools";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import type {
   AgentMiddleware,
@@ -7,7 +8,7 @@ import type {
 } from "./types.js";
 
 export interface ComposedMiddleware {
-  tools: ToolSet;
+  tools: StructuredToolInterface[];
   beforeIteration: (ctx: MiddlewareContext) => Promise<void>;
   afterIteration: (ctx: MiddlewareContext, result: unknown) => Promise<void>;
 }
@@ -15,17 +16,20 @@ export interface ComposedMiddleware {
 export function composeMiddleware(
   middlewares: AgentMiddleware[],
 ): ComposedMiddleware {
-  const tools: ToolSet = {};
+  const tools: StructuredToolInterface[] = [];
 
   for (const mw of middlewares) {
     if (mw.tools) {
-      for (const [name, tool] of Object.entries(mw.tools)) {
-        if (name in tools) {
+      for (const t of mw.tools) {
+        const existing = tools.findIndex((x) => x.name === t.name);
+        if (existing >= 0) {
           console.warn(
-            `Middleware tool conflict: "${name}" from "${mw.name}" overrides a previous definition`,
+            `Middleware tool conflict: "${t.name}" from "${mw.name}" overrides a previous definition`,
           );
+          tools[existing] = t;
+        } else {
+          tools.push(t);
         }
-        (tools as Record<string, unknown>)[name] = tool;
       }
     }
   }
@@ -65,27 +69,29 @@ export function todoMiddleware(): AgentMiddleware {
 
   return {
     name: "todo",
-    tools: {
-      write_todos: {
-        description: "Create or update the todo list for planning and tracking progress",
-        parameters: todoSchema,
-        execute: async (
-          args: z.infer<typeof todoSchema>,
-          { messages }: { messages?: unknown[] } = {},
-        ) => {
-          // Todos will be stored in thread.metadata.todos by the agent loop
-          return { success: true, todos: args.todos };
+    tools: [
+      tool(
+        async (args: z.infer<typeof todoSchema>) => {
+          return JSON.stringify({ success: true, todos: args.todos });
         },
-      },
-      read_todos: {
-        description: "Read the current todo list",
-        parameters: z.object({}),
-        execute: async () => {
-          // The agent loop handles reading from thread.metadata.todos
-          return { todos: [] };
+        {
+          name: "write_todos",
+          description:
+            "Create or update the todo list for planning and tracking progress",
+          schema: todoSchema,
         },
-      },
-    } as unknown as ToolSet,
+      ),
+      tool(
+        async () => {
+          return JSON.stringify({ todos: [] });
+        },
+        {
+          name: "read_todos",
+          description: "Read the current todo list",
+          schema: z.object({}),
+        },
+      ),
+    ],
   };
 }
 

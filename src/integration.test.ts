@@ -1,64 +1,50 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { AIMessage } from "@langchain/core/messages";
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
 import { createDeepFactorAgent } from "./create-agent.js";
 import { DeepFactorAgent } from "./agent.js";
 import { maxIterations, maxTokens } from "./stop-conditions.js";
 import { requestHumanInput } from "./human-in-the-loop.js";
 import type { PendingResult, AgentMiddleware } from "./types.js";
 
-// Mock the AI SDK
-vi.mock("ai", () => {
-  return {
-    generateText: vi.fn(),
-    streamText: vi.fn(),
-    stepCountIs: vi.fn(() => () => true),
-  };
-});
-
-import { generateText } from "ai";
-
-const mockGenerateText = vi.mocked(generateText);
-
 function makeMockModel() {
-  return {
-    specificationVersion: "v1" as const,
-    provider: "test",
-    modelId: "test-model",
-    doGenerate: vi.fn(),
-  } as any;
+  const model: any = {
+    invoke: vi.fn(),
+    bindTools: vi.fn(),
+    stream: vi.fn(),
+    modelName: "test-model",
+  };
+  model.bindTools.mockReturnValue(model);
+  return model;
 }
 
-function makeResult(text = "Response", overrides: Record<string, unknown> = {}) {
-  return {
-    text,
-    steps: [
-      {
-        toolCalls: [],
-        toolResults: [],
-        text,
-        usage: {
-          inputTokens: 100,
-          outputTokens: 50,
-          totalTokens: 150,
-        },
-        ...(overrides.step ?? {}),
-      },
-    ],
-    toolCalls: [],
-    toolResults: [],
-    totalUsage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    usage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    finishReason: "stop",
-    response: { messages: [] },
-    ...overrides,
-  };
+const defaultUsage = {
+  input_tokens: 100,
+  output_tokens: 50,
+  total_tokens: 150,
+};
+
+function makeAIMessage(
+  content = "Response",
+  options: {
+    tool_calls?: Array<{
+      name: string;
+      args: Record<string, any>;
+      id: string;
+    }>;
+    usage?: {
+      input_tokens: number;
+      output_tokens: number;
+      total_tokens: number;
+    };
+  } = {},
+) {
+  return new AIMessage({
+    content,
+    tool_calls: options.tool_calls ?? [],
+    usage_metadata: options.usage ?? defaultUsage,
+  });
 }
 
 beforeEach(() => {
@@ -67,49 +53,49 @@ beforeEach(() => {
 
 describe("Integration: full workflow", () => {
   it("createDeepFactorAgent -> loop() with tools, middleware, stop conditions", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResult("Task completed", {
-        steps: [
-          {
-            toolCalls: [
-              {
-                toolCallId: "tc_1",
-                toolName: "searchDocs",
-                input: { query: "typescript" },
-              },
-            ],
-            toolResults: [
-              {
-                toolCallId: "tc_1",
-                toolName: "searchDocs",
-                output: { docs: ["found result"] },
-              },
-            ],
-            text: "Task completed",
-            usage: {
-              inputTokens: 200,
-              outputTokens: 100,
-              totalTokens: 300,
-            },
-          },
-        ],
-        totalUsage: {
-          inputTokens: 200,
-          outputTokens: 100,
-          totalTokens: 300,
-        },
-      }) as any,
+    const searchDocsTool = tool(
+      async (args: { query: string }) =>
+        JSON.stringify({ docs: ["found result"] }),
+      {
+        name: "searchDocs",
+        description: "Search documentation",
+        schema: z.object({ query: z.string() }),
+      },
     );
 
+    const mockModel = makeMockModel();
+    // First invoke: model calls searchDocs tool
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "searchDocs",
+              args: { query: "typescript" },
+              id: "tc_1",
+            },
+          ],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150,
+          },
+        }),
+      )
+      // Second invoke: model returns final text after tool result
+      .mockResolvedValueOnce(
+        makeAIMessage("Task completed", {
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150,
+          },
+        }),
+      );
+
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
-      tools: {
-        searchDocs: {
-          description: "Search documentation",
-          parameters: {},
-          execute: async (args: any) => ({ docs: ["result"] }),
-        },
-      } as any,
+      model: mockModel,
+      tools: [searchDocsTool],
       stopWhen: [maxIterations(5), maxTokens(50000)],
     });
 
@@ -118,7 +104,6 @@ describe("Integration: full workflow", () => {
     expect(result.response).toBe("Task completed");
     expect(result.usage.inputTokens).toBe(200);
 
-    // Tool call and result recorded
     const toolCalls = result.thread.events.filter(
       (e) => e.type === "tool_call",
     );
@@ -130,12 +115,13 @@ describe("Integration: full workflow", () => {
   });
 
   it("multi-iteration with verification feedback", async () => {
-    mockGenerateText
-      .mockResolvedValueOnce(makeResult("Draft 1") as any)
-      .mockResolvedValueOnce(makeResult("Draft 2 - improved") as any);
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(makeAIMessage("Draft 1"))
+      .mockResolvedValueOnce(makeAIMessage("Draft 2 - improved"));
 
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       verifyCompletion: vi
         .fn()
         .mockResolvedValueOnce({
@@ -143,7 +129,7 @@ describe("Integration: full workflow", () => {
           reason: "Missing error handling",
         })
         .mockResolvedValueOnce({ complete: true }),
-      middleware: [], // No built-in middleware for cleaner test
+      middleware: [],
     });
 
     const result = await agent.loop("Write a function");
@@ -151,7 +137,6 @@ describe("Integration: full workflow", () => {
     expect(result.iterations).toBe(2);
     expect(result.response).toBe("Draft 2 - improved");
 
-    // Verification feedback injected
     const feedbackMessages = result.thread.events.filter(
       (e) =>
         e.type === "message" &&
@@ -162,36 +147,31 @@ describe("Integration: full workflow", () => {
   });
 
   it("human-in-the-loop: pause, resume, continue", async () => {
-    // Agent calls requestHumanInput
-    mockGenerateText.mockResolvedValueOnce(
-      makeResult("", {
-        steps: [
-          {
-            toolCalls: [
-              {
-                toolCallId: "tc_hi",
-                toolName: "requestHumanInput",
-                input: { question: "Which DB to use?", format: "free_text" },
-              },
-            ],
-            toolResults: [
-              {
-                toolCallId: "tc_hi",
-                toolName: "requestHumanInput",
-                output: { requested: true, question: "Which DB to use?" },
-              },
-            ],
-            text: "",
-            usage: { inputTokens: 50, outputTokens: 25, totalTokens: 75 },
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "requestHumanInput",
+              args: { question: "Which DB to use?", format: "free_text" },
+              id: "tc_hi",
+            },
+          ],
+          usage: {
+            input_tokens: 50,
+            output_tokens: 25,
+            total_tokens: 75,
           },
-        ],
-        totalUsage: { inputTokens: 50, outputTokens: 25, totalTokens: 75 },
-      }) as any,
-    );
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeAIMessage("Set up PostgreSQL as requested"),
+      );
 
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
-      tools: { requestHumanInput } as any,
+      model: mockModel,
+      tools: [requestHumanInput],
       middleware: [],
     });
 
@@ -200,16 +180,10 @@ describe("Integration: full workflow", () => {
     )) as PendingResult;
     expect(pending.stopReason).toBe("human_input_needed");
 
-    // Resume with human response
-    mockGenerateText.mockResolvedValueOnce(
-      makeResult("Set up PostgreSQL as requested") as any,
-    );
-
     const final = await pending.resume("PostgreSQL");
     expect(final.stopReason).toBe("completed");
     expect(final.response).toBe("Set up PostgreSQL as requested");
 
-    // Both events recorded
     const requested = final.thread.events.filter(
       (e) => e.type === "human_input_requested",
     );
@@ -242,10 +216,11 @@ describe("Integration: full workflow", () => {
       },
     };
 
-    mockGenerateText.mockResolvedValueOnce(makeResult() as any);
+    const mockModel = makeMockModel();
+    mockModel.invoke.mockResolvedValueOnce(makeAIMessage());
 
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       middleware: [mw1, mw2],
     });
 
@@ -254,37 +229,38 @@ describe("Integration: full workflow", () => {
   });
 
   it("token usage aggregation across iterations", async () => {
-    mockGenerateText
+    const mockModel = makeMockModel();
+    mockModel.invoke
       .mockResolvedValueOnce(
-        makeResult("r1", {
-          totalUsage: {
-            inputTokens: 100,
-            outputTokens: 50,
-            totalTokens: 150,
+        makeAIMessage("r1", {
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150,
           },
-        }) as any,
+        }),
       )
       .mockResolvedValueOnce(
-        makeResult("r2", {
-          totalUsage: {
-            inputTokens: 200,
-            outputTokens: 100,
-            totalTokens: 300,
+        makeAIMessage("r2", {
+          usage: {
+            input_tokens: 200,
+            output_tokens: 100,
+            total_tokens: 300,
           },
-        }) as any,
+        }),
       )
       .mockResolvedValueOnce(
-        makeResult("r3", {
-          totalUsage: {
-            inputTokens: 300,
-            outputTokens: 150,
-            totalTokens: 450,
+        makeAIMessage("r3", {
+          usage: {
+            input_tokens: 300,
+            output_tokens: 150,
+            total_tokens: 450,
           },
-        }) as any,
+        }),
       );
 
     const agent = createDeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       verifyCompletion: vi
         .fn()
         .mockResolvedValueOnce({ complete: false, reason: "try again" })
@@ -300,8 +276,8 @@ describe("Integration: full workflow", () => {
     expect(result.usage.totalTokens).toBe(900);
   });
 
-  it("all tests with mocked LLM - no real API calls", () => {
-    // This is an assertion that we're using mocks
-    expect(vi.isMockFunction(generateText)).toBe(true);
+  it("all tests use mock models - no real API calls", () => {
+    const model = makeMockModel();
+    expect(vi.isMockFunction(model.invoke)).toBe(true);
   });
 });

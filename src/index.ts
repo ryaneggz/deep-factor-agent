@@ -27,6 +27,8 @@ export type {
   PendingResult,
 } from "./types.js";
 
+export { isPendingResult } from "./types.js";
+
 // Stop conditions
 export {
   maxIterations,
@@ -57,3 +59,10 @@ export { createDeepFactorAgent } from "./create-agent.js";
 
 // Human-in-the-loop
 export { requestHumanInput } from "./human-in-the-loop.js";
+
+// Tool adapter utilities
+export {
+  createLangChainTool,
+  toolArrayToMap,
+  findToolByName,
+} from "./tool-adapter.js";

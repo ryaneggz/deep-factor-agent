@@ -1,164 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { AIMessage } from "@langchain/core/messages";
 import { DeepFactorAgent } from "./agent.js";
 import { requestHumanInput } from "./human-in-the-loop.js";
 import type { PendingResult } from "./types.js";
 
-// Mock the AI SDK
-vi.mock("ai", () => {
-  return {
-    generateText: vi.fn(),
-    streamText: vi.fn(),
-    stepCountIs: vi.fn(() => () => true),
-  };
-});
-
-import { generateText } from "ai";
-
-const mockGenerateText = vi.mocked(generateText);
-
 function makeMockModel() {
-  return {
-    specificationVersion: "v1" as const,
-    provider: "test",
-    modelId: "test-model",
-    doGenerate: vi.fn(),
-  } as any;
+  const model: any = {
+    invoke: vi.fn(),
+    bindTools: vi.fn(),
+    stream: vi.fn(),
+    modelName: "test-model",
+  };
+  model.bindTools.mockReturnValue(model);
+  return model;
 }
 
-function makeDefaultResult(text = "Test response") {
-  return {
-    text,
-    steps: [
-      {
-        toolCalls: [],
-        toolResults: [],
-        text,
-        usage: {
-          inputTokens: 100,
-          outputTokens: 50,
-          totalTokens: 150,
-        },
-      },
-    ],
-    toolCalls: [],
-    toolResults: [],
-    totalUsage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    usage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    finishReason: "stop",
-    response: { messages: [] },
-  };
-}
+const defaultUsage = {
+  input_tokens: 100,
+  output_tokens: 50,
+  total_tokens: 150,
+};
 
-function makeResultWithHumanInput() {
-  return {
-    text: "",
-    steps: [
-      {
-        toolCalls: [
-          {
-            toolCallId: "tc_hi_1",
-            toolName: "requestHumanInput",
-            input: {
-              question: "What color do you prefer?",
-              context: "For the UI theme",
-              urgency: "medium",
-              format: "free_text",
-            },
-          },
-        ],
-        toolResults: [
-          {
-            toolCallId: "tc_hi_1",
-            toolName: "requestHumanInput",
-            output: {
-              requested: true,
-              question: "What color do you prefer?",
-            },
-          },
-        ],
-        text: "",
-        usage: {
-          inputTokens: 100,
-          outputTokens: 50,
-          totalTokens: 150,
-        },
-      },
-    ],
-    toolCalls: [
-      {
-        toolCallId: "tc_hi_1",
-        toolName: "requestHumanInput",
-        input: {
-          question: "What color do you prefer?",
-        },
-      },
-    ],
-    toolResults: [],
-    totalUsage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    usage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    finishReason: "tool-calls",
-    response: { messages: [] },
-  };
-}
-
-function makeResultWithInterruptTool() {
-  return {
-    text: "",
-    steps: [
-      {
-        toolCalls: [
-          {
-            toolCallId: "tc_del_1",
-            toolName: "deleteUser",
-            input: { userId: "123" },
-          },
-        ],
-        toolResults: [
-          {
-            toolCallId: "tc_del_1",
-            toolName: "deleteUser",
-            output: { deleted: true },
-          },
-        ],
-        text: "",
-        usage: {
-          inputTokens: 100,
-          outputTokens: 50,
-          totalTokens: 150,
-        },
-      },
-    ],
-    toolCalls: [],
-    toolResults: [],
-    totalUsage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    usage: {
-      inputTokens: 100,
-      outputTokens: 50,
-      totalTokens: 150,
-    },
-    finishReason: "tool-calls",
-    response: { messages: [] },
-  };
+function makeAIMessage(
+  content = "Test response",
+  options: {
+    tool_calls?: Array<{
+      name: string;
+      args: Record<string, any>;
+      id: string;
+    }>;
+  } = {},
+) {
+  return new AIMessage({
+    content,
+    tool_calls: options.tool_calls ?? [],
+    usage_metadata: defaultUsage,
+  });
 }
 
 beforeEach(() => {
@@ -170,32 +47,45 @@ describe("requestHumanInput tool", () => {
     expect(requestHumanInput.description).toContain("human");
   });
 
-  it("has parameters schema", () => {
-    expect(requestHumanInput.parameters).toBeDefined();
+  it("has schema", () => {
+    expect(requestHumanInput.schema).toBeDefined();
   });
 
-  it("execute returns requested flag", async () => {
-    const result = await (requestHumanInput as any).execute({
+  it("invoke returns requested flag", async () => {
+    const result = await requestHumanInput.invoke({
       question: "What is your name?",
       urgency: "high",
       format: "free_text",
     });
-    expect(result.requested).toBe(true);
-    expect(result.question).toBe("What is your name?");
+    const parsed = JSON.parse(result as string);
+    expect(parsed.requested).toBe(true);
+    expect(parsed.question).toBe("What is your name?");
   });
 });
 
 describe("human-in-the-loop: requestHumanInput tool call", () => {
   it("pauses the loop and returns PendingResult", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithHumanInput() as any,
+    const mockModel = makeMockModel();
+    mockModel.invoke.mockResolvedValueOnce(
+      makeAIMessage("", {
+        tool_calls: [
+          {
+            name: "requestHumanInput",
+            args: {
+              question: "What color do you prefer?",
+              context: "For the UI theme",
+              urgency: "medium",
+              format: "free_text",
+            },
+            id: "tc_hi_1",
+          },
+        ],
+      }),
     );
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
-      tools: {
-        requestHumanInput: requestHumanInput,
-      } as any,
+      model: mockModel,
+      tools: [requestHumanInput],
     });
 
     const result = await agent.loop("Ask user something");
@@ -205,15 +95,27 @@ describe("human-in-the-loop: requestHumanInput tool call", () => {
   });
 
   it("HumanInputRequestedEvent is appended to thread on pause", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithHumanInput() as any,
+    const mockModel = makeMockModel();
+    mockModel.invoke.mockResolvedValueOnce(
+      makeAIMessage("", {
+        tool_calls: [
+          {
+            name: "requestHumanInput",
+            args: {
+              question: "What color do you prefer?",
+              context: "For the UI theme",
+              urgency: "medium",
+              format: "free_text",
+            },
+            id: "tc_hi_1",
+          },
+        ],
+      }),
     );
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
-      tools: {
-        requestHumanInput: requestHumanInput,
-      } as any,
+      model: mockModel,
+      tools: [requestHumanInput],
     });
 
     const result = await agent.loop("Ask user something");
@@ -227,16 +129,27 @@ describe("human-in-the-loop: requestHumanInput tool call", () => {
   });
 
   it("resume continues the loop and returns AgentResult", async () => {
-    // First call: agent calls requestHumanInput
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithHumanInput() as any,
-    );
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "requestHumanInput",
+              args: {
+                question: "What color do you prefer?",
+                format: "free_text",
+              },
+              id: "tc_hi_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage("Blue is a great choice!"));
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
-      tools: {
-        requestHumanInput: requestHumanInput,
-      } as any,
+      model: mockModel,
+      tools: [requestHumanInput],
     });
 
     const pendingResult = (await agent.loop(
@@ -244,35 +157,35 @@ describe("human-in-the-loop: requestHumanInput tool call", () => {
     )) as PendingResult;
     expect(pendingResult.stopReason).toBe("human_input_needed");
 
-    // Resume with human response
-    mockGenerateText.mockResolvedValueOnce(
-      makeDefaultResult("Blue is a great choice!") as any,
-    );
-
     const finalResult = await pendingResult.resume("Blue");
     expect(finalResult.stopReason).toBe("completed");
     expect(finalResult.response).toBe("Blue is a great choice!");
   });
 
   it("HumanInputReceivedEvent is appended on resume", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithHumanInput() as any,
-    );
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "requestHumanInput",
+              args: { question: "Q?", format: "free_text" },
+              id: "tc_hi_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage("Thanks!"));
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
-      tools: {
-        requestHumanInput: requestHumanInput,
-      } as any,
+      model: mockModel,
+      tools: [requestHumanInput],
     });
 
     const pendingResult = (await agent.loop(
       "Ask user something",
     )) as PendingResult;
-
-    mockGenerateText.mockResolvedValueOnce(
-      makeDefaultResult("Thanks!") as any,
-    );
 
     const finalResult = await pendingResult.resume("My answer");
 
@@ -288,12 +201,23 @@ describe("human-in-the-loop: requestHumanInput tool call", () => {
 
 describe("human-in-the-loop: interruptOn", () => {
   it("pauses before executing a listed tool", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithInterruptTool() as any,
-    );
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "deleteUser",
+              args: { userId: "123" },
+              id: "tc_del_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage(""));
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
@@ -304,34 +228,58 @@ describe("human-in-the-loop: interruptOn", () => {
   });
 
   it("resume with 'approved' continues the loop", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithInterruptTool() as any,
-    );
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "deleteUser",
+              args: { userId: "123" },
+              id: "tc_del_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage(""))
+      .mockResolvedValueOnce(
+        makeAIMessage("User deleted successfully"),
+      );
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
     const pendingResult = (await agent.loop(
       "Delete user 123",
     )) as PendingResult;
-
-    mockGenerateText.mockResolvedValueOnce(
-      makeDefaultResult("User deleted successfully") as any,
-    );
 
     const finalResult = await pendingResult.resume("approved");
     expect(finalResult.stopReason).toBe("completed");
   });
 
   it("resume with 'denied: reason' skips tool execution", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithInterruptTool() as any,
-    );
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "deleteUser",
+              args: { userId: "123" },
+              id: "tc_del_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage(""))
+      .mockResolvedValueOnce(
+        makeAIMessage("Understood, deletion was denied."),
+      );
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
@@ -339,16 +287,11 @@ describe("human-in-the-loop: interruptOn", () => {
       "Delete user 123",
     )) as PendingResult;
 
-    mockGenerateText.mockResolvedValueOnce(
-      makeDefaultResult("Understood, deletion was denied.") as any,
-    );
-
     const finalResult = await pendingResult.resume(
       "denied: User deletion not authorized",
     );
     expect(finalResult.stopReason).toBe("completed");
 
-    // The denial should be in the thread
     const receivedEvents = finalResult.thread.events.filter(
       (e) => e.type === "human_input_received",
     );
@@ -359,24 +302,33 @@ describe("human-in-the-loop: interruptOn", () => {
   });
 
   it("after resume, the loop continues from where it left off", async () => {
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithInterruptTool() as any,
-    );
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "deleteUser",
+              args: { userId: "123" },
+              id: "tc_del_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage(""))
+      .mockResolvedValueOnce(
+        makeAIMessage("Continuing after approval"),
+      );
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
+      model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
     const pendingResult = (await agent.loop(
       "Delete user 123",
     )) as PendingResult;
-
     expect(pendingResult.iterations).toBe(1);
-
-    mockGenerateText.mockResolvedValueOnce(
-      makeDefaultResult("Continuing after approval") as any,
-    );
 
     const finalResult = await pendingResult.resume("approved");
     expect(finalResult.iterations).toBe(2);
@@ -385,43 +337,42 @@ describe("human-in-the-loop: interruptOn", () => {
 
 describe("multiple pause/resume cycles", () => {
   it("supports multiple pause/resume within a single run", async () => {
-    // First iteration: requests human input
-    mockGenerateText.mockResolvedValueOnce(
-      makeResultWithHumanInput() as any,
-    );
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "requestHumanInput",
+              args: { question: "Color?", format: "free_text" },
+              id: "tc_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage("Got it, working on it"))
+      .mockResolvedValueOnce(makeAIMessage("All done!"));
 
     const agent = new DeepFactorAgent({
-      model: makeMockModel(),
-      tools: {
-        requestHumanInput: requestHumanInput,
-      } as any,
+      model: mockModel,
+      tools: [requestHumanInput],
       verifyCompletion: vi
         .fn()
-        .mockResolvedValueOnce({ complete: false, reason: "Need more info" })
+        .mockResolvedValueOnce({
+          complete: false,
+          reason: "Need more info",
+        })
         .mockResolvedValueOnce({ complete: true }),
     });
 
-    // First pause
     const pending1 = (await agent.loop(
       "Multi-step task",
     )) as PendingResult;
     expect(pending1.stopReason).toBe("human_input_needed");
 
-    // First resume - agent asks again (via verification failure)
-    const secondResult = {
-      ...makeDefaultResult("Got it, working on it"),
-    };
-    mockGenerateText.mockResolvedValueOnce(secondResult as any);
-
-    // Second result after verification failure retry
-    mockGenerateText.mockResolvedValueOnce(
-      makeDefaultResult("All done!") as any,
-    );
-
     const finalResult = await pending1.resume("Use blue theme");
-    // May complete or continue based on verification
-    expect(["completed", "stop_condition"].includes(finalResult.stopReason)).toBe(
-      true,
-    );
+    expect(
+      ["completed", "stop_condition"].includes(finalResult.stopReason),
+    ).toBe(true);
   });
 });

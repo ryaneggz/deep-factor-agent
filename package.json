@@ -20,13 +20,13 @@
   "peerDependencies": {
     "zod": ">=4.0.0"
   },
-  "dependencies": {
-    "@ai-sdk/provider-utils": "^4.0.15",
-    "ai": "^6.0.97"
-  },
   "devDependencies": {
     "@types/node": "^25.3.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.1.27",
+    "langchain": "^1.2.25"
   }
 }

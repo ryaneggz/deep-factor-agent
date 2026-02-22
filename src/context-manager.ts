@@ -1,5 +1,5 @@
-import type { LanguageModel } from "ai";
-import { generateText } from "ai";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { HumanMessage } from "@langchain/core/messages";
 import type {
   AgentThread,
   ContextManagementConfig,
@@ -35,9 +35,8 @@ export class ContextManager {
 
   async summarize(
     thread: AgentThread,
-    model: LanguageModel,
+    model: BaseChatModel,
   ): Promise<AgentThread> {
-    // Group events by iteration
     const iterationMap = new Map<number, typeof thread.events>();
     for (const event of thread.events) {
       const iter = event.iteration;
@@ -53,7 +52,6 @@ export class ContextManager {
     const maxIteration = iterations[iterations.length - 1];
     const cutoff = maxIteration - this.keepRecentIterations;
 
-    // Identify old iterations to summarize (skip already-summarized events)
     const oldIterations = iterations.filter((i) => i <= cutoff);
     if (oldIterations.length === 0) return thread;
 
@@ -61,7 +59,6 @@ export class ContextManager {
 
     for (const iter of oldIterations) {
       const events = iterationMap.get(iter)!;
-      // Skip if already a single summary event
       if (events.length === 1 && events[0].type === "summary") continue;
 
       const eventsText = events
@@ -69,25 +66,25 @@ export class ContextManager {
         .join("\n");
 
       try {
-        const result = await generateText({
-          model,
-          messages: [
-            {
-              role: "user",
-              content: `Summarize the following agent iteration events in 2-3 sentences. Focus on what tools were called, what was accomplished, and any errors:\n\n${eventsText}`,
-            },
-          ],
-        });
+        const response = await model.invoke([
+          new HumanMessage(
+            `Summarize the following agent iteration events in 2-3 sentences. Focus on what tools were called, what was accomplished, and any errors:\n\n${eventsText}`,
+          ),
+        ]);
+
+        const content =
+          typeof response.content === "string"
+            ? response.content
+            : JSON.stringify(response.content);
 
         summaryEvents.push({
           type: "summary",
           summarizedIterations: [iter],
-          summary: result.text,
+          summary: content,
           timestamp: Date.now(),
           iteration: iter,
         });
       } catch {
-        // If summarization fails, keep a simple summary
         summaryEvents.push({
           type: "summary",
           summarizedIterations: [iter],
@@ -98,12 +95,10 @@ export class ContextManager {
       }
     }
 
-    // Remove old iteration events, keep recent ones and summaries
     const newEvents = thread.events.filter(
       (e) => e.iteration > cutoff || e.type === "summary",
     );
 
-    // Add new summaries
     thread.events = [...summaryEvents, ...newEvents];
     thread.updatedAt = Date.now();
 

@@ -4,7 +4,7 @@ A TypeScript library for building loop-based AI agents with middleware, verifica
 
 ## Overview
 
-`deep-factor-agent` wraps the [Vercel AI SDK v6](https://sdk.vercel.ai/) in an opinionated agent loop that gives you fine-grained control over iteration limits, cost guardrails, completion verification, context window management, and human escalation — all through a declarative configuration surface.
+`deep-factor-agent` wraps [LangChain's `initChatModel`](https://js.langchain.com/docs/how_to/chat_models_universal_init/) in an opinionated agent loop that gives you fine-grained control over iteration limits, cost guardrails, completion verification, context window management, and human escalation — all through a declarative configuration surface.
 
 **Why a loop-based agent?** Single-shot LLM calls are rarely enough for non-trivial tasks. An agentic loop lets the model call tools, observe results, reflect, and iterate until the task is truly done — while stop conditions and middleware keep execution safe and observable.
 
@@ -17,30 +17,31 @@ A TypeScript library for building loop-based AI agents with middleware, verifica
 - **Human-in-the-loop** — pause execution, collect human input, and resume
 - **Context management** — automatic summarization when the context window fills up
 - **Streaming** — stream the first LLM turn for real-time UIs
+- **Universal model support** — string-based model IDs (`"anthropic:claude-sonnet-4-5"`) or `BaseChatModel` instances
 
 ## Installation
 
 ```bash
-pnpm add deep-factor-agent ai zod
+pnpm add deep-factor-agent langchain @langchain/core zod
 ```
 
-`ai` (Vercel AI SDK v6+) is a runtime dependency. `zod` (v4+) is a **peer dependency** — you must install it yourself.
+`langchain` and `@langchain/core` are runtime dependencies. `zod` (v4+) is a **peer dependency** — you must install it yourself.
 
-You also need a model provider, e.g.:
+You also need a model provider package, e.g.:
 
 ```bash
-pnpm add @ai-sdk/anthropic
-# or @ai-sdk/openai, @ai-sdk/google, etc.
+pnpm add @langchain/anthropic
+# or @langchain/openai, @langchain/google-genai, etc.
 ```
 
 ## Quick Start
 
 ```typescript
 import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
+// String-based model ID (universal — requires provider package installed)
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
+  model: "anthropic:claude-sonnet-4-5",
   instructions: "You are a helpful assistant.",
   stopWhen: [maxIterations(5)],
 });
@@ -52,16 +53,26 @@ console.log(result.iterations); // number of loop iterations used
 console.log(result.usage);      // { inputTokens, outputTokens, totalTokens }
 ```
 
+You can also pass a `BaseChatModel` instance directly:
+
+```typescript
+import { initChatModel } from "langchain/chat_models/universal";
+
+const model = await initChatModel("claude-sonnet-4-5", {
+  modelProvider: "anthropic",
+});
+const agent = createDeepFactorAgent({ model });
+```
+
 ## Usage Examples
 
 ### Minimal agent (model only)
 
 ```typescript
 import { createDeepFactorAgent } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
+  model: "anthropic:claude-sonnet-4-5",
 });
 
 const result = await agent.loop("Hello!");
@@ -74,22 +85,25 @@ All other settings use sensible defaults — see the [Defaults table](#defaults)
 
 ```typescript
 import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
+import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
-  instructions: "Use the weather tool to answer weather questions.",
-  tools: {
-    getWeather: {
-      description: "Get weather for a city",
-      parameters: z.object({ city: z.string() }),
-      execute: async ({ city }) => `72°F and sunny in ${city}`,
-    },
+const getWeather = tool(
+  async ({ city }) => `72°F and sunny in ${city}`,
+  {
+    name: "getWeather",
+    description: "Get weather for a city",
+    schema: z.object({ city: z.string() }),
   },
+);
+
+const agent = createDeepFactorAgent({
+  model: "anthropic:claude-sonnet-4-5",
+  instructions: "Use the weather tool to answer weather questions.",
+  tools: [getWeather],
   stopWhen: [maxIterations(10)],
   verifyCompletion: async ({ result }) => ({
-    complete: typeof result === "string" && result.includes("°F"),
+    complete: result.includes("°F"),
     reason: "Response must contain a temperature",
   }),
 });
@@ -108,10 +122,9 @@ import {
   maxOutputTokens,
   maxCost,
 } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
+  model: "anthropic:claude-sonnet-4-5",
   stopWhen: [
     maxIterations(20),          // stop after 20 loop iterations
     maxTokens(100_000),         // stop at 100k total tokens
@@ -130,20 +143,20 @@ Multiple conditions can be combined — the first one that triggers ends the loo
 import {
   createDeepFactorAgent,
   requestHumanInput,
+  isPendingResult,
   maxIterations,
 } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
-  tools: { requestHumanInput },
+  model: "anthropic:claude-sonnet-4-5",
+  tools: [requestHumanInput],
   interruptOn: ["requestHumanInput"],
   stopWhen: [maxIterations(10)],
 });
 
 const result = await agent.loop("Ask the user what color they prefer.");
 
-if ("resume" in result) {
+if (isPendingResult(result)) {
   console.log("Agent is waiting for input");
 
   // Provide the human's answer and resume the loop
@@ -161,11 +174,10 @@ import {
   errorRecoveryMiddleware,
   maxIterations,
 } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
 // Built-in middleware (these are the defaults)
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
+  model: "anthropic:claude-sonnet-4-5",
   middleware: [todoMiddleware(), errorRecoveryMiddleware()],
   stopWhen: [maxIterations(10)],
 });
@@ -176,7 +188,6 @@ const agent = createDeepFactorAgent({
 ```typescript
 import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 import type { AgentMiddleware } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
 const loggingMiddleware: AgentMiddleware = {
   name: "logging",
@@ -189,7 +200,7 @@ const loggingMiddleware: AgentMiddleware = {
 };
 
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
+  model: "anthropic:claude-sonnet-4-5",
   middleware: [loggingMiddleware],
   stopWhen: [maxIterations(5)],
 });
@@ -199,16 +210,15 @@ const agent = createDeepFactorAgent({
 
 ```typescript
 import { createDeepFactorAgent } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
+  model: "anthropic:claude-sonnet-4-5",
 });
 
-const stream = agent.stream("Tell me a story.");
+const stream = await agent.stream("Tell me a story.");
 
-for await (const chunk of stream.textStream) {
-  process.stdout.write(chunk);
+for await (const chunk of stream) {
+  process.stdout.write(typeof chunk.content === "string" ? chunk.content : "");
 }
 ```
 
@@ -216,10 +226,9 @@ for await (const chunk of stream.textStream) {
 
 ```typescript
 import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
-import { anthropic } from "@ai-sdk/anthropic";
 
 const agent = createDeepFactorAgent({
-  model: anthropic("claude-sonnet-4-5-20250514"),
+  model: "anthropic:claude-sonnet-4-5",
   stopWhen: [maxIterations(50)],
   contextManagement: {
     maxContextTokens: 100_000,  // summarize when context exceeds this
@@ -236,7 +245,7 @@ When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 
 | Setting | Default |
 |---|---|
-| `tools` | `{}` (no tools) |
+| `tools` | `[]` (no tools) |
 | `instructions` | `""` (empty) |
 | `stopWhen` | `[maxIterations(10)]` |
 | `verifyCompletion` | `undefined` (no verification) |
@@ -259,7 +268,7 @@ When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 |---|---|
 | `DeepFactorAgent` | Core agent class. Use `createDeepFactorAgent` unless you need full control. |
 | `.loop(prompt)` | Run the agentic loop. Returns `AgentResult` or `PendingResult`. |
-| `.stream(prompt)` | Stream the first LLM turn (non-looping). Returns the AI SDK stream result. |
+| `.stream(prompt)` | Stream the first LLM turn (non-looping). Returns `AsyncIterable<AIMessageChunk>`. |
 | `addUsage(a, b)` | Merge two `TokenUsage` objects by summing their fields. |
 
 ### Stop Conditions
@@ -294,7 +303,16 @@ When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 
 | Export | Description |
 |---|---|
-| `requestHumanInput` | A tool that pauses the agent loop to collect human input. Use with `interruptOn: ["requestHumanInput"]`. |
+| `requestHumanInput` | A LangChain tool that pauses the agent loop to collect human input. Use with `interruptOn: ["requestHumanInput"]`. |
+| `isPendingResult(r)` | Type guard to check if a result is a `PendingResult` (agent is waiting for human input). |
+
+### Tool Adapter Utilities
+
+| Export | Description |
+|---|---|
+| `createLangChainTool(name, config)` | Create a LangChain `StructuredToolInterface` from a simple `{ description, schema, execute }` config. |
+| `toolArrayToMap(tools)` | Convert a `StructuredToolInterface[]` to a `Record<string, StructuredToolInterface>` for name-based lookup. |
+| `findToolByName(tools, name)` | Find a tool in an array by its `.name` property. |
 
 ### Types
 
@@ -302,18 +320,18 @@ All types are exported for use in your code:
 
 | Type | Description |
 |---|---|
-| `DeepFactorAgentSettings<TTools>` | Configuration for `createDeepFactorAgent`. |
+| `DeepFactorAgentSettings<TTools>` | Configuration for `createDeepFactorAgent`. `model` accepts `BaseChatModel \| string`. |
 | `AgentResult` | Return type of `loop()` — contains `response`, `thread`, `usage`, `iterations`, `stopReason`. |
-| `PendingResult` | Extends `AgentResult` when `stopReason` is `"human_input_needed"` — adds `resume(input)`. |
+| `PendingResult` | Returned when `stopReason` is `"human_input_needed"` — adds `resume(input)`. |
 | `AgentThread` | The conversation thread with `id`, `events`, `metadata`. |
 | `TokenUsage` | Token counts: `inputTokens`, `outputTokens`, `totalTokens`, optional cache fields. |
 | `StopCondition` | A function `(ctx: StopConditionContext) => StopConditionResult`. |
 | `StopConditionContext` | Context passed to stop conditions: `iteration`, `usage`, `model`, `thread`. |
 | `StopConditionResult` | Result from a stop condition: `{ stop: boolean, reason?: string }`. |
 | `VerifyCompletion` | Async function to verify the agent completed its task. |
-| `VerifyContext` | Context passed to `verifyCompletion`: `result`, `iteration`, `thread`, `originalPrompt`. |
+| `VerifyContext` | Context passed to `verifyCompletion`: `result` (string), `iteration`, `thread`, `originalPrompt`. |
 | `VerifyResult` | Result from verification: `{ complete: boolean, reason?: string }`. |
-| `AgentMiddleware` | Middleware definition with `name`, optional `tools`, and lifecycle hooks. |
+| `AgentMiddleware` | Middleware definition with `name`, optional `tools` (`StructuredToolInterface[]`), and lifecycle hooks. |
 | `MiddlewareContext` | Context passed to middleware hooks: `thread`, `iteration`, `settings`. |
 | `ContextManagementConfig` | Config for context management: `maxContextTokens`, `keepRecentIterations`. |
 | `AgentEvent` | Discriminated union of all event types in the thread. |
@@ -325,8 +343,8 @@ This library is designed around the [12-factor agent](https://github.com/humanla
 1. **Natural language to tool calls** — the agent loop translates prompts into tool invocations
 2. **Own your prompts** — `instructions` are plain strings you control, not hidden behind abstractions
 3. **Own your context window** — `ContextManager` gives you explicit control over context size and summarization
-4. **Tools are just functions** — standard Vercel AI SDK tool definitions, no proprietary wrapper
-5. **Unified LLM interface** — any model provider supported by the AI SDK works out of the box
+4. **Tools are just functions** — standard LangChain `tool()` definitions, no proprietary wrapper
+5. **Unified LLM interface** — any model provider supported by LangChain's `initChatModel` works, including string IDs like `"anthropic:claude-sonnet-4-5"`
 6. **Use structured outputs** — Zod schemas for tool parameters and validation
 7. **Own your control flow** — the loop, stop conditions, and middleware are all configurable
 8. **Compact errors into context** — `errorRecoveryMiddleware` feeds truncated errors back into the conversation
