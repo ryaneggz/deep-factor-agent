@@ -175,13 +175,77 @@ describe("todoMiddleware", () => {
     expect(parsed.todos[0].text).toBe("Test task");
   });
 
-  it("read_todos tool returns todos array", async () => {
+  it("read_todos tool returns empty array initially", async () => {
     const mw = todoMiddleware();
     const readTool = mw.tools!.find((t) => t.name === "read_todos")!;
     const result = await readTool.invoke({});
     const parsed = JSON.parse(result as string);
     expect(parsed.todos).toBeDefined();
     expect(Array.isArray(parsed.todos)).toBe(true);
+    expect(parsed.todos).toHaveLength(0);
+  });
+
+  it("read_todos returns what write_todos persisted (round-trip)", async () => {
+    const mw = todoMiddleware();
+    const writeTool = mw.tools!.find((t) => t.name === "write_todos")!;
+    const readTool = mw.tools!.find((t) => t.name === "read_todos")!;
+
+    // Write todos
+    await writeTool.invoke({
+      todos: [
+        { id: "1", text: "First task", status: "pending" },
+        { id: "2", text: "Second task", status: "in_progress" },
+      ],
+    });
+
+    // Read should reflect what was written
+    const result = await readTool.invoke({});
+    const parsed = JSON.parse(result as string);
+    expect(parsed.todos).toHaveLength(2);
+    expect(parsed.todos[0]).toEqual({ id: "1", text: "First task", status: "pending" });
+    expect(parsed.todos[1]).toEqual({ id: "2", text: "Second task", status: "in_progress" });
+  });
+
+  it("write_todos overwrites previous todos on subsequent calls", async () => {
+    const mw = todoMiddleware();
+    const writeTool = mw.tools!.find((t) => t.name === "write_todos")!;
+    const readTool = mw.tools!.find((t) => t.name === "read_todos")!;
+
+    // First write
+    await writeTool.invoke({
+      todos: [{ id: "1", text: "Old task", status: "pending" }],
+    });
+
+    // Second write replaces
+    await writeTool.invoke({
+      todos: [{ id: "2", text: "New task", status: "done" }],
+    });
+
+    const result = await readTool.invoke({});
+    const parsed = JSON.parse(result as string);
+    expect(parsed.todos).toHaveLength(1);
+    expect(parsed.todos[0]).toEqual({ id: "2", text: "New task", status: "done" });
+  });
+
+  it("separate todoMiddleware instances have independent state", async () => {
+    const mw1 = todoMiddleware();
+    const mw2 = todoMiddleware();
+
+    const writeTool1 = mw1.tools!.find((t) => t.name === "write_todos")!;
+    const readTool1 = mw1.tools!.find((t) => t.name === "read_todos")!;
+    const readTool2 = mw2.tools!.find((t) => t.name === "read_todos")!;
+
+    await writeTool1.invoke({
+      todos: [{ id: "1", text: "Instance 1 task", status: "pending" }],
+    });
+
+    // Instance 1 should have the todo
+    const result1 = JSON.parse(await readTool1.invoke({}) as string);
+    expect(result1.todos).toHaveLength(1);
+
+    // Instance 2 should still be empty
+    const result2 = JSON.parse(await readTool2.invoke({}) as string);
+    expect(result2.todos).toHaveLength(0);
   });
 });
 

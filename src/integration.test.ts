@@ -276,6 +276,66 @@ describe("Integration: full workflow", () => {
     expect(result.usage.totalTokens).toBe(900);
   });
 
+  it("todoMiddleware write-then-read round-trip through agent loop", async () => {
+    const mockModel = makeMockModel();
+
+    const todosPayload = [
+      { id: "t1", text: "Design schema", status: "done" },
+      { id: "t2", text: "Write tests", status: "in_progress" },
+    ];
+
+    // Iteration 1: model calls write_todos
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "write_todos",
+              args: { todos: todosPayload },
+              id: "tc_write",
+            },
+          ],
+        }),
+      )
+      // After write_todos result, model calls read_todos
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "read_todos",
+              args: {},
+              id: "tc_read",
+            },
+          ],
+        }),
+      )
+      // After read_todos result, model returns final response
+      .mockResolvedValueOnce(
+        makeAIMessage("Todos written and verified"),
+      );
+
+    // Use createDeepFactorAgent which adds todoMiddleware by default
+    const agent = createDeepFactorAgent({
+      model: mockModel,
+    });
+
+    const result = await agent.loop("Write and verify todos");
+    expect(result.stopReason).toBe("completed");
+
+    // Verify thread.metadata.todos was set by agent.ts interception
+    expect(result.thread.metadata.todos).toEqual(todosPayload);
+
+    // Verify read_todos returned the written data (check tool_result events)
+    const toolResults = result.thread.events.filter(
+      (e) => e.type === "tool_result",
+    );
+    expect(toolResults.length).toBe(2);
+
+    // The second tool_result is from read_todos — it should contain the written todos
+    const readResult = JSON.parse(toolResults[1].result);
+    expect(readResult.todos).toEqual(todosPayload);
+  });
+
   it("all tests use mock models - no real API calls", () => {
     const model = makeMockModel();
     expect(vi.isMockFunction(model.invoke)).toBe(true);

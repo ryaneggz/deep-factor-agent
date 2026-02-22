@@ -67,11 +67,16 @@ export function todoMiddleware(): AgentMiddleware {
     ),
   });
 
+  // Closure-scoped state so read_todos returns what write_todos persisted.
+  // agent.ts also copies to thread.metadata.todos for external access.
+  let currentTodos: z.infer<typeof todoSchema>["todos"] = [];
+
   return {
     name: "todo",
     tools: [
       tool(
         async (args: z.infer<typeof todoSchema>) => {
+          currentTodos = args.todos;
           return JSON.stringify({ success: true, todos: args.todos });
         },
         {
@@ -83,7 +88,7 @@ export function todoMiddleware(): AgentMiddleware {
       ),
       tool(
         async () => {
-          return JSON.stringify({ todos: [] });
+          return JSON.stringify({ todos: currentTodos });
         },
         {
           name: "read_todos",
