@@ -76,7 +76,7 @@ while true; do
     fi
 
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-    LOG_FILE="${LOG_DIR}/${TIMESTAMP}_${MODE}_iter${ITERATION}.log"
+    LOG_FILE="${LOG_DIR}/${TIMESTAMP}_${MODE}_iter${ITERATION}.md"
     ITER_START=$(date +%s)
 
     echo "┌─ Iteration $ITERATION ─────────────────────────"
@@ -90,12 +90,12 @@ while true; do
     #               Can use 'sonnet' in build mode for speed if plan is clear and tasks well-defined
     # --verbose: Detailed execution logging
     if [ "$FORMAT_LOGS" = "1" ]; then
-        # Raw JSON to log file, formatted output to terminal
+        # Formatted markdown to log file AND terminal
         cat "$PROMPT_FILE" | claude -p \
             --dangerously-skip-permissions \
             --output-format=stream-json \
             --model opus \
-            --verbose 2>&1 | tee "$LOG_FILE" | "$FORMAT_SCRIPT"
+            --verbose 2>&1 | "$FORMAT_SCRIPT" | tee "$LOG_FILE"
     else
         # Raw JSON to both terminal and log file (original behavior)
         cat "$PROMPT_FILE" | claude -p \

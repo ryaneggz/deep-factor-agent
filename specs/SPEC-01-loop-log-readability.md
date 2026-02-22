@@ -31,96 +31,86 @@
 | `{"type":"rate_limit_event",...}` | Rate limit status |
 | `{"type":"result","subtype":"success",...}` | Session complete: duration, turns, cost, model usage breakdown |
 
-### Current `loop.sh` Behavior
+### Current `loop.sh` Behavior (pre-markdown)
 
-- Pipes `claude -p --output-format=stream-json` through `tee "$LOG_FILE"`
-- Raw JSON goes to both terminal and log file
-- After each iteration: `git push`, loop counter banner
-- No post-processing, no filtering, no summarization
+- Pipes `claude -p --output-format=stream-json` through `tee "$LOG_FILE" | format-log.sh`
+- Raw JSON saved to `.log` files; plain-text `[PREFIX]` formatted output to terminal
+- After each iteration: `git push`, iteration summary box
+- `format-log.sh` outputs `[INIT]`, `[THINK]`, `[TOOL]`, etc. prefixed lines
 
 ### RELEVANT FILES
-- `loop.sh` -- current loop runner
+- `loop.sh` -- loop runner
+- `format-log.sh` -- stream-json to readable output filter
+- `review-log.sh` -- standalone log reviewer
 - `archive/0004-openai-default/logs/*.log` -- example raw JSON logs
 
 ---
 
 ## OVERVIEW
 
-Introduce three components to make `loop.sh` log output human-readable:
+Transform the log output from plain-text `[PREFIX]` lines to **markdown format** (`.md` files) that render natively in VS Code, GitHub, and any markdown viewer:
 
-1. **`format-log.sh`** -- A post-processing filter script that transforms stream-json lines into readable, prefixed output
-2. **`loop.sh` improvements** -- Add formatted output support alongside raw JSON logging, plus timing and summary data
-3. **`review-log.sh`** -- A standalone script to re-process saved JSON logs into readable format
-
-All three components share the same formatting rules. Raw JSON is always preserved for machine processing.
+1. **`format-log.sh`** -- Rewrite to output markdown (headers, code blocks, blockquotes, tables) instead of `[PREFIX]` lines
+2. **`loop.sh`** -- Reverse the pipeline so **formatted markdown is saved** to `.md` files (not raw JSON); raw JSON goes to terminal only when `FORMAT_LOGS=0`
+3. **`review-log.sh`** -- Support both `.md` (direct cat) and `.log` (pipe through `format-log.sh`) for backward compatibility with archived raw JSON
 
 ---
 
 ## USER STORIES
 
-### US-01: Post-Processing Filter Script (`format-log.sh`)
+### US-01: Markdown Output Filter (`format-log.sh`)
 
 **As a** developer reviewing Claude loop output
-**I want to** pipe stream-json through a filter that produces human-readable output
-**So that** I can follow what the agent is doing without parsing raw JSON
+**I want** the formatter to produce markdown instead of plain-text prefixed lines
+**So that** logs render as rich documents in VS Code preview, GitHub, and other markdown viewers
 
 #### Formatting Rules
 
 Each stream-json line is parsed and formatted according to its `type` and `subtype`/`content[].type`:
 
-| Event | Formatted Output |
-|-------|-----------------|
-| `system/init` | `[INIT] model=claude-opus-4-6 mode=bypassPermissions tools=19` |
-| `assistant` with `thinking` | `[THINK] <first 200 chars of thinking text>...` (strip `signature` field entirely) |
-| `assistant` with `text` | `[ASSISTANT] <full text content>` |
-| `assistant` with `tool_use` | `[TOOL] Read(file_path="/home/.../foo.ts")` -- tool name + truncated args (max 120 chars) |
-| `user` with `tool_result` | `[RESULT] <content truncated to max 500 chars>` |
-| `user` with `tool_result` (error) | `[ERROR] <error content truncated to max 500 chars>` |
-| `system/task_started` | `[SUBAGENT] <description> (task_id=<short_id>)` |
-| `rate_limit_event` | `[RATE] status=<status>` |
-| `result/success` | See summary block format below |
-| Unrecognized type | `[???] type=<type> subtype=<subtype>` (one-liner fallback) |
+| Event | Current Output | New Markdown Output |
+|-------|---------------|---------------------|
+| `system/init` | `[INIT] model=... mode=... tools=19` | `## Session: <timestamp>` + `**Model:** ... \| **Mode:** ... \| **Tools:** N` + `---` |
+| `assistant/thinking` | `[THINK] first 200 chars...` | `### Thinking` + `> first 200 chars` (blockquote) |
+| `assistant/text` | `[ASSISTANT] text content` | `### Assistant` + bare text content |
+| `assistant/tool_use` | `[TOOL] Read(file_path="...")` | `` ### Tool: `Read` `` + ` ```\nfile_path="..."\n``` ` |
+| `user/tool_result` | `[RESULT] content...` | `### Result` + ` ```\ncontent...\n``` ` |
+| `user/tool_result` (error) | `[ERROR] content...` | `### Error` + ` ```\ncontent...\n``` ` |
+| `system/task_started` | `[SUBAGENT] desc (id)` | `### Subagent` + `> desc (task_id=short_id)` |
+| `rate_limit_event` | `[RATE] status=allowed` | `*Rate limit: allowed*` (italic, inline) |
+| `result/success` | Box with `[DONE]` + metrics | `---` + `## Session Complete` + metrics table |
+| Unknown | `[???] type=...` | `*Unknown event: type=...*` |
 
-**Summary block** (for `result/success`):
+**Session complete block** (for `result/success`):
 
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[DONE] Session complete
-  Duration:  2m 16s (API: 2m 12s)
-  Turns:     44
-  Cost:      $1.03
-  Model:     claude-opus-4-6
-    Input:   12 tokens
-    Output:  7,286 tokens
-    Cache:   539,120 read / 91,852 created
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
+```markdown
+---
 
-**Visual separators** between logical phases:
+## Session Complete
 
-```
-── init ─────────────────────────────────
-[INIT] model=claude-opus-4-6 ...
-
-── execution ────────────────────────────
-[THINK] Let me start by reading...
-[ASSISTANT] I'll read the project files.
-[TOOL] Read(file_path="/home/.../CLAUDE.md")
-[RESULT] ## Build & Run\n- Package manage...
-...
-
-── result ───────────────────────────────
-[DONE] Session complete
-  ...
+| Metric | Value |
+|--------|-------|
+| Duration | 2m 16s (API: 2m 12s) |
+| Turns | 44 |
+| Cost | $1.03 |
+| Model | claude-opus-4-6 |
+| Input | 12 tokens |
+| Output | 7,286 tokens |
+| Cache | 539,120 read / 91,852 created |
 ```
 
-**Stripping rules:**
+**Phase separators:**
+- Remove the `── init ──` / `── execution ──` / `── result ──` plain-text separators
+- Use `---` (horizontal rule) between the init header and execution, and before the result summary
+- No phase tracking variable needed -- markdown structure provides visual separation naturally
+
+**Stripping rules** (unchanged):
 - Remove `uuid`, `session_id`, `parent_tool_use_id` from all events
 - Remove `signature` from thinking blocks entirely
 - Remove per-message `usage` blocks (usage is only shown in the final summary)
 - Remove `context_management`, `stop_reason`, `stop_sequence` from assistant messages
 
-**Configuration** (via environment variables):
+**Configuration** (via environment variables, unchanged):
 - `THINK_MAX_CHARS` -- max chars for thinking preview (default: `200`)
 - `RESULT_MAX_CHARS` -- max chars for tool result content (default: `500`)
 - `TOOL_ARGS_MAX_CHARS` -- max chars for tool_use input display (default: `120`)
@@ -128,14 +118,14 @@ Each stream-json line is parsed and formatted according to its `type` and `subty
 #### Usage Modes
 
 ```bash
-# Pipe mode (real-time filtering during loop)
+# Pipe mode (real-time formatting during loop, saved to .md)
 cat "$PROMPT_FILE" | claude ... | ./format-log.sh | tee "$LOG_FILE"
 
-# Review mode (re-process a saved raw JSON log)
-./format-log.sh < logs/20260222_093100_build_iter0.log
+# Review mode (re-process a saved raw JSON log from archive)
+./format-log.sh < archive/0004-openai-default/logs/20260222_092718_plan_iter0.log
 
 # With custom truncation
-THINK_MAX_CHARS=500 RESULT_MAX_CHARS=1000 ./format-log.sh < logs/some.log
+THINK_MAX_CHARS=500 RESULT_MAX_CHARS=1000 ./format-log.sh < archive/some.log
 ```
 
 #### Implementation
@@ -143,70 +133,83 @@ THINK_MAX_CHARS=500 RESULT_MAX_CHARS=1000 ./format-log.sh < logs/some.log
 - **Language**: Bash + `jq` (available on all target systems; no Node dependency for ops scripts)
 - Reads stdin line-by-line
 - Each line: attempt JSON parse with `jq`; on failure, pass through as-is (handles non-JSON lines like git push output)
-- Phase tracking: track current phase (`init`, `execution`, `result`) and print separator on transition
+- No phase tracking needed -- markdown structure provides natural separation
 
 #### Acceptance Criteria
 
 - [ ] `format-log.sh` exists at project root, is executable (`chmod +x`)
-- [ ] Handles all event types from the table above
+- [ ] Handles all event types from the markdown mapping table above
+- [ ] Outputs valid markdown: `##` headers, `###` sub-headers, `` ``` `` code blocks, `>` blockquotes, `|` tables
 - [ ] Strips UUIDs, signatures, per-message usage from output
 - [ ] Truncates thinking, tool results, and tool args to configurable max lengths
-- [ ] Prints phase separator lines between init, execution, and result phases
-- [ ] Prints formatted summary block for `result/success` events
+- [ ] Uses `---` horizontal rules for visual separation (no plain-text box drawing)
+- [ ] Prints markdown metrics table for `result/success` events
 - [ ] Passes through non-JSON lines unchanged (e.g. git output, loop banners)
 - [ ] Works in pipe mode: `echo '{"type":"system","subtype":"init",...}' | ./format-log.sh`
 - [ ] Works in review mode: `./format-log.sh < archive/0004-openai-default/logs/20260222_092718_plan_iter0.log`
 - [ ] Requires only `bash` and `jq` (no Node, Python, or other runtime)
+- [ ] Output renders correctly in VS Code markdown preview
 
 ---
 
-### US-02: `loop.sh` Improvements
+### US-02: `loop.sh` -- Save Markdown, Swap Pipeline
 
 **As a** developer running headless Claude loops
-**I want** `loop.sh` to produce readable terminal output and per-iteration summaries
-**So that** I can monitor progress in real-time without deciphering raw JSON
+**I want** `loop.sh` to save formatted markdown logs (not raw JSON)
+**So that** I can open log files directly in VS Code/GitHub and get readable content
 
 #### Changes to `loop.sh`
 
-**1. Dual output: raw JSON log + formatted terminal output**
+**1. File extension: `.log` → `.md`**
 
 ```bash
-# Current (raw JSON to both terminal and log):
-cat "$PROMPT_FILE" | claude ... 2>&1 | tee "$LOG_FILE"
+# Old:
+LOG_FILE="${LOG_DIR}/${TIMESTAMP}_${MODE}_iter${ITERATION}.log"
 
-# New (raw JSON to log, formatted output to terminal):
-cat "$PROMPT_FILE" | claude ... 2>&1 | tee "$RAW_LOG" | ./format-log.sh
+# New:
+LOG_FILE="${LOG_DIR}/${TIMESTAMP}_${MODE}_iter${ITERATION}.md"
 ```
 
-- Raw JSON always saved to `$LOG_DIR/${TIMESTAMP}_${MODE}_iter${ITERATION}.log` (unchanged)
-- Terminal output is piped through `format-log.sh` for readability
-- Optional: save formatted output to `$LOG_DIR/${TIMESTAMP}_${MODE}_iter${ITERATION}.readable.log`
+**2. Reversed pipeline: formatted output saved, raw JSON discarded**
 
-**2. Format control via environment variable**
+```bash
+# Old (raw JSON saved, formatted to terminal):
+cat "$PROMPT_FILE" | claude ... 2>&1 | tee "$LOG_FILE" | ./format-log.sh
 
-- `FORMAT_LOGS=1` (default): enable formatted terminal output
-- `FORMAT_LOGS=0`: disable formatting, show raw JSON (current behavior)
+# New (formatted markdown saved AND displayed):
+cat "$PROMPT_FILE" | claude ... 2>&1 | ./format-log.sh | tee "$LOG_FILE"
+```
+
+- Formatted markdown is saved to `.md` files
+- Same formatted output is displayed on the terminal
+- Raw JSON is **no longer preserved** (archived raw JSON in `archive/` still works via `review-log.sh`)
+
+**3. Format control via environment variable** (unchanged behavior)
+
+- `FORMAT_LOGS=1` (default): formatted markdown output saved and displayed
+- `FORMAT_LOGS=0`: raw JSON saved to `.md` file and displayed (unformatted fallback)
 - Check: if `format-log.sh` is not found or not executable, fall back to raw output with a warning
 
-**3. Iteration timing**
+**4. Iteration timing** (unchanged)
 
 - Record `ITER_START` timestamp before each Claude invocation
 - Record `ITER_END` timestamp after Claude completes
 - Calculate and display iteration duration
 
-**4. Per-iteration summary**
+**5. Per-iteration summary** (unchanged)
 
 After each Claude run completes, print:
 
 ```
 ┌─ Iteration 0 ─────────────────────────
+│ Started: 2026-02-22 09:31:00
 │ Duration: 2m 16s
-│ Log:      logs/20260222_093100_build_iter0.log
+│ Log:      logs/20260222_093100_build_iter0.md
 │ Pushing to origin/ryaneggz/feature...
 └────────────────────────────────────────
 ```
 
-**5. Session summary at loop end**
+**6. Session summary at loop end** (unchanged)
 
 When the loop exits (max iterations reached or manual stop), print:
 
@@ -222,62 +225,70 @@ When the loop exits (max iterations reached or manual stop), print:
 
 #### Acceptance Criteria
 
-- [ ] Raw JSON log files are still saved to `$LOG_DIR/` (unchanged format, unchanged naming)
-- [ ] Terminal output is piped through `format-log.sh` by default
-- [ ] `FORMAT_LOGS=0 ./loop.sh` disables formatting and shows raw JSON
+- [ ] Log files saved with `.md` extension instead of `.log`
+- [ ] Pipeline reversed: `... | ./format-log.sh | tee "$LOG_FILE"` (formatted output saved)
+- [ ] `cat logs/*.md` shows valid markdown (not raw JSON)
+- [ ] `.md` files render correctly in VS Code markdown preview
+- [ ] `FORMAT_LOGS=0 ./loop.sh` saves raw JSON to `.md` (unformatted fallback)
 - [ ] Falls back to raw output with warning if `format-log.sh` is missing
 - [ ] Each iteration prints start/end timestamps and duration
 - [ ] Per-iteration summary box printed after each Claude run
 - [ ] Session summary box printed when loop exits
-- [ ] Session summary includes: mode, total iterations, total wall-clock time
 - [ ] Existing behavior preserved: git push after each iteration, prompt file selection, max iterations
 
 ---
 
-### US-03: Standalone Log Reviewer (`review-log.sh`)
+### US-03: `review-log.sh` -- Dual Format Support (`.md` + `.log`)
 
 **As a** developer reviewing past Claude sessions
-**I want to** re-process saved JSON logs into readable format
-**So that** I can review what happened without manually parsing JSON
+**I want** `review-log.sh` to handle both new `.md` files and archived `.log` files
+**So that** I can review any log regardless of format era
 
 #### Usage
 
 ```bash
-# Review a single log file
-./review-log.sh logs/20260222_093100_build_iter0.log
+# Review a new markdown log (direct cat, already formatted)
+./review-log.sh logs/20260222_093100_build_iter0.md
 
-# Review an archived log
+# Review an archived raw JSON log (pipe through format-log.sh)
 ./review-log.sh archive/0004-openai-default/logs/20260222_092718_plan_iter0.log
 
-# Review all logs from a directory (concatenated)
+# Review all logs from a directory (prefers .md, falls back to .log)
 ./review-log.sh logs/
 
 # Pipe to less for paging
-./review-log.sh logs/20260222_093100_build_iter0.log | less -R
+./review-log.sh logs/20260222_093100_build_iter0.md | less -R
 ```
 
 #### Implementation
 
-- Thin wrapper around `format-log.sh`
-- If argument is a file: `./format-log.sh < "$1"`
-- If argument is a directory: iterate over `*.log` files in sorted order, print filename header between each, pipe each through `format-log.sh`
-- If no argument: print usage and exit
+**Single file mode:**
+- If file ends with `.md`: `cat "$1"` (already formatted markdown)
+- If file ends with `.log`: `./format-log.sh < "$1"` (transform raw JSON to markdown)
+- Other extensions: attempt `./format-log.sh < "$1"` as fallback
+
+**Directory mode:**
+- Look for `*.md` files first; if found, `cat` each directly
+- If no `.md` files found, fall back to `*.log` files and pipe each through `format-log.sh`
+- Print filename header between each file
 
 #### Acceptance Criteria
 
 - [ ] `review-log.sh` exists at project root, is executable
-- [ ] Accepts a file path argument and formats it via `format-log.sh`
-- [ ] Accepts a directory argument and formats all `*.log` files within it
+- [ ] `.md` files: displayed via `cat` (already formatted)
+- [ ] `.log` files: piped through `format-log.sh` (backward compat with archived raw JSON)
+- [ ] Directory mode: prefers `*.md`, falls back to `*.log`
 - [ ] Prints filename header between multiple log files
 - [ ] Prints usage message when called with no arguments
 - [ ] Output is suitable for piping to `less` or redirecting to a file
+- [ ] Works with archived logs in `archive/` directories
 
 ---
 
 ## DEPENDENCY ORDER
 
 ```
-US-01 (format-log.sh)
+US-01 (format-log.sh — markdown rewrite)
   |
   +----+----+
   v         v
@@ -293,9 +304,10 @@ US-01 must be completed first since both US-02 and US-03 depend on `format-log.s
 
 | Action | File | Description |
 |--------|------|-------------|
-| **Create** | `format-log.sh` | Stream-json to readable output filter |
-| **Modify** | `loop.sh` | Add formatted output, timing, summaries |
-| **Create** | `review-log.sh` | Standalone log reviewer wrapper |
+| **Modify** | `format-log.sh` | Rewrite `[PREFIX]` output to markdown (headers, code blocks, blockquotes, tables) |
+| **Modify** | `loop.sh` | Change `.log` → `.md` extension, reverse pipeline to save formatted output |
+| **Modify** | `review-log.sh` | Support both `.md` (cat) and `.log` (format-log.sh) files |
+| **Modify** | `specs/SPEC-01-loop-log-readability.md` | Update spec to document markdown format |
 
 ---
 
@@ -303,10 +315,10 @@ US-01 must be completed first since both US-02 and US-03 depend on `format-log.s
 
 After implementation, verify with these manual tests:
 
-1. **Pipe mode**: `./loop.sh plan 1` -- terminal output should show `[INIT]`, `[THINK]`, `[TOOL]`, etc. instead of raw JSON
-2. **Raw log preserved**: Check `logs/*.log` -- should still contain raw JSON (one JSON object per line)
-3. **Review mode**: `./review-log.sh archive/0004-openai-default/logs/20260222_092718_plan_iter0.log` -- should produce readable output
-4. **All event types**: The reviewed log should show `[INIT]`, `[THINK]`, `[ASSISTANT]`, `[TOOL]`, `[RESULT]`, `[RATE]`, and `[DONE]` prefixes
-5. **Formatting disabled**: `FORMAT_LOGS=0 ./loop.sh plan 1` -- should show raw JSON in terminal (current behavior)
-6. **Directory review**: `./review-log.sh archive/0004-openai-default/logs/` -- should format all logs with headers between files
-7. **Fallback**: Temporarily rename `format-log.sh` and run `./loop.sh plan 1` -- should warn and fall back to raw output
+1. **Pipe mode**: `./loop.sh plan 1` → terminal shows markdown-formatted output (headers, code blocks, blockquotes)
+2. **Saved markdown**: `cat logs/*.md` → valid markdown with `##` headers, `` ``` `` code blocks, `|` tables (not raw JSON)
+3. **VS Code preview**: Open `logs/*.md` in VS Code → renders as readable markdown preview
+4. **Review new logs**: `./review-log.sh logs/` → shows `.md` files directly via `cat`
+5. **Review archived logs**: `./review-log.sh archive/0004-openai-default/logs/` → still formats old `.log` JSON files through `format-log.sh`
+6. **Formatting disabled**: `FORMAT_LOGS=0 ./loop.sh plan 1` → raw JSON saved to `.md` (unformatted fallback)
+7. **Single file review**: `./review-log.sh logs/some_file.md` → cat directly; `./review-log.sh archive/.../some.log` → pipe through formatter
