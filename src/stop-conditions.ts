@@ -44,6 +44,10 @@ export const MODEL_PRICING: Record<
     input: 0.00000015,
     output: 0.0000006,
   },
+  "gpt-4.1-mini": {
+    input: 0.0000004,
+    output: 0.0000016,
+  },
   // Google
   "gemini-2.5-pro": {
     input: 0.00000125,

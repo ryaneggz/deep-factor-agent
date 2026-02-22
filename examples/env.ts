@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 // Default model if MODEL_ID env var is not set
-export const MODEL_ID = process.env.MODEL_ID ?? "claude-sonnet-4-5";
+export const MODEL_ID = process.env.MODEL_ID ?? "gpt-4.1-mini";
 
 // Validate that at least one provider key is present
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
