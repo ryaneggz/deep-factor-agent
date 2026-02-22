@@ -371,11 +371,11 @@ This library is designed around the [12-factor agent](https://github.com/humanla
 ## Development
 
 ```bash
-pnpm install        # install dependencies
-pnpm build          # compile TypeScript
-pnpm test           # run tests (vitest)
-pnpm type-check     # type-check without emitting
-pnpm dev            # watch mode
+make install        # install dependencies
+make build          # compile TypeScript
+make test           # run tests (vitest)
+make type-check     # type-check without emitting
+make dev            # watch mode
 ```
 
 ## License

@@ -1,6 +1,6 @@
-node_modules/
-dist/
-.env
+packages/deep-factor-agent/node_modules/
+packages/deep-factor-agent/dist/
+packages/deep-factor-agent/.env
 *.tsbuildinfo
-logs/
-coverage/
+.ralph/logs/
+packages/deep-factor-agent/coverage/
