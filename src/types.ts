@@ -138,6 +138,8 @@ export type VerifyCompletion = (ctx: VerifyContext) => Promise<VerifyResult>;
 export interface ContextManagementConfig {
   maxContextTokens?: number;
   keepRecentIterations?: number;
+  /** Custom token estimator replacing the built-in `Math.ceil(text.length / 3.5)` heuristic. */
+  tokenEstimator?: (text: string) => number;
 }
 
 // --- Middleware ---

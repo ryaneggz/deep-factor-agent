@@ -68,6 +68,60 @@ describe("ContextManager", () => {
     });
   });
 
+  describe("custom tokenEstimator", () => {
+    it("uses custom tokenEstimator when provided", () => {
+      const customEstimator = (text: string) => text.length; // 1 token per char
+      const cm = new ContextManager({ tokenEstimator: customEstimator });
+      const thread = makeThread([
+        {
+          type: "message",
+          role: "user",
+          content: "Hello world",
+          timestamp: Date.now(),
+          iteration: 1,
+        },
+      ]);
+      const tokens = cm.estimateThreadTokens(thread);
+      const expected = JSON.stringify(thread.events[0]).length;
+      expect(tokens).toBe(expected);
+    });
+
+    it("custom tokenEstimator affects needsSummarization threshold", () => {
+      // Use an inflated estimator so even small threads trigger summarization
+      const inflated = (_text: string) => 100000;
+      const cm = new ContextManager({
+        maxContextTokens: 50000,
+        tokenEstimator: inflated,
+      });
+      const thread = makeThread([
+        {
+          type: "message",
+          role: "user",
+          content: "tiny",
+          timestamp: Date.now(),
+          iteration: 1,
+        },
+      ]);
+      expect(cm.needsSummarization(thread)).toBe(true);
+    });
+
+    it("falls back to estimateTokens when no custom estimator is provided", () => {
+      const cm = new ContextManager();
+      const thread = makeThread([
+        {
+          type: "message",
+          role: "user",
+          content: "hello",
+          timestamp: Date.now(),
+          iteration: 1,
+        },
+      ]);
+      const tokens = cm.estimateThreadTokens(thread);
+      const expected = estimateTokens(JSON.stringify(thread.events[0]));
+      expect(tokens).toBe(expected);
+    });
+  });
+
   describe("needsSummarization", () => {
     it("returns false when below threshold", () => {
       const cm = new ContextManager({ maxContextTokens: 100000 });

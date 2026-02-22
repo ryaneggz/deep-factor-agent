@@ -98,6 +98,45 @@ describe("composeMiddleware", () => {
     warnSpy.mockRestore();
   });
 
+  it("calls custom onConflict callback instead of console.warn on tool name conflict", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const conflicts: Array<{ toolName: string; middlewareName: string }> = [];
+
+    const mw1: AgentMiddleware = {
+      name: "mw1",
+      tools: [
+        tool(async () => "v1", {
+          name: "shared_tool",
+          description: "V1",
+          schema: z.object({}),
+        }),
+      ],
+    };
+    const mw2: AgentMiddleware = {
+      name: "mw2",
+      tools: [
+        tool(async () => "v2", {
+          name: "shared_tool",
+          description: "V2",
+          schema: z.object({}),
+        }),
+      ],
+    };
+
+    const composed = composeMiddleware([mw1, mw2], {
+      onConflict: (toolName, middlewareName) => {
+        conflicts.push({ toolName, middlewareName });
+      },
+    });
+
+    expect(conflicts).toEqual([{ toolName: "shared_tool", middlewareName: "mw2" }]);
+    expect(warnSpy).not.toHaveBeenCalled();
+    const sharedTool = composed.tools.find((t) => t.name === "shared_tool");
+    expect(sharedTool!.description).toBe("V2");
+
+    warnSpy.mockRestore();
+  });
+
   it("executes beforeIteration hooks in order", async () => {
     const order: string[] = [];
 

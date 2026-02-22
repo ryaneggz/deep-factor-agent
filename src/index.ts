@@ -49,7 +49,7 @@ export {
   TOOL_NAME_WRITE_TODOS,
 } from "./middleware.js";
 
-export type { ComposedMiddleware } from "./middleware.js";
+export type { ComposedMiddleware, ComposeMiddlewareOptions } from "./middleware.js";
 
 // Context management
 export { ContextManager, estimateTokens } from "./context-manager.js";

@@ -6,6 +6,16 @@ import type {
   SummaryEvent,
 } from "./types.js";
 
+/**
+ * Default token estimator using `Math.ceil(text.length / 3.5)`.
+ *
+ * This heuristic assumes ~3.5 characters per token, which is reasonable for
+ * English prose but inaccurate for CJK text, emoji-heavy content, and dense
+ * code (where the ratio is closer to 1.5–2.5 chars/token). It only affects
+ * summarization trigger timing — not billing — so moderate inaccuracy is
+ * acceptable. For tighter control, supply a custom `tokenEstimator` in
+ * `ContextManagementConfig`.
+ */
 export function estimateTokens(text: string): number {
   if (text.length === 0) return 0;
   return Math.ceil(text.length / 3.5);
@@ -14,17 +24,19 @@ export function estimateTokens(text: string): number {
 export class ContextManager {
   private maxContextTokens: number;
   private keepRecentIterations: number;
+  private tokenEstimator: (text: string) => number;
 
   constructor(config: ContextManagementConfig = {}) {
     this.maxContextTokens = config.maxContextTokens ?? 150000;
     this.keepRecentIterations = config.keepRecentIterations ?? 3;
+    this.tokenEstimator = config.tokenEstimator ?? estimateTokens;
   }
 
   estimateThreadTokens(thread: AgentThread): number {
     let total = 0;
     for (const event of thread.events) {
       const serialized = JSON.stringify(event);
-      total += estimateTokens(serialized);
+      total += this.tokenEstimator(serialized);
     }
     return total;
   }

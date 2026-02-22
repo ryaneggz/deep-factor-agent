@@ -15,19 +15,30 @@ export interface ComposedMiddleware {
   afterIteration: (ctx: MiddlewareContext, result: unknown) => Promise<void>;
 }
 
+export interface ComposeMiddlewareOptions {
+  /** Called when two middleware provide a tool with the same name. Defaults to `console.warn`. */
+  onConflict?: (toolName: string, middlewareName: string) => void;
+}
+
 export function composeMiddleware(
   middlewares: AgentMiddleware[],
+  options?: ComposeMiddlewareOptions,
 ): ComposedMiddleware {
   const tools: StructuredToolInterface[] = [];
+  const onConflict =
+    options?.onConflict ??
+    ((toolName: string, middlewareName: string) => {
+      console.warn(
+        `Middleware tool conflict: "${toolName}" from "${middlewareName}" overrides a previous definition`,
+      );
+    });
 
   for (const mw of middlewares) {
     if (mw.tools) {
       for (const t of mw.tools) {
         const existing = tools.findIndex((x) => x.name === t.name);
         if (existing >= 0) {
-          console.warn(
-            `Middleware tool conflict: "${t.name}" from "${mw.name}" overrides a previous definition`,
-          );
+          onConflict(t.name, mw.name);
           tools[existing] = t;
         } else {
           tools.push(t);
