@@ -46,10 +46,10 @@ Template file showing required environment variables.
 
 ```
 # Required: API key for your model provider
-OPENAI_API_KEY=your-api-key-here
+ANTHROPIC_API_KEY=your-api-key-here
 
-# Optional: Override the default model (default: gpt-4o)
-# MODEL_ID=gpt-4o
+# Optional: Override the default model (default: claude-sonnet-4-5)
+# MODEL_ID=claude-sonnet-4-5
 ```
 
 ### 2. `package.json` changes
@@ -61,12 +61,12 @@ Add to `devDependencies`:
   "devDependencies": {
     "dotenv": "^16.5.0",
     "tsx": "^4.19.0",
-    "@langchain/openai": "^0.5.0"
+    "@langchain/anthropic": "^1.3.0"
   }
 }
 ```
 
-> `dotenv` for env loading, `tsx` for running TypeScript directly, `@langchain/openai` as the default provider for examples.
+> `dotenv` for env loading, `tsx` for running TypeScript directly, `@langchain/anthropic` as the default provider for examples.
 
 ### 3. `examples/env.ts`
 
@@ -76,16 +76,16 @@ Shared environment configuration module.
 import "dotenv/config";
 
 // Default model if MODEL_ID env var is not set
-export const MODEL_ID = process.env.MODEL_ID ?? "gpt-4o";
+export const MODEL_ID = process.env.MODEL_ID ?? "claude-sonnet-4-5";
 
 // Validate that at least one provider key is present
-const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 const hasGoogleKey = !!process.env.GOOGLE_API_KEY;
 
-if (!hasOpenAIKey && !hasAnthropicKey && !hasGoogleKey) {
+if (!hasAnthropicKey && !hasOpenAIKey && !hasGoogleKey) {
   console.error(
-    "Error: No API key found. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY in your .env file.",
+    "Error: No API key found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in your .env file.",
   );
   process.exit(1);
 }
@@ -95,7 +95,7 @@ console.log(`Using model: ${MODEL_ID}\n`);
 
 **Key behaviors:**
 - Loads `.env` via `dotenv/config` side-effect import
-- Exports `MODEL_ID` (defaults to `gpt-4o`)
+- Exports `MODEL_ID` (defaults to `claude-sonnet-4-5`)
 - Validates that at least one provider API key is set
 - Prints the active model on startup
 
@@ -125,7 +125,7 @@ Runnable TypeScript examples demonstrating the deep-factor-agent library.
 
 4. Add your API key to `.env`:
    ```
-   OPENAI_API_KEY=sk-...
+   ANTHROPIC_API_KEY=sk-ant-...
    ```
 
 ## Running Examples
@@ -165,8 +165,8 @@ ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 Supported models include any model supported by LangChain's `initChatModel`:
-- `gpt-4o`, `gpt-4o-mini` (OpenAI)
 - `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-5` (Anthropic)
+- `gpt-4o`, `gpt-4o-mini` (OpenAI)
 - `gemini-2.5-pro`, `gemini-2.5-flash` (Google)
 
 ## Example Overview
@@ -379,8 +379,8 @@ main().catch(console.error);
 
 ## ACCEPTANCE CRITERIA
 
-- [ ] `.env.example` exists at project root with `OPENAI_API_KEY` and `MODEL_ID` placeholders
-- [ ] `package.json` has `dotenv`, `tsx`, and `@langchain/openai` in `devDependencies`
+- [ ] `.env.example` exists at project root with `ANTHROPIC_API_KEY` and `MODEL_ID` placeholders
+- [ ] `package.json` has `dotenv`, `tsx`, and `@langchain/anthropic` in `devDependencies`
 - [ ] `examples/env.ts` loads dotenv, exports `MODEL_ID`, validates API keys, prints active model
 - [ ] `examples/README.md` documents prerequisites, setup, running instructions, and example overview
 - [ ] `examples/01-basic.ts` creates an agent with string model, runs `loop()`, prints result summary

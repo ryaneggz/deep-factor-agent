@@ -6,40 +6,15 @@
 
 ---
 
-## Completed (Core Library)
+## Completed Work
 
-All items below are fully implemented, tested, and type-checked:
+All planned work is fully implemented, tested, and type-checked. This covers the core library (types, stop conditions, agent loop, middleware, factory, human-in-the-loop, context management, tool adapter, barrel exports, and 93-test suite) as well as the full examples suite (7 runnable examples spanning basic usage, tools, streaming, stop conditions, middleware, human-in-the-loop, and verification). See commit history for the detailed implementation record.
 
-- [x] **Project setup** — ESM, TypeScript, vitest, pnpm
-- [x] **Types** (`src/types.ts`) — All event types, thread, token usage, stop conditions, verification, middleware, agent settings, results
-- [x] **Stop conditions** (`src/stop-conditions.ts`) — maxIterations, maxTokens, maxInputTokens, maxOutputTokens, maxCost, calculateCost, MODEL_PRICING, evaluateStopConditions
-- [x] **Agent loop** (`src/agent.ts`) — DeepFactorAgent class with loop(), stream(), tool execution, error recovery, human-in-the-loop, verification, context management integration
-- [x] **Middleware** (`src/middleware.ts`) — composeMiddleware, todoMiddleware, errorRecoveryMiddleware
-- [x] **Factory** (`src/create-agent.ts`) — createDeepFactorAgent with sensible defaults
-- [x] **Human-in-the-loop** (`src/human-in-the-loop.ts`) — requestHumanInput tool with Zod schema
-- [x] **Context management** (`src/context-manager.ts`) — ContextManager, estimateTokens, summarization
-- [x] **Tool adapter** (`src/tool-adapter.ts`) — createLangChainTool, toolArrayToMap, findToolByName
-- [x] **Barrel exports** (`src/index.ts`) — All public API re-exported
-- [x] **Test suite** — 93 tests across 7 files, all passing
-- [x] **README.md** — Full documentation with API reference
+---
 
-## Completed (SPEC-01 — Examples Setup & Basic Examples)
+## Spec Reconciliation
 
-- [x] **1.1 `.env.example`** — Template with `ANTHROPIC_API_KEY` and `MODEL_ID` placeholders
-- [x] **1.2 `package.json` devDependencies** — Added `dotenv` (^16.5.0), `tsx` (^4.19.0), `@langchain/anthropic` (^1.3.0)
-  - Note: Spec said `^0.3.0` but `@langchain/anthropic@0.3.x` has peer dep `@langchain/core >=0.3.58 <0.4.0`, incompatible with project's `@langchain/core@^1.1.27`. Used `^1.3.0` instead.
-- [x] **1.3 `examples/env.ts`** — Loads dotenv, exports `MODEL_ID`, validates API keys, prints active model
-- [x] **1.4 `examples/README.md`** — Prerequisites, setup, running, overview table
-- [x] **1.5 `examples/01-basic.ts`** — Minimal agent, string model, loop(), result summary
-- [x] **1.6 `examples/02-tools.ts`** — calculator + weather tools, thread event inspection
-- [x] **1.7 `examples/03-streaming.ts`** — agent.stream(), stdout.write, handles string + structured content
-
-## Completed (SPEC-02 — Advanced Examples)
-
-- [x] **2.1 `examples/04-stop-conditions.ts`** — maxIterations, maxTokens, maxCost combined; calculateCost; stopDetail
-- [x] **2.2 `examples/05-middleware.ts`** — logging, timing, dateToolMiddleware + todoMiddleware + errorRecoveryMiddleware
-- [x] **2.3 `examples/06-human-in-the-loop.ts`** — requestHumanInput, isPendingResult, result.resume()
-- [x] **2.4 `examples/07-verification.ts`** — verifyCompletion with JSON structure check, self-correction, completed vs stop_condition
+`specs/01-examples-setup-basic.md` was updated to reflect the actual provider package chosen during implementation. The spec originally listed `@langchain/openai@^0.5.0`, but the project uses `@langchain/anthropic@^1.3.0`. The `^0.3.x` release of `@langchain/anthropic` has a peer dependency on `@langchain/core >=0.3.58 <0.4.0`, which is incompatible with this project's `@langchain/core@^1.1.27`. Version `^1.3.0` satisfies the `1.x` peer requirement and is what is installed.
 
 ---
 
