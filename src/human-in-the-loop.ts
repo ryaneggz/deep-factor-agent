@@ -1,0 +1,39 @@
+import { z } from "zod";
+import type { ToolSet } from "ai";
+
+export const requestHumanInputSchema = z.object({
+  question: z.string().describe("The question to ask the human"),
+  context: z.string().optional().describe("Background context for the question"),
+  urgency: z
+    .enum(["low", "medium", "high"])
+    .optional()
+    .default("medium")
+    .describe("How urgent is this request"),
+  format: z
+    .enum(["free_text", "yes_no", "multiple_choice"])
+    .optional()
+    .default("free_text")
+    .describe("Expected response format"),
+  choices: z
+    .array(z.string())
+    .optional()
+    .describe("Options for multiple_choice format"),
+});
+
+export const requestHumanInput = {
+  description:
+    "Request input or approval from a human. Use when you need clarification, confirmation, or a decision.",
+  parameters: requestHumanInputSchema,
+  execute: async (args: z.infer<typeof requestHumanInputSchema>) => {
+    // The actual pause mechanism is handled by the agent loop.
+    // This tool's execute function returns the args so the loop can detect it.
+    return {
+      requested: true,
+      question: args.question,
+      context: args.context,
+      urgency: args.urgency,
+      format: args.format,
+      choices: args.choices,
+    };
+  },
+} as unknown as ToolSet[string];
