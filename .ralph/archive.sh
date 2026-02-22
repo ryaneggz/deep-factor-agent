@@ -1,8 +1,7 @@
 #!/bin/bash
 # archive.sh — Archive current implementation phase
-# Moves IMPLEMENTATION_PLAN.md, specs/, and logs/ into archive/NNNN-name/,
-# deletes ephemeral .claude/plans/*.md, and resets IMPLEMENTATION_PLAN.md
-# to a fresh template.
+# Moves IMPLEMENTATION_PLAN.md and specs/ into archive/NNNN-name/,
+# deletes logs/, and resets IMPLEMENTATION_PLAN.md to a fresh template.
 #
 # Usage:
 #   ./archive.sh                    # Derive name from git branch
@@ -11,12 +10,10 @@
 #   ./archive.sh my-feature --yes   # Both
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 IMPL_PLAN="$SCRIPT_DIR/IMPLEMENTATION_PLAN.md"
 SPECS_DIR="$SCRIPT_DIR/specs"
 LOGS_DIR="$SCRIPT_DIR/logs"
-PLANS_DIR="$REPO_ROOT/.claude/plans"
 
 # ── Parse arguments ──────────────────────────────────────────
 
@@ -178,8 +175,8 @@ if [ -d "$LOGS_DIR" ]; then
     done
 fi
 
-if [ "$has_specs" = false ] && [ "$has_logs" = false ]; then
-    echo "Error: No specs or logs to archive." >&2
+if [ "$has_specs" = false ]; then
+    echo "Error: No specs to archive." >&2
     exit 1
 fi
 
@@ -214,21 +211,9 @@ if [ "$has_logs" = true ]; then
         [ "$(basename "$f")" = ".gitkeep" ] && continue
         local_count=$((local_count + 1))
     done
-    echo "║   logs/ ($local_count files) → ${NUMBER}-${NAME}/logs/"
-fi
-
-# Ephemeral plans
-plan_count=0
-if [ -d "$PLANS_DIR" ]; then
-    for f in "$PLANS_DIR"/*.md; do
-        [ -f "$f" ] || continue
-        plan_count=$((plan_count + 1))
-    done
-fi
-if [ "$plan_count" -gt 0 ]; then
     echo "║"
     echo "║ Delete:"
-    echo "║   .claude/plans/*.md ($plan_count files)"
+    echo "║   logs/ ($local_count files)"
 fi
 
 echo "║"
@@ -268,19 +253,13 @@ if [ "$has_specs" = true ]; then
     done
 fi
 
-# Move logs (except .gitkeep)
+# Delete logs (except .gitkeep)
 if [ "$has_logs" = true ]; then
-    mkdir -p "$TARGET_DIR/logs"
     for f in "$LOGS_DIR"/*; do
         [ -f "$f" ] || continue
         [ "$(basename "$f")" = ".gitkeep" ] && continue
-        mv "$f" "$TARGET_DIR/logs/"
+        rm -f "$f"
     done
-fi
-
-# Delete ephemeral plans
-if [ "$plan_count" -gt 0 ]; then
-    rm -f "$PLANS_DIR"/*.md
 fi
 
 # Write fresh template
@@ -293,7 +272,6 @@ echo "╔═══════════════════════�
 echo "║ ARCHIVE COMPLETE"
 echo "║ Archived to: $TARGET_DIR/"
 [ "$has_specs" = true ] && echo "║ Specs:       moved"
-[ "$has_logs" = true ]  && echo "║ Logs:        moved"
-[ "$plan_count" -gt 0 ] && echo "║ Plans:       deleted ($plan_count files)"
+[ "$has_logs" = true ]  && echo "║ Logs:        deleted"
 echo "║ Template:    reset"
 echo "╚══════════════════════════════════════════"
