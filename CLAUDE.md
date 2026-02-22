@@ -1,0 +1,3 @@
+# CLAUDE.md
+
+_READ_ ./AGENTS.md
