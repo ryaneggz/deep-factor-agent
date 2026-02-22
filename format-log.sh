@@ -82,6 +82,7 @@ while IFS= read -r line || [ -n "$line" ]; do
             "---"
 
         elif .type == "system" and .subtype == "task_started" then
+            "",
             "### Subagent",
             "",
             "> \(.description // "unknown") (task_id=\((.task_id // "unknown")[0:8]))"
@@ -89,19 +90,22 @@ while IFS= read -r line || [ -n "$line" ]; do
         elif .type == "assistant" then
             (.message.content // [] | .[] |
                 if .type == "thinking" then
+                    "",
                     "### Thinking",
                     "",
                     "> " + ((.thinking // "") | gsub("\n"; " ") | trunc($think_max))
                 elif .type == "text" then
+                    "",
                     "### Assistant",
                     "",
                     (.text // "")
                 elif .type == "tool_use" then
-                    "### Tool: `\(.name // "unknown")`",
+                    "",
+                    "### Tool: `\((.name // "unknown") | split("\" id=\"") | .[0])`",
                     "",
                     "```",
                     ((.input // {}) | to_entries | map(
-                        .key + "=\"" + (.value | tostring | .[0:60]) + "\""
+                        .key + "=\"" + (.value | tostring) + "\""
                     ) | join(", ") | trunc($tool_max)),
                     "```"
                 else
@@ -113,18 +117,25 @@ while IFS= read -r line || [ -n "$line" ]; do
             (.message.content // [] | .[] |
                 if .type == "tool_result" then
                     if .is_error == true then
+                        "",
                         "### Error",
                         "",
                         "```",
-                        ((.content // "") | tostring | gsub("\n"; " ") | trunc($result_max)),
+                        ((.content // "") | tostring | trunc($result_max)),
                         "```"
                     else
+                        "",
                         "### Result",
                         "",
                         "```",
-                        ((.content // "") | tostring | gsub("\n"; " ") | trunc($result_max)),
+                        ((.content // "") | tostring | trunc($result_max)),
                         "```"
                     end
+                elif .type == "text" then
+                    "",
+                    "### User",
+                    "",
+                    "> " + ((.text // "") | gsub("\n"; " ") | trunc($result_max))
                 else
                     "*Unknown event: type=user content_type=\(.type)*"
                 end

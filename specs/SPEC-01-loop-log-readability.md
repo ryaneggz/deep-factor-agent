@@ -76,6 +76,7 @@ Each stream-json line is parsed and formatted according to its `type` and `subty
 | `assistant/tool_use` | `[TOOL] Read(file_path="...")` | `` ### Tool: `Read` `` + ` ```\nfile_path="..."\n``` ` |
 | `user/tool_result` | `[RESULT] content...` | `### Result` + ` ```\ncontent...\n``` ` |
 | `user/tool_result` (error) | `[ERROR] content...` | `### Error` + ` ```\ncontent...\n``` ` |
+| `user/text` | *(not handled)* | `### User` + `> text content` (blockquote) |
 | `system/task_started` | `[SUBAGENT] desc (id)` | `### Subagent` + `> desc (task_id=short_id)` |
 | `rate_limit_event` | `[RATE] status=allowed` | `*Rate limit: allowed*` (italic, inline) |
 | `result/success` | Box with `[DONE]` + metrics | `---` + `## Session Complete` + metrics table |
@@ -115,6 +116,18 @@ Each stream-json line is parsed and formatted according to its `type` and `subty
 - `RESULT_MAX_CHARS` -- max chars for tool result content (default: `500`)
 - `TOOL_ARGS_MAX_CHARS` -- max chars for tool_use input display (default: `120`)
 
+#### Known Rendering Issues
+
+The initial markdown implementation (commit `537ab00`) produced output with 5 rendering bugs observed in `logs/20260222_131721_build_iter0.md`. These must be fixed:
+
+| # | Bug | Root Cause | Fix |
+|---|-----|-----------|-----|
+| 1 | **Missing blank lines before `###` headings** — `---\n### Thinking`, `> blockquote\n### Assistant`, etc. render as literal text instead of headings | Each jq event block emits its `###` heading without a leading blank line. Markdown requires a blank line before headings. | Each event block must emit a leading blank line (`""`) before its `###` heading. |
+| 2 | **Tool name includes `" id="toolu_..."` suffix** — e.g. `` ### Tool: `Task" id="toolu_01YVE..."` `` | Some stream-json `tool_use` events have the `id` field concatenated into `.name` (upstream API quirk). | Sanitize `.name` by stripping everything from `" id="` onward: `(.name // "unknown") \| split("\" id=\"") \| .[0]` |
+| 3 | **Newlines collapsed in Result/Error code blocks** — multi-line content compressed to one line (`1→# SPEC-01...  2→  3→## CONTEXT...`) | `gsub("\n"; " ")` in Result/Error handlers collapses all newlines to spaces. | Remove `gsub("\n"; " ")` from Result and Error handlers. Code blocks preserve newlines natively. |
+| 4 | **Unhandled `user/text` content type** — renders as `*Unknown event: type=user content_type=text*` | User message handler only handles `tool_result` content blocks. User messages can also contain `text` content blocks (e.g. subagent responses). | Add handler for `.type == "text"` inside the user branch — render as `### User` + `> text` blockquote. |
+| 5 | **Double truncation of tool args** — args cut at arbitrary positions with missing closing quotes | `.value \| tostring \| .[0:60]` truncates each value to 60 chars, then `trunc($tool_max)` truncates the joined result again to 120 chars. | Remove per-value `.[0:60]` limit. Rely solely on `trunc($tool_max)` for the total. |
+
 #### Usage Modes
 
 ```bash
@@ -137,18 +150,23 @@ THINK_MAX_CHARS=500 RESULT_MAX_CHARS=1000 ./format-log.sh < archive/some.log
 
 #### Acceptance Criteria
 
-- [ ] `format-log.sh` exists at project root, is executable (`chmod +x`)
-- [ ] Handles all event types from the markdown mapping table above
-- [ ] Outputs valid markdown: `##` headers, `###` sub-headers, `` ``` `` code blocks, `>` blockquotes, `|` tables
-- [ ] Strips UUIDs, signatures, per-message usage from output
-- [ ] Truncates thinking, tool results, and tool args to configurable max lengths
-- [ ] Uses `---` horizontal rules for visual separation (no plain-text box drawing)
-- [ ] Prints markdown metrics table for `result/success` events
-- [ ] Passes through non-JSON lines unchanged (e.g. git output, loop banners)
-- [ ] Works in pipe mode: `echo '{"type":"system","subtype":"init",...}' | ./format-log.sh`
-- [ ] Works in review mode: `./format-log.sh < archive/0004-openai-default/logs/20260222_092718_plan_iter0.log`
-- [ ] Requires only `bash` and `jq` (no Node, Python, or other runtime)
-- [ ] Output renders correctly in VS Code markdown preview
+- [x] `format-log.sh` exists at project root, is executable (`chmod +x`)
+- [x] Handles all event types from the markdown mapping table above
+- [x] Outputs valid markdown: `##` headers, `###` sub-headers, `` ``` `` code blocks, `>` blockquotes, `|` tables
+- [x] Strips UUIDs, signatures, per-message usage from output
+- [x] Truncates thinking, tool results, and tool args to configurable max lengths
+- [x] Uses `---` horizontal rules for visual separation (no plain-text box drawing)
+- [x] Prints markdown metrics table for `result/success` events
+- [x] Passes through non-JSON lines unchanged (e.g. git output, loop banners)
+- [x] Works in pipe mode: `echo '{"type":"system","subtype":"init",...}' | ./format-log.sh`
+- [x] Works in review mode: `./format-log.sh < archive/0004-openai-default/logs/20260222_092718_plan_iter0.log`
+- [x] Requires only `bash` and `jq` (no Node, Python, or other runtime)
+- [x] Output renders correctly in VS Code markdown preview
+- [x] Blank line emitted before every `###` heading (valid markdown rendering)
+- [x] Tool names sanitized — no embedded `" id="` attributes in heading
+- [x] Code blocks in Result/Error preserve newlines (multi-line content readable)
+- [x] User `text` content blocks handled — rendered as blockquote, not unknown event
+- [x] Tool args use only `TOOL_ARGS_MAX_CHARS` total limit (no per-value 60-char truncation)
 
 ---
 

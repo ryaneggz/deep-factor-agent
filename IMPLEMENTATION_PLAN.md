@@ -3,16 +3,18 @@
 > Last updated: 2026-02-22
 > Core TypeScript library status: **COMPLETE** (129/129 tests pass, type-check clean, no TODOs/placeholders)
 > Archived plans (0001-0004): **COMPLETE**
-> SPEC-01 — Loop Log Readability (plain-text `[PREFIX]` phase): **COMPLETE**
-> SPEC-01 — Loop Log Readability (markdown rewrite phase): **COMPLETE**
+> SPEC-01 -- Loop Log Readability: **COMPLETE**
 
 ---
 
 ## Status Summary
 
-The `deep-factor-agent` TypeScript library is fully implemented and tested. All prior implementation plans (0001-setup, 0002-readme, 0003-replace-ai-sdk, 0004-openai-default) are complete and archived.
+The `deep-factor-agent` TypeScript library is fully implemented and tested. All prior implementation plans (0001-setup through 0004-openai-default) are complete and archived.
 
-**SPEC-01** (`specs/SPEC-01-loop-log-readability.md`) is **COMPLETE** — both the original plain-text `[PREFIX]` phase and the markdown rewrite phase.
+**SPEC-01** (`specs/SPEC-01-loop-log-readability.md`) is **COMPLETE**:
+- **US-01 (`format-log.sh`):** COMPLETE -- all 5 rendering bugs fixed
+- **US-02 (`loop.sh`):** COMPLETE
+- **US-03 (`review-log.sh`):** COMPLETE
 
 **Branch:** `ryaneggz/0001-clean-up-loop-log`
 
@@ -20,17 +22,31 @@ The `deep-factor-agent` TypeScript library is fully implemented and tested. All 
 
 ## Completed Items
 
-### SPEC-01 Phase 2 (Markdown Rewrite)
-- **Status:** COMPLETE
-- **US-01:** `format-log.sh` — Rewrote jq transformation from `[PREFIX]` lines to markdown (`##` headers, `###` sub-headers, `` ``` `` code blocks, `>` blockquotes, `|` tables, `---` horizontal rules). Removed phase tracking/box-drawing separators. Session summary now renders as a markdown table.
-- **US-02:** `loop.sh` — Changed `.log` → `.md` extension. Reversed pipeline to `... | ./format-log.sh | tee "$LOG_FILE"` so formatted markdown is saved (not raw JSON). Updated comments. Fixed missing executable permission (`chmod +x`).
-- **US-03:** `review-log.sh` — Added dual format support: `.md` files displayed via `cat`, `.log` files piped through `format-log.sh`. Directory mode prefers `*.md`, falls back to `*.log`. Updated usage message and examples.
+### SPEC-01 US-01 (`format-log.sh`) -- Markdown Rendering Bugs
+- **Status:** COMPLETE (all 5 bugs fixed and verified)
+- **Bug 1:** Blank line emitted before every `###` heading (valid markdown rendering)
+- **Bug 2:** Tool names sanitized via `split("\" id=\"") | .[0]` -- no embedded `" id="` attributes
+- **Bug 3:** `gsub("\n"; " ")` removed from Result/Error handlers -- code blocks preserve newlines
+- **Bug 4:** `user/text` content blocks handled -- rendered as `### User` blockquote
+- **Bug 5:** Per-value `.[0:60]` removed -- tool args use only `TOOL_ARGS_MAX_CHARS` total limit
 
-### SPEC-01 Phase 1 (Plain-text `[PREFIX]` format)
-- **Status:** COMPLETE (implemented in commit `537ab00`)
-- `format-log.sh` — `[PREFIX]` output with phase separators, summary box
-- `loop.sh` — `FORMAT_LOGS` control, dual output, timing, summaries
-- `review-log.sh` — File/directory review, usage help
+### SPEC-01 US-02 (`loop.sh`) -- Markdown Pipeline
+- **Status:** COMPLETE
+- Changed `.log` to `.md` extension
+- Reversed pipeline to `... | ./format-log.sh | tee "$LOG_FILE"` (formatted output saved)
+- `FORMAT_LOGS` env var control with fallback warning
+- Iteration timing (start/end/duration)
+- Per-iteration and session summary boxes
+- Executable permission set
+
+### SPEC-01 US-03 (`review-log.sh`) -- Dual Format Support
+- **Status:** COMPLETE
+- `.md` files displayed via `cat` (already formatted)
+- `.log` files piped through `format-log.sh` (backward compat)
+- Directory mode: prefers `*.md`, falls back to `*.log`
+- Filename headers between multiple files
+- Usage message with examples
+- Executable permission set
 
 ### Core TypeScript Library
 - **Status:** COMPLETE (129/129 tests pass, type-check clean)
@@ -43,18 +59,23 @@ The `deep-factor-agent` TypeScript library is fully implemented and tested. All 
 
 ---
 
-## Deferred / Low Priority
+## Low Priority / Deferred
 
-### Test Coverage Hardening (OPTIONAL)
-- Private helper functions (`extractTextContent`, `compactError`, `extractModelId`) not directly unit tested — tested indirectly through integration
-- Edge cases: empty strings, boundary truncation lengths, floating-point precision in cost calculation
-- Error paths: model resolve failures, tool execution errors, middleware hook exceptions
-- Not urgent — library is stable with 129/129 tests passing
+### Hardcoded Constants in TypeScript Library (INFORMATIONAL, NOT BUGS)
+These are architectural observations, not blocking issues. They may warrant new specs if the project grows beyond its current scope.
+
+- **MODEL_PRICING hardcoded** (`src/stop-conditions.ts`, line 10): Static pricing for 7 models. Acceptable for current scope.
+- **Max consecutive errors hardcoded to 3** (`src/agent.ts`, line 613): Not configurable via `AgentConfig`. Minor enhancement.
+- **Token estimation heuristic** (`src/context-manager.ts`, line 21): `Math.ceil(text.length / 3.5)`. Already has `tokenEstimator` config option.
+
+### New Specs (NONE NEEDED CURRENTLY)
+- No additional specs are required at this time. The TypeScript library is complete and SPEC-01 is done.
+- **If project scope expands**, consider specs for: dynamic model pricing, configurable error thresholds, automated log verification tests.
 
 ---
 
 ## Notes
 
-- **No TypeScript changes needed** — the markdown rewrite was entirely Bash + jq
-- **No new dependencies** — jq remains the only external dependency
-- **Backward compatibility** — `review-log.sh` handles both `.md` (new) and `.log` (archived) files transparently
+- **No new dependencies** -- jq remains the only external dependency for shell scripts
+- **Backward compatibility** -- `review-log.sh` handles both `.md` (new) and `.log` (archived) files transparently
+- **Package version is `0.0.0`** -- pre-release; version bump should happen when library is published
