@@ -23,7 +23,7 @@ The `deep-factor-agent` TypeScript library is fully implemented and tested. All 
 ### SPEC-01 Phase 2 (Markdown Rewrite)
 - **Status:** COMPLETE
 - **US-01:** `format-log.sh` — Rewrote jq transformation from `[PREFIX]` lines to markdown (`##` headers, `###` sub-headers, `` ``` `` code blocks, `>` blockquotes, `|` tables, `---` horizontal rules). Removed phase tracking/box-drawing separators. Session summary now renders as a markdown table.
-- **US-02:** `loop.sh` — Changed `.log` → `.md` extension. Reversed pipeline to `... | ./format-log.sh | tee "$LOG_FILE"` so formatted markdown is saved (not raw JSON). Updated comments.
+- **US-02:** `loop.sh` — Changed `.log` → `.md` extension. Reversed pipeline to `... | ./format-log.sh | tee "$LOG_FILE"` so formatted markdown is saved (not raw JSON). Updated comments. Fixed missing executable permission (`chmod +x`).
 - **US-03:** `review-log.sh` — Added dual format support: `.md` files displayed via `cat`, `.log` files piped through `format-log.sh`. Directory mode prefers `*.md`, falls back to `*.log`. Updated usage message and examples.
 
 ### SPEC-01 Phase 1 (Plain-text `[PREFIX]` format)
