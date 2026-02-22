@@ -8,8 +8,9 @@ import {
 import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { initChatModel } from "langchain/chat_models/universal";
-import { composeMiddleware } from "./middleware.js";
+import { composeMiddleware, TOOL_NAME_WRITE_TODOS } from "./middleware.js";
 import type { ComposedMiddleware } from "./middleware.js";
+import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "./human-in-the-loop.js";
 import { evaluateStopConditions } from "./stop-conditions.js";
 import { ContextManager } from "./context-manager.js";
 import { findToolByName } from "./tool-adapter.js";
@@ -333,7 +334,7 @@ export class DeepFactorAgent<
             thread.events.push(toolCallEvent);
 
             // Check for requestHumanInput
-            if (tc.name === "requestHumanInput") {
+            if (tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT) {
               const args = (tc.args ?? {}) as Record<string, unknown>;
               const hirEvent: HumanInputRequestedEvent = {
                 type: "human_input_requested",
@@ -375,7 +376,7 @@ export class DeepFactorAgent<
                   : JSON.stringify(toolResult);
 
               // Handle todoMiddleware special cases
-              if (tc.name === "write_todos") {
+              if (tc.name === TOOL_NAME_WRITE_TODOS) {
                 try {
                   const parsed = JSON.parse(resultStr);
                   if (parsed.todos) {

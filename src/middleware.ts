@@ -7,6 +7,8 @@ import type {
   ErrorEvent,
 } from "./types.js";
 
+export const TOOL_NAME_WRITE_TODOS = "write_todos";
+
 export interface ComposedMiddleware {
   tools: StructuredToolInterface[];
   beforeIteration: (ctx: MiddlewareContext) => Promise<void>;
@@ -80,7 +82,7 @@ export function todoMiddleware(): AgentMiddleware {
           return JSON.stringify({ success: true, todos: args.todos });
         },
         {
-          name: "write_todos",
+          name: TOOL_NAME_WRITE_TODOS,
           description:
             "Create or update the todo list for planning and tracking progress",
           schema: todoSchema,

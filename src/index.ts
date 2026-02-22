@@ -46,7 +46,10 @@ export {
   composeMiddleware,
   todoMiddleware,
   errorRecoveryMiddleware,
+  TOOL_NAME_WRITE_TODOS,
 } from "./middleware.js";
+
+export type { ComposedMiddleware } from "./middleware.js";
 
 // Context management
 export { ContextManager, estimateTokens } from "./context-manager.js";
@@ -58,7 +61,11 @@ export { DeepFactorAgent, addUsage } from "./agent.js";
 export { createDeepFactorAgent } from "./create-agent.js";
 
 // Human-in-the-loop
-export { requestHumanInput } from "./human-in-the-loop.js";
+export {
+  requestHumanInput,
+  requestHumanInputSchema,
+  TOOL_NAME_REQUEST_HUMAN_INPUT,
+} from "./human-in-the-loop.js";
 
 // Tool adapter utilities
 export {

@@ -1,6 +1,8 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
+export const TOOL_NAME_REQUEST_HUMAN_INPUT = "requestHumanInput";
+
 export const requestHumanInputSchema = z.object({
   question: z.string().describe("The question to ask the human"),
   context: z.string().optional().describe("Background context for the question"),
@@ -32,7 +34,7 @@ export const requestHumanInput = tool(
     });
   },
   {
-    name: "requestHumanInput",
+    name: TOOL_NAME_REQUEST_HUMAN_INPUT,
     description:
       "Request input or approval from a human. Use when you need clarification, confirmation, or a decision.",
     schema: requestHumanInputSchema,
