@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DeepFactorAgent, addUsage } from "./agent.js";
 import { maxIterations } from "./stop-conditions.js";
+import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "./human-in-the-loop.js";
+import { isPendingResult } from "./types.js";
 import { tool } from "@langchain/core/tools";
-import { AIMessage } from "@langchain/core/messages";
+import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { z } from "zod";
 import type { TokenUsage } from "./types.js";
 
@@ -356,6 +358,334 @@ describe("DeepFactorAgent", () => {
 
       const result = await agent.stream("Test stream");
       expect(result).toBeDefined();
+    });
+
+    it("yields chunks that can be iterated", async () => {
+      const mockModel = makeMockModel();
+      mockModel.stream.mockReturnValueOnce(
+        (async function* () {
+          yield new AIMessageChunk({ content: "Hello " });
+          yield new AIMessageChunk({ content: "World" });
+        })(),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+      });
+
+      const stream = await agent.stream("Test iteration");
+      const chunks: AIMessageChunk[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0].content).toBe("Hello ");
+      expect(chunks[1].content).toBe("World");
+    });
+
+    it("can reconstruct full message from chunks", async () => {
+      const mockModel = makeMockModel();
+      mockModel.stream.mockReturnValueOnce(
+        (async function* () {
+          yield new AIMessageChunk({ content: "The capital " });
+          yield new AIMessageChunk({ content: "of France " });
+          yield new AIMessageChunk({ content: "is Paris." });
+        })(),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+      });
+
+      const stream = await agent.stream("Capital of France?");
+      let fullContent = "";
+      for await (const chunk of stream) {
+        if (typeof chunk.content === "string") {
+          fullContent += chunk.content;
+        }
+      }
+      expect(fullContent).toBe("The capital of France is Paris.");
+    });
+
+    it("propagates errors from the underlying stream", async () => {
+      const mockModel = makeMockModel();
+      mockModel.stream.mockReturnValueOnce(
+        (async function* () {
+          yield new AIMessageChunk({ content: "partial" });
+          throw new Error("Stream interrupted");
+        })(),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+      });
+
+      const stream = await agent.stream("Error test");
+      const chunks: AIMessageChunk[] = [];
+      await expect(async () => {
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("Stream interrupted");
+      expect(chunks).toHaveLength(1);
+    });
+
+    it("binds tools to model when tools are provided", async () => {
+      const mockModel = makeMockModel();
+      mockModel.stream.mockReturnValueOnce(
+        (async function* () {
+          yield new AIMessageChunk({ content: "ok" });
+        })(),
+      );
+
+      const searchTool = tool(
+        async () => "result",
+        {
+          name: "search",
+          description: "Search",
+          schema: z.object({ query: z.string() }),
+        },
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [searchTool],
+      });
+
+      await agent.stream("Test with tools");
+      expect(mockModel.bindTools).toHaveBeenCalledWith(
+        expect.arrayContaining([searchTool]),
+      );
+    });
+  });
+
+  describe("maxToolCallsPerIteration", () => {
+    it("defaults to 20 inner steps", async () => {
+      // Create a mock that always returns tool calls to exhaust the cap
+      const dummyTool = tool(async () => "ok", {
+        name: "dummy",
+        description: "A dummy tool",
+        schema: z.object({}),
+      });
+
+      const mockModel = makeMockModel();
+      // Return tool calls 21 times to exceed default cap; step 21 should not be reached
+      for (let i = 0; i < 21; i++) {
+        mockModel.invoke.mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [{ name: "dummy", args: {}, id: `tc_${i}` }],
+          }),
+        );
+      }
+      // Final response after exhausting inner loop
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [dummyTool],
+      });
+
+      const result = await agent.loop("Exhaust tool calls");
+      // The inner loop ran 20 times (stepCount 0..19), then the outer loop
+      // completed without verification → single iteration
+      const toolCallEvents = result.thread.events.filter(
+        (e) => e.type === "tool_call",
+      );
+      // Should be exactly 20 tool calls (the 21st invoke never triggers a tool_call event)
+      expect(toolCallEvents.length).toBe(20);
+    });
+
+    it("respects custom maxToolCallsPerIteration", async () => {
+      const dummyTool = tool(async () => "ok", {
+        name: "dummy",
+        description: "A dummy tool",
+        schema: z.object({}),
+      });
+
+      const mockModel = makeMockModel();
+      for (let i = 0; i < 4; i++) {
+        mockModel.invoke.mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [{ name: "dummy", args: {}, id: `tc_${i}` }],
+          }),
+        );
+      }
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [dummyTool],
+        maxToolCallsPerIteration: 3,
+      });
+
+      const result = await agent.loop("Limited tool calls");
+      const toolCallEvents = result.thread.events.filter(
+        (e) => e.type === "tool_call",
+      );
+      // With cap of 3, only 3 inner steps run (step 0, 1, 2)
+      expect(toolCallEvents.length).toBe(3);
+    });
+  });
+
+  describe("multiple tool calls in single response", () => {
+    it("executes multiple tool calls from one model response", async () => {
+      const calcTool = tool(
+        async (args: { expression: string }) => `Result: ${args.expression}`,
+        {
+          name: "calculator",
+          description: "Calculate",
+          schema: z.object({ expression: z.string() }),
+        },
+      );
+      const weatherTool = tool(
+        async (args: { city: string }) => `72°F in ${args.city}`,
+        {
+          name: "weather",
+          description: "Weather",
+          schema: z.object({ city: z.string() }),
+        },
+      );
+
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [
+              { name: "calculator", args: { expression: "2+2" }, id: "tc_1" },
+              { name: "weather", args: { city: "Austin" }, id: "tc_2" },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Here are the results"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [calcTool, weatherTool],
+      });
+
+      const result = await agent.loop("Calculate and check weather");
+
+      const toolCallEvents = result.thread.events.filter(
+        (e) => e.type === "tool_call",
+      );
+      const toolResultEvents = result.thread.events.filter(
+        (e) => e.type === "tool_result",
+      );
+
+      expect(toolCallEvents.length).toBe(2);
+      expect(toolResultEvents.length).toBe(2);
+
+      if (toolCallEvents[0].type === "tool_call") {
+        expect(toolCallEvents[0].toolName).toBe("calculator");
+      }
+      if (toolCallEvents[1].type === "tool_call") {
+        expect(toolCallEvents[1].toolName).toBe("weather");
+      }
+    });
+  });
+
+  describe("write_todos parse failure warning (#8)", () => {
+    it("logs console.warn when write_todos result is not valid JSON", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // Create a tool named "write_todos" that returns invalid JSON
+      const badTodoTool = tool(async () => "not-json{{", {
+        name: "write_todos",
+        description: "Write todos",
+        schema: z.object({
+          todos: z.array(z.object({ id: z.string(), text: z.string(), status: z.string() })),
+        }),
+      });
+
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [
+              {
+                name: "write_todos",
+                args: { todos: [{ id: "1", text: "test", status: "pending" }] },
+                id: "tc_1",
+              },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [badTodoTool],
+      });
+
+      await agent.loop("Write todos");
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[deep-factor-agent] Failed to parse write_todos result"),
+      );
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe("isPendingResult type guard", () => {
+    it("returns true for PendingResult", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: TOOL_NAME_REQUEST_HUMAN_INPUT,
+              args: { question: "What color?" },
+              id: "tc_hi",
+            },
+          ],
+        }),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [],
+      });
+
+      const result = await agent.loop("Ask user something");
+      expect(isPendingResult(result)).toBe(true);
+      expect(result.stopReason).toBe("human_input_needed");
+    });
+
+    it("returns false for AgentResult", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+      });
+
+      const result = await agent.loop("Normal result");
+      expect(isPendingResult(result)).toBe(false);
+      expect(result.stopReason).toBe("completed");
+    });
+  });
+
+  describe("verifyCompletion + stop condition combined", () => {
+    it("stop condition fires before verification completes", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(makeAIMessage("Attempt 1"))
+        .mockResolvedValueOnce(makeAIMessage("Attempt 2"));
+
+      const verifyFn = vi.fn().mockResolvedValue({
+        complete: false,
+        reason: "Not ready",
+      });
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        stopWhen: maxIterations(1),
+        verifyCompletion: verifyFn,
+      });
+
+      const result = await agent.loop("Will be stopped");
+      expect(result.stopReason).toBe("stop_condition");
+      expect(result.stopDetail).toContain("iterations");
+      // Verification was never called because stop condition evaluated first
+      // (or was called but stop condition result took precedence)
     });
   });
 });

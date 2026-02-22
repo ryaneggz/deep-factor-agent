@@ -201,6 +201,22 @@ describe("maxCost", () => {
     expect(result.reason).toContain("$0.01");
   });
 
+  it("never triggers for unknown model because calculateCost returns 0", () => {
+    const condition = maxCost(0.001);
+    const result = condition(
+      makeCtx({
+        usage: makeUsage({
+          inputTokens: 999999,
+          outputTokens: 999999,
+          totalTokens: 1999998,
+        }),
+        model: "unknown-model-xyz",
+      }),
+    );
+    // calculateCost returns 0 for unknown models, so cost never exceeds budget
+    expect(result.stop).toBe(false);
+  });
+
   it("uses explicit model override instead of context model", () => {
     const condition = maxCost(0.01, "gpt-4o");
     // With gpt-4o: 1000 * 0.0000025 + 500 * 0.00001 = 0.0025 + 0.005 = 0.0075 < 0.01

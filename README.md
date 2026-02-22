@@ -251,6 +251,7 @@ When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 | `verifyCompletion` | `undefined` (no verification) |
 | `middleware` | `[todoMiddleware(), errorRecoveryMiddleware()]` |
 | `interruptOn` | `[]` (no interruptions) |
+| `maxToolCallsPerIteration` | `20` |
 | `contextManagement.maxContextTokens` | `150000` |
 | `contextManagement.keepRecentIterations` | `3` |
 
@@ -291,6 +292,7 @@ When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 | `composeMiddleware(middlewares)` | Compose an array of `AgentMiddleware` into a single middleware with merged tools and chained hooks. |
 | `todoMiddleware()` | Built-in middleware that gives the agent `write_todos` and `read_todos` tools. |
 | `errorRecoveryMiddleware()` | Built-in middleware that injects recovery guidance after errors. |
+| `TOOL_NAME_WRITE_TODOS` | Constant (`"write_todos"`) for the todo middleware tool name. |
 
 ### Context Management
 
@@ -304,6 +306,8 @@ When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 | Export | Description |
 |---|---|
 | `requestHumanInput` | A LangChain tool that pauses the agent loop to collect human input. Use with `interruptOn: ["requestHumanInput"]`. |
+| `requestHumanInputSchema` | Zod schema for the `requestHumanInput` tool parameters. |
+| `TOOL_NAME_REQUEST_HUMAN_INPUT` | Constant (`"requestHumanInput"`) for the human input tool name. |
 | `isPendingResult(r)` | Type guard to check if a result is a `PendingResult` (agent is waiting for human input). |
 
 ### Tool Adapter Utilities
@@ -334,7 +338,18 @@ All types are exported for use in your code:
 | `AgentMiddleware` | Middleware definition with `name`, optional `tools` (`StructuredToolInterface[]`), and lifecycle hooks. |
 | `MiddlewareContext` | Context passed to middleware hooks: `thread`, `iteration`, `settings`. |
 | `ContextManagementConfig` | Config for context management: `maxContextTokens`, `keepRecentIterations`. |
+| `ComposedMiddleware` | Result of `composeMiddleware()`: merged `tools`, chained `beforeIteration`/`afterIteration` hooks. |
 | `AgentEvent` | Discriminated union of all event types in the thread. |
+| `AgentEventType` | String literal union of all event type names (`"tool_call"`, `"tool_result"`, etc.). |
+| `BaseEvent` | Common fields shared by all events: `type`, `timestamp`, `iteration`. |
+| `ToolCallEvent` | Recorded when a tool is invoked. Adds `toolName`, `toolCallId`, `args`. |
+| `ToolResultEvent` | Recorded after a tool returns. Adds `toolCallId`, `result`. |
+| `ErrorEvent` | Recorded on errors. Adds `error` (string), `recoverable`, optional `toolCallId`. |
+| `HumanInputRequestedEvent` | Recorded when the agent pauses for human input. Adds `question`, optional `context`, `urgency`, `format`, `choices`. |
+| `HumanInputReceivedEvent` | Recorded when a human responds. Adds `response`. |
+| `MessageEvent` | Recorded for user/assistant/system messages. Adds `role`, `content`. |
+| `CompletionEvent` | Recorded when the agent completes. Adds `result`, `verified`. |
+| `SummaryEvent` | Recorded after context summarization. Adds `summarizedIterations`, `summary`. |
 
 ## Architecture: 12-Factor Agent Alignment
 

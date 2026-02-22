@@ -2,6 +2,7 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import {
   HumanMessage,
   AIMessage,
+  AIMessageChunk,
   SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
@@ -50,7 +51,16 @@ export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
 }
 
 function extractUsage(response: AIMessage): TokenUsage {
-  const meta = (response as any).usage_metadata;
+  const meta =
+    "usage_metadata" in response
+      ? (response.usage_metadata as
+          | {
+              input_tokens?: number;
+              output_tokens?: number;
+              total_tokens?: number;
+            }
+          | undefined)
+      : undefined;
   return {
     inputTokens: meta?.input_tokens ?? 0,
     outputTokens: meta?.output_tokens ?? 0,
@@ -58,13 +68,28 @@ function extractUsage(response: AIMessage): TokenUsage {
   };
 }
 
+interface TextContentBlock {
+  type: "text";
+  text: string;
+}
+
+function isTextContentBlock(block: unknown): block is TextContentBlock {
+  return (
+    typeof block === "object" &&
+    block !== null &&
+    "type" in block &&
+    (block as TextContentBlock).type === "text" &&
+    "text" in block
+  );
+}
+
 function extractTextContent(content: string | unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .map((block: any) => {
+      .map((block: unknown) => {
         if (typeof block === "string") return block;
-        if (block.type === "text") return block.text;
+        if (isTextContentBlock(block)) return block.text;
         return JSON.stringify(block);
       })
       .join("");
@@ -78,6 +103,19 @@ function compactError(error: unknown, maxLen = 500): string {
       ? `${error.name}: ${error.message}`
       : String(error);
   return msg.length > maxLen ? msg.substring(0, maxLen) + "..." : msg;
+}
+
+function extractModelId(model: BaseChatModel): string {
+  if ("modelName" in model && typeof model.modelName === "string") {
+    return model.modelName;
+  }
+  if ("model" in model && typeof model.model === "string") {
+    return model.model;
+  }
+  if ("name" in model && typeof model.name === "string") {
+    return model.name;
+  }
+  return "unknown";
 }
 
 function createThread(): AgentThread {
@@ -106,6 +144,7 @@ export class DeepFactorAgent<
   private onIterationStart?: (iteration: number) => void;
   private onIterationEnd?: (iteration: number, result: unknown) => void;
   private modelId: string;
+  private maxToolCallsPerIteration: number;
 
   constructor(settings: DeepFactorAgentSettings<TTools>) {
     this.modelOrString = settings.model;
@@ -113,11 +152,7 @@ export class DeepFactorAgent<
     if (typeof settings.model === "string") {
       this.modelId = settings.model;
     } else {
-      this.modelId =
-        (settings.model as any).modelName ??
-        (settings.model as any).model ??
-        (settings.model as any).name ??
-        "unknown";
+      this.modelId = extractModelId(settings.model);
     }
 
     this.tools = (settings.tools ?? []) as TTools;
@@ -126,6 +161,7 @@ export class DeepFactorAgent<
     this.interruptOn = settings.interruptOn ?? [];
     this.onIterationStart = settings.onIterationStart;
     this.onIterationEnd = settings.onIterationEnd;
+    this.maxToolCallsPerIteration = settings.maxToolCallsPerIteration ?? 20;
 
     // Normalize stopWhen
     if (!settings.stopWhen) {
@@ -305,7 +341,7 @@ export class DeepFactorAgent<
         let humanInputRequested = false;
         let lastAIResponse: AIMessage | null = null;
 
-        while (stepCount < 20) {
+        while (stepCount < this.maxToolCallsPerIteration) {
           const response = (await modelWithTools.invoke(
             messages,
           )) as AIMessage;
@@ -382,8 +418,10 @@ export class DeepFactorAgent<
                   if (parsed.todos) {
                     thread.metadata.todos = parsed.todos;
                   }
-                } catch {
-                  // ignore parse errors
+                } catch (parseError) {
+                  console.warn(
+                    `[deep-factor-agent] Failed to parse write_todos result: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+                  );
                 }
               }
 
@@ -610,7 +648,7 @@ export class DeepFactorAgent<
     }
   }
 
-  async stream(prompt: string): Promise<AsyncIterable<any>> {
+  async stream(prompt: string): Promise<AsyncIterable<AIMessageChunk>> {
     const model = await this.ensureModel();
     const thread = createThread();
 

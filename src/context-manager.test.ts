@@ -139,6 +139,38 @@ describe("ContextManager", () => {
       expect(recentEvents.length).toBe(6);
     });
 
+    it("falls back to a descriptive summary when model throws", async () => {
+      const mockModel = {
+        invoke: vi.fn().mockRejectedValue(new Error("Model unavailable")),
+      };
+
+      const events: MessageEvent[] = [];
+      for (let i = 0; i < 6; i++) {
+        events.push({
+          type: "message",
+          role: "user",
+          content: `Iteration ${i} content`,
+          timestamp: Date.now(),
+          iteration: i,
+        });
+      }
+
+      const thread = makeThread(events);
+      const cm = new ContextManager({ keepRecentIterations: 3 });
+
+      const result = await cm.summarize(thread, mockModel as any);
+
+      const summaryEvents = result.events.filter(
+        (e) => e.type === "summary",
+      ) as SummaryEvent[];
+      expect(summaryEvents.length).toBeGreaterThan(0);
+
+      // Fallback summaries contain "summarization failed"
+      for (const s of summaryEvents) {
+        expect(s.summary).toContain("summarization failed");
+      }
+    });
+
     it("preserves recent iterations unchanged", async () => {
       const events: MessageEvent[] = [
         {

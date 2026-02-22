@@ -171,6 +171,8 @@ export interface DeepFactorAgentSettings<
   middleware?: AgentMiddleware[];
   interruptOn?: string[];
   contextManagement?: ContextManagementConfig;
+  /** Maximum tool-call steps per outer iteration (default: 20). */
+  maxToolCallsPerIteration?: number;
   onIterationStart?: (iteration: number) => void;
   onIterationEnd?: (iteration: number, result: unknown) => void;
 }
