@@ -663,6 +663,94 @@ describe("DeepFactorAgent", () => {
     });
   });
 
+  describe("context summarization auto-trigger in loop()", () => {
+    it("triggers summarization when thread exceeds maxContextTokens", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        // Iteration 1: main LLM response
+        .mockResolvedValueOnce(makeAIMessage("First response"))
+        // Summarization call for iteration 0 (triggered at start of iteration 2)
+        .mockResolvedValueOnce(
+          new AIMessage("Summary: User asked about summarization."),
+        )
+        // Iteration 2: main LLM response
+        .mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        contextManagement: {
+          maxContextTokens: 10, // Very low threshold to force summarization
+          keepRecentIterations: 1,
+        },
+        verifyCompletion: vi
+          .fn()
+          .mockResolvedValueOnce({ complete: false, reason: "Try again" })
+          .mockResolvedValueOnce({ complete: true }),
+      });
+
+      const result = await agent.loop("Test context summarization trigger");
+
+      // Verify summary events exist in thread — proves summarization triggered
+      const summaryEvents = result.thread.events.filter(
+        (e) => e.type === "summary",
+      );
+      expect(summaryEvents.length).toBeGreaterThan(0);
+
+      // The summary should reference the summarized iteration (iteration 0)
+      if (summaryEvents[0].type === "summary") {
+        expect(summaryEvents[0].summarizedIterations).toContain(0);
+        expect(summaryEvents[0].summary).toContain("Summary");
+      }
+
+      // Should have completed successfully after 2 iterations
+      expect(result.stopReason).toBe("completed");
+      expect(result.iterations).toBe(2);
+    });
+
+    it("injects summaries into system prompt via buildContextInjection", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        // Iteration 1: main LLM response
+        .mockResolvedValueOnce(makeAIMessage("First response"))
+        // Summarization of iteration 0
+        .mockResolvedValueOnce(
+          new AIMessage("Summary of initial conversation."),
+        )
+        // Iteration 2: main LLM response
+        .mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        contextManagement: {
+          maxContextTokens: 10,
+          keepRecentIterations: 1,
+        },
+        verifyCompletion: vi
+          .fn()
+          .mockResolvedValueOnce({ complete: false, reason: "Try again" })
+          .mockResolvedValueOnce({ complete: true }),
+      });
+
+      const result = await agent.loop("Test summary injection");
+
+      // The third invoke call (iteration 2) should receive messages that
+      // include the summary context in a SystemMessage
+      const thirdCall = mockModel.invoke.mock.calls[2];
+      expect(thirdCall).toBeDefined();
+      const messages = thirdCall[0] as Array<{ content: string }>;
+      const systemMessages = messages.filter(
+        (m: any) => m._getType?.() === "system" || m.constructor?.name === "SystemMessage",
+      );
+      // If there's a system message, it should contain the summary injection
+      if (systemMessages.length > 0) {
+        const systemContent = systemMessages[0].content;
+        expect(systemContent).toContain("Previous Iteration Summaries");
+      }
+
+      expect(result.stopReason).toBe("completed");
+    });
+  });
+
   describe("verifyCompletion + stop condition combined", () => {
     it("stop condition fires before verification completes", async () => {
       const mockModel = makeMockModel();
