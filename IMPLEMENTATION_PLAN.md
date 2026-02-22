@@ -1,162 +1,54 @@
-# IMPLEMENTATION_PLAN.md
+# IMPLEMENTATION PLAN
 
-## deep-factor-agent -- LangChain `initChatModel` Migration (COMPLETE)
-
-**Project:** `deep-factor-agent` -- a TypeScript library for building loop-based AI agents with middleware, verification, stop conditions, human-in-the-loop, and context management.
-
-**Previous Stack:** TypeScript (ESM-only), Vercel AI SDK v6 (`ai` + `@ai-sdk/provider-utils`), Zod v4+ (peer), Vitest, pnpm
-
-**Current Stack:** TypeScript (ESM-only), LangChain (`langchain` + `@langchain/core`), Zod v4+ (peer), Vitest, pnpm
-
-**Migration Spec:** Archived to `specs/archive/initChatModel-migration.md`
+> Last updated: 2026-02-22
+> Core library status: **COMPLETE** (93/93 tests pass, type-check clean, no TODOs/placeholders)
+> Examples status: **COMPLETE** (SPEC-01 + SPEC-02 fully implemented, all typecheck clean)
 
 ---
 
-## COMPLETED
+## Completed (Core Library)
 
-- 93 tests passing across 7 test files
-- 0 type errors
-- Clean build (`dist/` with `.js` and `.d.ts` files)
-- All tiers (9-20) completed successfully
-- Migration spec archived to `specs/archive/`
+All items below are fully implemented, tested, and type-checked:
 
----
+- [x] **Project setup** — ESM, TypeScript, vitest, pnpm
+- [x] **Types** (`src/types.ts`) — All event types, thread, token usage, stop conditions, verification, middleware, agent settings, results
+- [x] **Stop conditions** (`src/stop-conditions.ts`) — maxIterations, maxTokens, maxInputTokens, maxOutputTokens, maxCost, calculateCost, MODEL_PRICING, evaluateStopConditions
+- [x] **Agent loop** (`src/agent.ts`) — DeepFactorAgent class with loop(), stream(), tool execution, error recovery, human-in-the-loop, verification, context management integration
+- [x] **Middleware** (`src/middleware.ts`) — composeMiddleware, todoMiddleware, errorRecoveryMiddleware
+- [x] **Factory** (`src/create-agent.ts`) — createDeepFactorAgent with sensible defaults
+- [x] **Human-in-the-loop** (`src/human-in-the-loop.ts`) — requestHumanInput tool with Zod schema
+- [x] **Context management** (`src/context-manager.ts`) — ContextManager, estimateTokens, summarization
+- [x] **Tool adapter** (`src/tool-adapter.ts`) — createLangChainTool, toolArrayToMap, findToolByName
+- [x] **Barrel exports** (`src/index.ts`) — All public API re-exported
+- [x] **Test suite** — 93 tests across 7 files, all passing
+- [x] **README.md** — Full documentation with API reference
 
-## Tiers 1-8 -- Foundation (Pre-Migration)
+## Completed (SPEC-01 — Examples Setup & Basic Examples)
 
-- [x] **Tier 1 -- Project Setup:** ESM-only TypeScript project with pnpm, vitest, tsconfig targeting ES2022/ESNext
-- [x] **Tier 2 -- Types:** Full type system in `src/types.ts`
-- [x] **Tier 3 -- Stop Conditions:** Five stop condition factories with evaluator and pricing table
-- [x] **Tier 4 -- Agent Loop:** `DeepFactorAgent` class with `loop()` and `stream()`
-- [x] **Tier 5 -- Middleware:** `composeMiddleware` system with lifecycle hooks and built-in middlewares
-- [x] **Tier 6 -- Context Management:** `ContextManager` with token estimation and LLM-based summarization
-- [x] **Tier 7 -- Factory Function:** `createDeepFactorAgent` with sensible defaults and barrel exports
-- [x] **Tier 8 -- Human-in-the-Loop:** `requestHumanInput` tool, `interruptOn` mechanism, `PendingResult` with `resume()`
+- [x] **1.1 `.env.example`** — Template with `ANTHROPIC_API_KEY` and `MODEL_ID` placeholders
+- [x] **1.2 `package.json` devDependencies** — Added `dotenv` (^16.5.0), `tsx` (^4.19.0), `@langchain/anthropic` (^1.3.0)
+  - Note: Spec said `^0.3.0` but `@langchain/anthropic@0.3.x` has peer dep `@langchain/core >=0.3.58 <0.4.0`, incompatible with project's `@langchain/core@^1.1.27`. Used `^1.3.0` instead.
+- [x] **1.3 `examples/env.ts`** — Loads dotenv, exports `MODEL_ID`, validates API keys, prints active model
+- [x] **1.4 `examples/README.md`** — Prerequisites, setup, running, overview table
+- [x] **1.5 `examples/01-basic.ts`** — Minimal agent, string model, loop(), result summary
+- [x] **1.6 `examples/02-tools.ts`** — calculator + weather tools, thread event inspection
+- [x] **1.7 `examples/03-streaming.ts`** — agent.stream(), stdout.write, handles string + structured content
 
----
+## Completed (SPEC-02 — Advanced Examples)
 
-## Tier 9 -- Pre-Migration Cleanup
-
-- [x] **9.1** -- Narrowed `VerifyContext.result` type from `unknown` to `string`
-- [x] **9.2** -- Fixed `PendingResult` discriminant narrowing
-
----
-
-## Tier 10 -- Dependency & Package Changes
-
-- [x] **10.1** -- Removed AI SDK dependencies (`ai`, `@ai-sdk/provider-utils`)
-- [x] **10.2** -- Added LangChain dependencies (`langchain`, `@langchain/core`)
-- [x] **10.3** -- Verified tsconfig compatibility with LangChain subpath exports
-
----
-
-## Tier 11 -- Type System Migration (`src/types.ts`)
-
-- [x] **11.1** -- Replaced `LanguageModel` with `BaseChatModel`
-- [x] **11.2** -- Defined LangChain-compatible tool type alias using `StructuredToolInterface`
-- [x] **11.3** -- Updated `AgentMiddleware.tools` type
+- [x] **2.1 `examples/04-stop-conditions.ts`** — maxIterations, maxTokens, maxCost combined; calculateCost; stopDetail
+- [x] **2.2 `examples/05-middleware.ts`** — logging, timing, dateToolMiddleware + todoMiddleware + errorRecoveryMiddleware
+- [x] **2.3 `examples/06-human-in-the-loop.ts`** — requestHumanInput, isPendingResult, result.resume()
+- [x] **2.4 `examples/07-verification.ts`** — verifyCompletion with JSON structure check, self-correction, completed vs stop_condition
 
 ---
 
-## Tier 12 -- Tool Format Adapter
+## Notes
 
-- [x] **12.1** -- Created `src/tool-adapter.ts` (`createLangChainTool`, `toolArrayToMap`, `findToolByName`)
-- [x] **12.2** -- Exported tool adapter from barrel (`src/index.ts`)
-
----
-
-## Tier 13 -- Core Agent Loop Migration (`src/agent.ts`)
-
-- [x] **13.1** -- Replaced all AI SDK imports with LangChain equivalents
-- [x] **13.2** -- Added string model ID support via `initChatModel` with lazy `ensureModel()` pattern
-- [x] **13.3** -- Rewrote `buildMessages` to use LangChain message classes
-- [x] **13.4** -- Rewrote `loop()` to use `model.bindTools().invoke()` with manual tool loop
-- [x] **13.5** -- Rewrote `extractUsage` for LangChain `usage_metadata`
-- [x] **13.6** -- Replaced `appendResultEvents` with inline event recording during tool loop
-- [x] **13.7** -- Handled `requestHumanInput` detection in manual tool loop
-- [x] **13.8** -- Handled `todoMiddleware` tool results in manual tool loop
-- [x] **13.9** -- Rewrote `stream()` to use `model.stream()`
-
----
-
-## Tier 14 -- Context Manager Migration (`src/context-manager.ts`)
-
-- [x] **14.1** -- Replaced `LanguageModel` and `generateText` with `BaseChatModel` and `model.invoke()`
-
----
-
-## Tier 15 -- Middleware Migration (`src/middleware.ts`)
-
-- [x] **15.1** -- Replaced `ToolSet` with `StructuredToolInterface[]` in composition system
-- [x] **15.2** -- Converted `todoMiddleware` tools to LangChain `tool()` format
-- [x] **15.3** -- Verified `errorRecoveryMiddleware` works unchanged
-
----
-
-## Tier 16 -- Human-in-the-Loop Migration (`src/human-in-the-loop.ts`)
-
-- [x] **16.1** -- Converted `requestHumanInput` to LangChain `tool()` format
-
----
-
-## Tier 17 -- Factory Function & Barrel Exports
-
-- [x] **17.1** -- Updated `createDeepFactorAgent` generic constraints for LangChain types
-- [x] **17.2** -- Updated barrel exports in `src/index.ts` (tool adapter, all type exports)
-
----
-
-## Tier 18 -- Test Migration
-
-- [x] **18.1** -- Rewrote `src/agent.test.ts` with LangChain mock `BaseChatModel` patterns
-- [x] **18.2** -- Rewrote `src/context-manager.test.ts` mock model
-- [x] **18.3** -- Rewrote `src/middleware.test.ts` tool format assertions
-- [x] **18.4** -- Rewrote `src/human-in-the-loop.test.ts` mock model and tool assertions
-- [x] **18.5** -- Rewrote `src/create-agent.test.ts` and `src/integration.test.ts`
-- [x] **18.6** -- Verified `src/stop-conditions.test.ts` passes unchanged
-- [x] **18.7** -- Achieved 93 tests passing, 0 type errors
-
----
-
-## Tier 19 -- Documentation Updates
-
-- [x] **19.1** -- Updated `README.md` installation instructions for LangChain
-- [x] **19.2** -- Updated `README.md` code examples with LangChain patterns
-- [x] **19.3** -- Updated `README.md` API reference tables
-- [x] **19.4** -- Updated `AGENTS.md` operational notes
-
----
-
-## Tier 20 -- Final Validation & Polish
-
-- [x] **20.1** -- Full build validation (type-check, build, test)
-- [x] **20.2** -- Removed dead code and unused AI SDK imports
-- [x] **20.3** -- Verified public API surface (all barrel exports accessible and correctly typed)
-- [x] **20.4** -- Archived migration spec to `specs/archive/initChatModel-migration.md`
-
----
-
-## FILE MANIFEST
-
-| File | Tier(s) | Change Type |
-|---|---|---|
-| `package.json` | 10 | Modified (dependency swap) |
-| `tsconfig.json` | 10 | Verified |
-| `src/types.ts` | 9, 11 | Modified (type system) |
-| `src/tool-adapter.ts` | 12 | New (tool format bridge) |
-| `src/agent.ts` | 13 | Rewritten (core agent loop) |
-| `src/context-manager.ts` | 14 | Modified (summarization) |
-| `src/middleware.ts` | 15 | Modified (tool definitions + composition) |
-| `src/human-in-the-loop.ts` | 16 | Modified (tool definition) |
-| `src/create-agent.ts` | 17 | Modified (generic constraints) |
-| `src/index.ts` | 12, 17 | Modified (barrel exports) |
-| `src/stop-conditions.ts` | -- | Unchanged |
-| `src/agent.test.ts` | 18 | Rewritten (mock patterns) |
-| `src/context-manager.test.ts` | 18 | Modified (mock model) |
-| `src/middleware.test.ts` | 18 | Modified (tool format assertions) |
-| `src/human-in-the-loop.test.ts` | 18 | Rewritten (mock patterns) |
-| `src/create-agent.test.ts` | 18 | Rewritten (mock patterns) |
-| `src/integration.test.ts` | 18 | Rewritten (mock patterns) |
-| `src/stop-conditions.test.ts` | 18 | Unchanged (verified only) |
-| `README.md` | 19 | Modified (all examples) |
-| `AGENTS.md` | 19 | Modified (operational notes) |
+- **No `src/lib/` directory exists** — shared utilities are in individual `src/*.ts` modules per AGENTS.md conventions
+- **No TODOs, FIXMEs, or placeholder code** found in source
+- **No skipped or flaky tests** — all 93 tests pass deterministically
+- **All examples import from `../dist/index.js`** — requires `pnpm build` before running examples
+- **SPEC-02 example 05** is the only example that does NOT pass `middleware: []` (intentionally composes with defaults)
+- **`stopWhen` accepts `StopCondition | StopCondition[]`** — example 05 passes a single condition, others pass arrays
+- **`@langchain/anthropic` version** — Spec specified `^0.3.0` but that's incompatible with `@langchain/core@1.x`; using `^1.3.0`
