@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AIMessage } from "@langchain/core/messages";
-import { DeepFactorAgent } from "./agent.js";
-import { requestHumanInput } from "./human-in-the-loop.js";
-import type { PendingResult } from "./types.js";
+import { DeepFactorAgent } from "../src/agent.js";
+import { requestHumanInput } from "../src/human-in-the-loop.js";
+import type { PendingResult } from "../src/types.js";
 
 function makeMockModel() {
   const model: any = {

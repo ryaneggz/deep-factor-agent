@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AIMessage } from "@langchain/core/messages";
-import { createDeepFactorAgent } from "./create-agent.js";
-import { DeepFactorAgent } from "./agent.js";
+import { createDeepFactorAgent } from "../src/create-agent.js";
+import { DeepFactorAgent } from "../src/agent.js";
 
 function makeMockModel() {
   const model: any = {
@@ -127,7 +127,7 @@ describe("createDeepFactorAgent", () => {
 
 describe("barrel exports", () => {
   it("all public types and functions are importable", async () => {
-    const exports = await import("./index.js");
+    const exports = await import("../src/index.js");
 
     // Factory
     expect(exports.createDeepFactorAgent).toBeDefined();

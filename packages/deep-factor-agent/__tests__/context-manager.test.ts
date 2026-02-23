@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { AIMessage } from "@langchain/core/messages";
-import { ContextManager, estimateTokens } from "./context-manager.js";
-import type { AgentThread, SummaryEvent, MessageEvent } from "./types.js";
+import { ContextManager, estimateTokens } from "../src/context-manager.js";
+import type { AgentThread, SummaryEvent, MessageEvent } from "../src/types.js";
 
 function makeThread(events: AgentThread["events"] = []): AgentThread {
   return {

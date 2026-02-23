@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AIMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { createDeepFactorAgent } from "./create-agent.js";
-import { DeepFactorAgent } from "./agent.js";
-import { maxIterations, maxTokens } from "./stop-conditions.js";
-import { requestHumanInput } from "./human-in-the-loop.js";
-import type { PendingResult, AgentMiddleware } from "./types.js";
+import { createDeepFactorAgent } from "../src/create-agent.js";
+import { DeepFactorAgent } from "../src/agent.js";
+import { maxIterations, maxTokens } from "../src/stop-conditions.js";
+import { requestHumanInput } from "../src/human-in-the-loop.js";
+import type { PendingResult, AgentMiddleware } from "../src/types.js";
 
 function makeMockModel() {
   const model: any = {

@@ -31,7 +31,7 @@
 - Factory function in `packages/deep-factor-agent/src/create-agent.ts` (createDeepFactorAgent)
 - Human-in-the-loop in `packages/deep-factor-agent/src/human-in-the-loop.ts` (requestHumanInput tool)
 - Tool adapter utilities in `packages/deep-factor-agent/src/tool-adapter.ts` (createLangChainTool, findToolByName, toolArrayToMap)
-- Tests co-located: `packages/deep-factor-agent/src/*.test.ts`
+- Tests in `packages/deep-factor-agent/__tests__/*.test.ts`
 
 ### Ralph Layout
 

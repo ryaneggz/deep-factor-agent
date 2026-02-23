@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { DeepFactorAgent, addUsage } from "./agent.js";
-import { maxIterations } from "./stop-conditions.js";
-import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "./human-in-the-loop.js";
-import { isPendingResult } from "./types.js";
+import { DeepFactorAgent, addUsage } from "../src/agent.js";
+import { maxIterations } from "../src/stop-conditions.js";
+import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "../src/human-in-the-loop.js";
+import { isPendingResult } from "../src/types.js";
 import { tool } from "@langchain/core/tools";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { z } from "zod";
-import type { TokenUsage } from "./types.js";
+import type { TokenUsage } from "../src/types.js";
 
 function makeMockModel() {
   const model: any = {

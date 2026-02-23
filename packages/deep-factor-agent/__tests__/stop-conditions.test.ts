@@ -8,8 +8,8 @@ import {
   calculateCost,
   MODEL_PRICING,
   evaluateStopConditions,
-} from "./stop-conditions.js";
-import type { StopConditionContext, TokenUsage, AgentThread } from "./types.js";
+} from "../src/stop-conditions.js";
+import type { StopConditionContext, TokenUsage, AgentThread } from "../src/types.js";
 
 function makeThread(): AgentThread {
   return {

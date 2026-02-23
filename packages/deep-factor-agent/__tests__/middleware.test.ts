@@ -5,14 +5,14 @@ import {
   composeMiddleware,
   todoMiddleware,
   errorRecoveryMiddleware,
-} from "./middleware.js";
+} from "../src/middleware.js";
 import type {
   AgentMiddleware,
   MiddlewareContext,
   AgentThread,
   DeepFactorAgentSettings,
   ErrorEvent,
-} from "./types.js";
+} from "../src/types.js";
 
 function makeThread(): AgentThread {
   return {

@@ -4,7 +4,7 @@ import {
   createLangChainTool,
   toolArrayToMap,
   findToolByName,
-} from "./tool-adapter.js";
+} from "../src/tool-adapter.js";
 
 describe("createLangChainTool", () => {
   it("returns a StructuredToolInterface with correct name and description", () => {
