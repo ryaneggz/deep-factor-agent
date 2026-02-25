@@ -17,7 +17,7 @@ A TypeScript library for building loop-based AI agents with middleware, verifica
 - **Human-in-the-loop** — pause execution, collect human input, and resume
 - **Context management** — automatic summarization when the context window fills up
 - **Streaming** — stream the first LLM turn for real-time UIs
-- **Universal model support** — string-based model IDs (`"anthropic:claude-sonnet-4-5"`) or `BaseChatModel` instances
+- **Universal model support** — string-based model IDs (`"openai:gpt-4.1-mini"`) or `BaseChatModel` instances
 
 ## Installation
 
@@ -30,8 +30,8 @@ pnpm add deep-factor-agent langchain @langchain/core zod
 You also need a model provider package, e.g.:
 
 ```bash
-pnpm add @langchain/anthropic
-# or @langchain/openai, @langchain/google-genai, etc.
+pnpm add @langchain/openai
+# or @langchain/anthropic, @langchain/google-genai, etc.
 ```
 
 ## Quick Start
@@ -41,7 +41,7 @@ import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 
 // String-based model ID (universal — requires provider package installed)
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
   instructions: "You are a helpful assistant.",
   stopWhen: [maxIterations(5)],
 });
@@ -58,8 +58,8 @@ You can also pass a `BaseChatModel` instance directly:
 ```typescript
 import { initChatModel } from "langchain/chat_models/universal";
 
-const model = await initChatModel("claude-sonnet-4-5", {
-  modelProvider: "anthropic",
+const model = await initChatModel("gpt-4.1-mini", {
+  modelProvider: "openai",
 });
 const agent = createDeepFactorAgent({ model });
 ```
@@ -72,7 +72,7 @@ const agent = createDeepFactorAgent({ model });
 import { createDeepFactorAgent } from "deep-factor-agent";
 
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
 });
 
 const result = await agent.loop("Hello!");
@@ -98,7 +98,7 @@ const getWeather = tool(
 );
 
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
   instructions: "Use the weather tool to answer weather questions.",
   tools: [getWeather],
   stopWhen: [maxIterations(10)],
@@ -124,7 +124,7 @@ import {
 } from "deep-factor-agent";
 
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
   stopWhen: [
     maxIterations(20),          // stop after 20 loop iterations
     maxTokens(100_000),         // stop at 100k total tokens
@@ -148,7 +148,7 @@ import {
 } from "deep-factor-agent";
 
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
   tools: [requestHumanInput],
   interruptOn: ["requestHumanInput"],
   stopWhen: [maxIterations(10)],
@@ -177,7 +177,7 @@ import {
 
 // Built-in middleware (these are the defaults)
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
   middleware: [todoMiddleware(), errorRecoveryMiddleware()],
   stopWhen: [maxIterations(10)],
 });
@@ -200,7 +200,7 @@ const loggingMiddleware: AgentMiddleware = {
 };
 
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
   middleware: [loggingMiddleware],
   stopWhen: [maxIterations(5)],
 });
@@ -212,7 +212,7 @@ const agent = createDeepFactorAgent({
 import { createDeepFactorAgent } from "deep-factor-agent";
 
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
 });
 
 const stream = await agent.stream("Tell me a story.");
@@ -228,7 +228,7 @@ for await (const chunk of stream) {
 import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 
 const agent = createDeepFactorAgent({
-  model: "anthropic:claude-sonnet-4-5",
+  model: "openai:gpt-4.1-mini",
   stopWhen: [maxIterations(50)],
   contextManagement: {
     maxContextTokens: 100_000,  // summarize when context exceeds this
@@ -359,7 +359,7 @@ This library is designed around the [12-factor agent](https://github.com/humanla
 2. **Own your prompts** — `instructions` are plain strings you control, not hidden behind abstractions
 3. **Own your context window** — `ContextManager` gives you explicit control over context size and summarization
 4. **Tools are just functions** — standard LangChain `tool()` definitions, no proprietary wrapper
-5. **Unified LLM interface** — any model provider supported by LangChain's `initChatModel` works, including string IDs like `"anthropic:claude-sonnet-4-5"`
+5. **Unified LLM interface** — any model provider supported by LangChain's `initChatModel` works, including string IDs like `"openai:gpt-4.1-mini"`
 6. **Use structured outputs** — Zod schemas for tool parameters and validation
 7. **Own your control flow** — the loop, stop conditions, and middleware are all configurable
 8. **Compact errors into context** — `errorRecoveryMiddleware` feeds truncated errors back into the conversation
@@ -371,11 +371,11 @@ This library is designed around the [12-factor agent](https://github.com/humanla
 ## Development
 
 ```bash
-pnpm install        # install dependencies
-pnpm build          # compile TypeScript
-pnpm test           # run tests (vitest)
-pnpm type-check     # type-check without emitting
-pnpm dev            # watch mode
+make install        # install dependencies
+make build          # compile TypeScript
+make test           # run tests (vitest)
+make type-check     # type-check without emitting
+make dev            # watch mode
 ```
 
 ## License
