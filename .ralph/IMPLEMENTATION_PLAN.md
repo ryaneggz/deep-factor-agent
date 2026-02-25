@@ -1,7 +1,7 @@
 # IMPLEMENTATION PLAN
 
 > Last updated: 2026-02-24
-> Status: **IN PROGRESS**
+> Status: **COMPLETE**
 > Phase: **Testing & Coverage**
 
 ---
@@ -32,7 +32,7 @@ All CLI source files now have dedicated test coverage. Only `cli.tsx` (entry poi
 | 3a | SPEC-02 | `useAgent` hook tests | **DONE** | +25 actual | SPEC-01 ✓ |
 | 3b | SPEC-03 | Component tests | **DONE** | +49 actual | SPEC-01 ✓ |
 | 3c | SPEC-04 | Bash tool tests | **DONE** | +14 actual | SPEC-01 ✓ |
-| 4 | SPEC-05 | App integration tests | PENDING | +16 | SPEC-02 ✓ |
+| 4 | SPEC-05 | App integration tests | **DONE** | +16 actual | SPEC-02 ✓ |
 
 SPEC-02, SPEC-03, and SPEC-04 are parallelizable (no shared state or pattern dependencies).
 
@@ -75,13 +75,19 @@ SPEC-02, SPEC-03, and SPEC-04 are parallelizable (no shared state or pattern dep
 
 ---
 
-## SPEC-05: Extended App Integration Tests (PENDING)
+## SPEC-05: Extended App Integration Tests (DONE)
 
-> **Priority: AFTER SPEC-02** — depends on useAgent mock patterns
+### Delivered
 
-### Items
-
-- [ ] Extend `app.test.tsx` with 16 additional tests
+- [x] Rewrote `app.test.tsx` from 2 to 18 tests using direct `useAgent` mock
+- [x] Mocked `useApp` from `ink` to capture `exit()` calls
+- [x] Mocked `bashTool` for `enableBash` flag tests
+- [x] Interactive mode (4 tests): PromptInput visibility, no auto-exit
+- [x] Pending input (3 tests): HumanInput rendering, choices, submit wiring
+- [x] Error state (3 tests): error display, exit behavior (interactive vs single-prompt)
+- [x] enableBash flag (2 tests): tools array passed to useAgent
+- [x] Spinner (2 tests): visibility tied to running status
+- [x] Single-prompt mode (2 tests): auto-send on mount, exit on completion
 
 ---
 
@@ -96,6 +102,7 @@ SPEC-02, SPEC-03, and SPEC-04 are parallelizable (no shared state or pattern dep
 - [x] **SPEC-02**: 25 useAgent hook tests (`eventsToChatMessages`, initial state, `sendPrompt()`, `submitHumanInput()`)
 - [x] **SPEC-03**: 49 component tests (ToolCall 9, Spinner 7, HumanInput 16, PromptInput 10, Chat +3 extensions, ToolCall.tsx source bug fix)
 - [x] **SPEC-04**: 14 bash tool tests (metadata, success path, error handling)
+- [x] **SPEC-05**: 18 app integration tests (rewrote from 2 → 18 with useAgent mock, useApp exit capture)
 
 ---
 
@@ -126,14 +133,14 @@ SPEC-02, SPEC-03, and SPEC-04 are parallelizable (no shared state or pattern dep
 
 ## Final Target State
 
-| Metric | Before | Current | After (SPEC-05) |
-|--------|--------|---------|-------|
-| Agent tests | 129 | 135 | 135 (done) |
-| CLI tests | 10 | 94 | 110 (+16 integration from SPEC-05) |
-| Total tests | 139 | 229 | 245 |
-| Coverage infra | None | Active | Active |
-| Untested CLI source files | 7 of 9 | 0 of 9 | 0 of 9 |
-| Known agent issues | 4 | 0 | 0 |
+| Metric | Before | Final |
+|--------|--------|-------|
+| Agent tests | 129 | 135 |
+| CLI tests | 10 | 110 |
+| Total tests | 139 | 245 |
+| Coverage infra | None | Active (`@vitest/coverage-v8`) |
+| Untested CLI source files | 7 of 9 | 0 of 9 |
+| Known agent issues | 4 | 0 |
 
 ---
 
