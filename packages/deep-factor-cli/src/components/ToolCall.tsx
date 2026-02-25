@@ -12,7 +12,7 @@ function truncateValues(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    const str = typeof value === "string" ? value : JSON.stringify(value);
+    const str = typeof value === "string" ? value : (JSON.stringify(value) ?? String(value));
     result[key] = str.length > maxLen ? str.slice(0, maxLen) + "..." : value;
   }
   return result;

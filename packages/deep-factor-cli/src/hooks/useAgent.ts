@@ -21,7 +21,7 @@ import type {
   AgentTools,
 } from "../types.js";
 
-function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
+export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
   for (const event of events) {
     switch (event.type) {
