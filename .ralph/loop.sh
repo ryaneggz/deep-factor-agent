@@ -9,6 +9,11 @@
 # Environment variables:
 #   FORMAT_LOGS=0          # Disable formatted output, show raw JSON (default: 1)
 
+# Resolve paths first
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FORMAT_LOGS="${FORMAT_LOGS:-1}"
+FORMAT_SCRIPT="$SCRIPT_DIR/format-log.sh"
+
 # Parse arguments
 if [ "$1" = "plan" ]; then
     # Plan mode
@@ -26,11 +31,6 @@ else
     PROMPT_FILE="$SCRIPT_DIR/PROMPT_build.md"
     MAX_ITERATIONS=0
 fi
-
-# Formatting control
-FORMAT_LOGS="${FORMAT_LOGS:-1}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FORMAT_SCRIPT="$SCRIPT_DIR/format-log.sh"
 
 if [ "$FORMAT_LOGS" = "1" ] && [ ! -x "$FORMAT_SCRIPT" ]; then
     echo "Warning: format-log.sh not found or not executable. Falling back to raw output." >&2
