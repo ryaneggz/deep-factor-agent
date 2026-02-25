@@ -50,6 +50,9 @@ importers:
       deep-factor-agent:
         specifier: workspace:*
         version: link:../deep-factor-agent
+      dotenv:
+        specifier: ^16.6.1
+        version: 16.6.1
       ink:
         specifier: ^6.8.0
         version: 6.8.0(@types/react@19.2.14)(react@19.2.4)

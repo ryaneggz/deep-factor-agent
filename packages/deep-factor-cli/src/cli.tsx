@@ -1,7 +1,14 @@
+import { config } from "dotenv";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import React from "react";
 import { render } from "ink";
 import meow from "meow";
 import { App } from "./app.js";
+
+// Load env: ~/.deep-factor/.env first (global), then local .env (overrides)
+config({ path: join(homedir(), ".deep-factor", ".env") });
+config();
 
 const cli = meow(
   `

@@ -82,6 +82,10 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
             .pop() ?? null;
         setHumanInputRequest(req);
         setStatus("pending_input");
+      } else if (result.stopReason === "max_errors") {
+        const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
+        setError(new Error(detail));
+        setStatus("error");
       } else {
         setStatus("done");
       }
