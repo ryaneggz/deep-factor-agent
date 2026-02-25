@@ -234,16 +234,6 @@ export class DeepFactorAgent<
     return messages;
   }
 
-  private isPendingHumanInput(thread: AgentThread): boolean {
-    const requestEvents = thread.events.filter(
-      (e) => e.type === "human_input_requested",
-    );
-    const responseEvents = thread.events.filter(
-      (e) => e.type === "human_input_received",
-    );
-    return requestEvents.length > responseEvents.length;
-  }
-
   private checkInterruptOn(
     thread: AgentThread,
     iteration: number,

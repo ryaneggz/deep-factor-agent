@@ -35,6 +35,18 @@ export const MODEL_PRICING: Record<
     cacheRead: 0.00000008,
     cacheWrite: 0.000001,
   },
+  "claude-sonnet-4-6": {
+    input: 0.000003,
+    output: 0.000015,
+    cacheRead: 0.0000003,
+    cacheWrite: 0.00000375,
+  },
+  "claude-opus-4-6": {
+    input: 0.000015,
+    output: 0.000075,
+    cacheRead: 0.0000015,
+    cacheWrite: 0.00001875,
+  },
   // OpenAI
   "gpt-4o": {
     input: 0.0000025,

@@ -741,13 +741,114 @@ describe("DeepFactorAgent", () => {
       const systemMessages = messages.filter(
         (m: any) => m._getType?.() === "system" || m.constructor?.name === "SystemMessage",
       );
-      // If there's a system message, it should contain the summary injection
-      if (systemMessages.length > 0) {
-        const systemContent = systemMessages[0].content;
-        expect(systemContent).toContain("Previous Iteration Summaries");
-      }
+      // Unconditional assertion: system messages must exist and contain summary
+      expect(systemMessages.length).toBeGreaterThan(0);
+      const systemContent = systemMessages[0].content;
+      expect(systemContent).toContain("Previous Iteration Summaries");
 
       expect(result.stopReason).toBe("completed");
+    });
+  });
+
+  describe("interruptOn", () => {
+    it("returns PendingResult when a tool in interruptOn is called", async () => {
+      const dangerTool = tool(
+        async () => "executed",
+        {
+          name: "dangerous_action",
+          description: "A dangerous action",
+          schema: z.object({ target: z.string() }),
+        },
+      );
+
+      const mockModel = makeMockModel();
+      // First response: model wants to call the interrupt tool
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("Let me run this", {
+          tool_calls: [
+            { name: "dangerous_action", args: { target: "prod" }, id: "tc_d1" },
+          ],
+        }),
+      );
+      // Second response: inner loop re-invokes after skipping execution;
+      // no tool calls → inner loop exits, then checkInterruptOn fires
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("Awaiting approval"),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [dangerTool],
+        interruptOn: ["dangerous_action"],
+      });
+
+      const result = await agent.loop("Do something dangerous");
+      expect(isPendingResult(result)).toBe(true);
+      expect(result.stopReason).toBe("human_input_needed");
+      expect(result.stopDetail).toContain("dangerous_action");
+
+      // The tool should NOT have been executed (no tool_result events)
+      const toolResultEvents = result.thread.events.filter(
+        (e) => e.type === "tool_result",
+      );
+      expect(toolResultEvents.length).toBe(0);
+    });
+
+    it("executes non-interrupt tools but pauses on interrupt tool in mixed batch", async () => {
+      const safeTool = tool(
+        async (args: { query: string }) => `result: ${args.query}`,
+        {
+          name: "safe_search",
+          description: "Safe search",
+          schema: z.object({ query: z.string() }),
+        },
+      );
+      const dangerTool = tool(
+        async () => "executed",
+        {
+          name: "deploy",
+          description: "Deploy to production",
+          schema: z.object({ env: z.string() }),
+        },
+      );
+
+      const mockModel = makeMockModel();
+      // First response: mixed tool calls (safe + interrupt)
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            { name: "safe_search", args: { query: "test" }, id: "tc_s1" },
+            { name: "deploy", args: { env: "prod" }, id: "tc_d1" },
+          ],
+        }),
+      );
+      // Second response: inner loop continues after processing tool results;
+      // no tool calls → exits, then checkInterruptOn fires
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("Waiting for approval"),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [safeTool, dangerTool],
+        interruptOn: ["deploy"],
+      });
+
+      const result = await agent.loop("Search and deploy");
+      expect(isPendingResult(result)).toBe(true);
+      expect(result.stopReason).toBe("human_input_needed");
+
+      // safe_search should have been executed (tool_result present)
+      const toolResultEvents = result.thread.events.filter(
+        (e) => e.type === "tool_result",
+      );
+      expect(toolResultEvents.length).toBe(1);
+
+      // Both tool_call events should be recorded
+      const toolCallEvents = result.thread.events.filter(
+        (e) => e.type === "tool_call",
+      );
+      expect(toolCallEvents.length).toBe(2);
     });
   });
 

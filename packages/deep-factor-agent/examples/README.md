@@ -64,7 +64,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 Supported models include any model supported by LangChain's `initChatModel`:
 - `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-5` (Anthropic)
-- `gpt-4o`, `gpt-4o-mini` (OpenAI)
+- `gpt-4.1`, `gpt-4.1-mini` (OpenAI)
 - `gemini-2.5-pro`, `gemini-2.5-flash` (Google)
 
 ## Example Overview

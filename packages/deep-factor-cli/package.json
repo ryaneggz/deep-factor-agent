@@ -13,7 +13,9 @@
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "coverage": "vitest run --coverage",
+    "link": "npm i && npm run build && npm link"
   },
   "dependencies": {
     "deep-factor-agent": "workspace:*",
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@types/node": "^25.3.0",
     "@types/react": "^19.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "ink-testing-library": "^4.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"

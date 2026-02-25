@@ -310,8 +310,11 @@ describe("MODEL_PRICING", () => {
       "claude-sonnet-4-5",
       "claude-opus-4-5",
       "claude-haiku-4-5",
+      "claude-sonnet-4-6",
+      "claude-opus-4-6",
       "gpt-4o",
       "gpt-4o-mini",
+      "gpt-4.1-mini",
       "gemini-2.5-pro",
       "gemini-2.5-flash",
     ];
@@ -320,5 +323,37 @@ describe("MODEL_PRICING", () => {
       expect(MODEL_PRICING[model].input).toBeGreaterThan(0);
       expect(MODEL_PRICING[model].output).toBeGreaterThan(0);
     }
+  });
+
+  it("claude-sonnet-4-6 has correct pricing", () => {
+    const pricing = MODEL_PRICING["claude-sonnet-4-6"];
+    expect(pricing).toBeDefined();
+    expect(pricing.input).toBe(0.000003);
+    expect(pricing.output).toBe(0.000015);
+    expect(pricing.cacheRead).toBe(0.0000003);
+    expect(pricing.cacheWrite).toBe(0.00000375);
+  });
+
+  it("claude-opus-4-6 has correct pricing", () => {
+    const pricing = MODEL_PRICING["claude-opus-4-6"];
+    expect(pricing).toBeDefined();
+    expect(pricing.input).toBe(0.000015);
+    expect(pricing.output).toBe(0.000075);
+    expect(pricing.cacheRead).toBe(0.0000015);
+    expect(pricing.cacheWrite).toBe(0.00001875);
+  });
+
+  it("computes cost correctly for claude-sonnet-4-6", () => {
+    const usage = makeUsage({ inputTokens: 1000, outputTokens: 500 });
+    const cost = calculateCost(usage, "claude-sonnet-4-6");
+    // input: 1000 * 0.000003 = 0.003, output: 500 * 0.000015 = 0.0075
+    expect(cost).toBeCloseTo(0.0105, 6);
+  });
+
+  it("computes cost correctly for claude-opus-4-6", () => {
+    const usage = makeUsage({ inputTokens: 1000, outputTokens: 500 });
+    const cost = calculateCost(usage, "claude-opus-4-6");
+    // input: 1000 * 0.000015 = 0.015, output: 500 * 0.000075 = 0.0375
+    expect(cost).toBeCloseTo(0.0525, 6);
   });
 });

@@ -1,95 +1,161 @@
-# Implementation Plan — deep-factor-cli
+# IMPLEMENTATION PLAN
 
 > Last updated: 2026-02-24
-> Agent library (`packages/deep-factor-agent`): **COMPLETE** — 129/129 tests passing, all source files implemented.
-> CLI package (`packages/deep-factor-cli`): **COMPLETE** — 10/10 tests passing, all specs implemented.
+> Status: **IN PROGRESS**
+> Phase: **Testing & Coverage**
 
 ---
 
-## Current State Summary
+## Status Summary
 
-The `deep-factor-agent` library is fully implemented with:
-- Core agent loop with tool calling, verification, human-in-the-loop (`agent.ts`)
-- Factory function with opinionated defaults (`create-agent.ts`)
-- Stop conditions: maxIterations, maxTokens, maxInputTokens, maxOutputTokens, maxCost (`stop-conditions.ts`)
-- Middleware system: composeMiddleware, todoMiddleware, errorRecoveryMiddleware (`middleware.ts`)
-- Context management with auto-summarization (`context-manager.ts`)
-- Human-in-the-loop pause/resume via sentinel tool pattern (`human-in-the-loop.ts`)
-- Tool adapter utilities: createLangChainTool, toolArrayToMap, findToolByName (`tool-adapter.ts`)
-- Full type system with discriminated union events (`types.ts`)
-- 129 tests across 8 test files, all passing
+Comprehensive testing phase for both `deep-factor-agent` and `deep-factor-cli` packages. Coverage infrastructure is now live. Agent package fixes are complete (dead code removed, Claude 4.6 pricing added, interruptOn tests added, conditional assertion fixed).
 
-The `deep-factor-cli` package is fully implemented with:
-- pnpm workspace configuration at repo root
-- CLI entry point with meow flags, Ink render (`src/cli.tsx`)
-- App shell composing all components (`src/app.tsx`)
-- useAgent hook with full lifecycle management (`src/hooks/useAgent.ts`)
-- 6 Ink components: Chat, ToolCall, Spinner, StatusBar, HumanInput, PromptInput
-- Bash tool using createLangChainTool (`src/tools/bash.ts`)
-- 10 tests across 3 test files (Chat, StatusBar, App integration), all passing
-- Makefile CLI and workspace targets, updated AGENTS.md
+### Current Test Inventory
 
-**Implementation notes:**
-- CLI package required `zod` as a direct dependency and `@types/node` as a devDependency (not in original spec)
-- `AgentTools` type is derived from `NonNullable<DeepFactorAgentSettings["tools"]>` to avoid direct `@langchain/core` import from CLI
+| Package | Test Files | Tests | Coverage Infra |
+|---------|-----------|-------|----------------|
+| `deep-factor-agent` | 8 | 135/135 pass | `@vitest/coverage-v8` active (94.1% stmts) |
+| `deep-factor-cli` | 3 | 10/10 pass | `@vitest/coverage-v8` active (50% stmts) |
 
----
+### Coverage Baselines (measured)
 
-## Completed Specs
+**Agent package** (94.1% stmts):
+- `agent.ts`: 90.67% stmts, 72.07% branch
+- `context-manager.ts`: 96.29% stmts
+- `create-agent.ts`, `human-in-the-loop.ts`, `middleware.ts`, `stop-conditions.ts`, `tool-adapter.ts`, `types.ts`: 100%
+- `index.ts`: 0% (re-export barrel, acceptable)
 
-### SPEC-01: pnpm Workspace Conversion ✅
-- Created `/pnpm-workspace.yaml` with `packages: ["packages/*"]`
-- Created root `/package.json` (private, workspace scripts: `build`, `test`, `type-check` using `pnpm -r`)
-- Removed `packages/deep-factor-agent/pnpm-lock.yaml`
-- Root `pnpm-lock.yaml` generated
-- Generalized `/.gitignore` with global patterns; root `pnpm-lock.yaml` not ignored
+**CLI package** (50% stmts):
+- `useAgent.ts`: 64% stmts, 35.29% branch
+- `Chat.tsx`: 83.33%, `StatusBar.tsx`: 100%, `ToolCall.tsx`: 100%
+- `HumanInput.tsx`, `PromptInput.tsx`, `Spinner.tsx`: 0%
+- `bash.ts`: 50%
+- `app.tsx`: 93.33%
+- `cli.tsx`: 0% (entry point, deferred)
 
-### SPEC-02: CLI Package Scaffold ✅
-- Created `packages/deep-factor-cli/package.json` with all required deps and devDeps
-- Created `packages/deep-factor-cli/tsconfig.json`
-- Created `packages/deep-factor-cli/vitest.config.ts`
-- Created `packages/deep-factor-cli/scripts/postbuild.js` (shebang + chmod 755)
-- All source files and directories created
+### Remaining Untested CLI Source Files (4 of 9)
 
-### SPEC-03: CLI Entry & App Shell ✅
-- Implemented `src/cli.tsx` with meow flags: `--model`, `--max-iter`, `--verbose`, `--bash`, `--interactive`
-- Implemented `src/app.tsx` composing all components
-
-### SPEC-04: useAgent Hook ✅
-- Implemented `src/hooks/useAgent.ts` with full lifecycle management
-- Handles all AgentEvent types, pending input, token accumulation, re-entrant sendPrompt()
-
-### SPEC-05: Ink Components ✅
-- **Chat** (`src/components/Chat.tsx`)
-- **ToolCall** (`src/components/ToolCall.tsx`)
-- **Spinner** (`src/components/Spinner.tsx`)
-- **StatusBar** (`src/components/StatusBar.tsx`)
-- **HumanInput** (`src/components/HumanInput.tsx`)
-- **PromptInput** (`src/components/PromptInput.tsx`)
-
-### SPEC-06: Bash Tool ✅
-- Implemented `src/tools/bash.ts` using `createLangChainTool`
-- Schema: `{ command: z.string() }`, execSync with 30s timeout, 1MB buffer
-
-### SPEC-07: Testing ✅
-- `__tests__/components/Chat.test.tsx` — 3 tests passing
-- `__tests__/components/StatusBar.test.tsx` — 3 tests passing
-- `__tests__/app.test.tsx` — 4 tests passing
-- All 10 CLI tests passing
-
-### SPEC-08: Makefile & Docs ✅
-- Added CLI targets: `install-cli`, `build-cli`, `dev-cli`, `test-cli`, `type-check-cli`
-- Added workspace targets: `install-all`, `build-all`, `test-all`, `check-all`
-- Updated AGENTS.md with CLI and workspace documentation
+| Source File | Coverage | Test File | Status |
+|-------------|----------|-----------|--------|
+| `hooks/useAgent.ts` | 64% | None | Needs dedicated test file |
+| `components/Spinner.tsx` | 0% | None | ZERO coverage |
+| `components/HumanInput.tsx` | 0% | None | ZERO coverage |
+| `components/PromptInput.tsx` | 0% | None | ZERO coverage |
 
 ---
 
-## Agent Library — Minor Issues (low priority, non-blocking)
+## Execution Order
 
-These are defects/gaps in `packages/deep-factor-agent` that do not block CLI development but should be addressed:
+| Order | Spec | Description | Status | Est. Tests | Dependencies |
+|-------|------|-------------|--------|------------|--------------|
+| 1 | SPEC-01 | Coverage infrastructure | **DONE** | 0 (infra) | — |
+| 2 | SPEC-06 | Agent package fixes | **DONE** | +6 actual | — |
+| 3a | SPEC-02 | `useAgent` hook tests | PENDING | +25 | SPEC-01 ✓ |
+| 3b | SPEC-03 | Component tests | PENDING | +45 | SPEC-01 ✓ |
+| 3c | SPEC-04 | Bash tool tests | PENDING | +14 | SPEC-01 ✓ |
+| 4 | SPEC-05 | App integration tests | PENDING | +16 | SPEC-02 |
 
-- [ ] **Dead code:** `isPendingHumanInput()` private method in `agent.ts:237` is defined but never called — remove or use it
-- [ ] **Missing model pricing:** `MODEL_PRICING` in `stop-conditions.ts` lacks entries for `claude-sonnet-4-6` and `claude-opus-4-6` — `maxCost()` silently no-ops for these models
-- [ ] **`stream()` limitation:** `DeepFactorAgent.stream()` does not loop, execute tools, or use context management — it is a single LLM call wrapper, which may surprise consumers expecting an agentic stream (document or enhance)
-- [ ] **`interruptOn` edge case:** When a tool is in `interruptOn`, the inner loop uses `continue` (not `break`), so other tool calls in the same batch still execute before the interrupt check — potentially unexpected behavior
-- [ ] **Conditional test assertion:** `agent.test.ts` context-summarization test uses `if (systemMessages.length > 0)` which silently passes if no SystemMessage is injected — strengthen this assertion
+SPEC-02, SPEC-03, and SPEC-04 are parallelizable (no shared state or pattern dependencies).
+
+---
+
+## SPEC-02: useAgent Hook Tests (PENDING)
+
+> **Priority: NEXT (parallelizable with SPEC-03 and SPEC-04)**
+> Highest-value gap: most complex CLI logic (283 lines), 64% coverage but no dedicated test file
+
+### Items
+
+- [ ] Export `eventsToChatMessages` from `packages/deep-factor-cli/src/hooks/useAgent.ts`
+- [ ] Create `packages/deep-factor-cli/__tests__/hooks/useAgent.test.ts`
+- [ ] `eventsToChatMessages` tests (8 tests)
+- [ ] Initial state tests (3 tests)
+- [ ] `sendPrompt()` tests (8 tests)
+- [ ] `submitHumanInput()` tests (6 tests)
+
+---
+
+## SPEC-03: Component Tests (PENDING)
+
+> **Priority: NEXT (parallelizable with SPEC-02 and SPEC-04)**
+
+### Items
+
+- [ ] Create `ToolCall.test.tsx` (9 tests)
+- [ ] Create `Spinner.test.tsx` (7 tests) — needs `vi.useFakeTimers()`
+- [ ] Create `HumanInput.test.tsx` (16 tests) — needs `stdin.write()`
+- [ ] Create `PromptInput.test.tsx` (10 tests)
+- [ ] Extend `Chat.test.tsx` (+3 tests)
+
+---
+
+## SPEC-04: Bash Tool Tests (PENDING)
+
+> **Priority: NEXT (parallelizable with SPEC-02 and SPEC-03)**
+
+### Items
+
+- [ ] Create `packages/deep-factor-cli/__tests__/tools/bash.test.ts` (14 tests)
+
+---
+
+## SPEC-05: Extended App Integration Tests (PENDING)
+
+> **Priority: AFTER SPEC-02** — depends on useAgent mock patterns
+
+### Items
+
+- [ ] Extend `app.test.tsx` with 16 additional tests
+
+---
+
+## Confirmed Complete
+
+- [x] CLI implementation (previous phase, archived to `0006-code`)
+- [x] Agent package core tests: 129/129 pass across 8 test files
+- [x] CLI baseline tests: 10/10 pass across 3 test files
+- [x] `.gitignore` covers `coverage/`, `packages/*/.env`, and root `.env`
+- [x] **SPEC-01**: `@vitest/coverage-v8` installed, `coverage` scripts added, vitest configs updated, both packages produce coverage tables
+- [x] **SPEC-06**: Dead `isPendingHumanInput()` removed, Claude 4.6 pricing added (sonnet + opus), 2 interruptOn edge case tests, conditional assertion fixed, `gpt-4.1-mini` added to required models test
+
+---
+
+## Learnings
+
+- **interruptOn behavior**: The inner tool loop does NOT break when encountering an interrupt tool — it skips execution via `continue` and the inner loop continues. `checkInterruptOn()` fires AFTER the inner loop exits naturally. Tests must mock a second model response (no tool calls) for the inner loop to exit.
+- **SPEC-06 test count**: Plan estimated +7 new tests, actual was +6 (the conditional assertion fix improved an existing test, not a new one). Updated final target accordingly.
+
+---
+
+## Deferred / Low Priority
+
+- **`verbose` prop unused in `useAgent`** — Intentional no-op for now
+- **`stream()` thin wrapper** — Documented limitation
+- **`cli.tsx` entry point tests** — High effort / low value
+- **StatusBar color-mapping exhaustive tests** — Existing 3 tests adequate
+- **Duplicate `useInput` logic** in HumanInput/PromptInput — Refactor opportunity
+- **`any` type in mock model pattern** — Cleanup opportunity
+- **No coverage thresholds** — Consider adding after testing phase establishes baselines
+- **No CI coverage integration** — Future spec opportunity
+
+---
+
+## Final Target State
+
+| Metric | Before | Current | After |
+|--------|--------|---------|-------|
+| Agent tests | 129 | 135 | 135 (done) |
+| CLI tests | 10 | 10 | 110 (+25 hook, +45 components, +14 bash, +16 integration) |
+| Total tests | 139 | 145 | 245 |
+| Coverage infra | None | Active | Active |
+| Untested CLI source files | 7 of 9 | 4 of 9 | 0 of 9 |
+| Known agent issues | 4 | 0 | 0 |
+
+---
+
+## Notes
+
+- All new CLI tests use `ink-testing-library` for rendering, `vi.mock` for dependencies.
+- Agent tests use existing mock patterns (`mockModel`, `mockThread`).
+- No API calls in any test — all mocked.
+- ESM-only project: all mocking must be compatible with `"type": "module"` configuration.
