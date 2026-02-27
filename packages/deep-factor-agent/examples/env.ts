@@ -1,4 +1,13 @@
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+
+// Load .env from ~/.deep-factor/.env if it exists, otherwise fall back to cwd
+const globalEnv = resolve(homedir(), ".deep-factor", ".env");
+const localEnv = resolve(process.cwd(), ".env");
+
+config({ path: existsSync(globalEnv) ? globalEnv : localEnv });
 
 // Default model if MODEL_ID env var is not set
 export const MODEL_ID = process.env.MODEL_ID ?? "gpt-4.1-mini";

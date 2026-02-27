@@ -51,6 +51,18 @@ npx tsx examples/06-human-in-the-loop.ts
 
 # Verification & self-correction
 npx tsx examples/07-verification.ts
+
+# XML context mode (vs standard)
+npx tsx examples/08-xml-context-mode.ts
+
+# Thread retention & inspection
+npx tsx examples/09-thread-inspection.ts
+
+# Multi-turn streaming chat with XML thread (interactive)
+npx tsx examples/10-xml-multi-turn-stream.ts
+
+# Multi-turn streaming chat with bash tool + XML thread (interactive)
+npx tsx examples/11-xml-tools-stream.ts
 ```
 
 ## Configuration
@@ -78,3 +90,7 @@ Supported models include any model supported by LangChain's `initChatModel`:
 | 05 | `05-middleware.ts` | Custom middleware (logging, timing, tool-providing) |
 | 06 | `06-human-in-the-loop.ts` | Pause/resume with simulated human input |
 | 07 | `07-verification.ts` | Verification with structural checks and self-correction |
+| 08 | `08-xml-context-mode.ts` | XML thread serialization vs standard context mode |
+| 09 | `09-thread-inspection.ts` | Thread retention, event inspection, XML export |
+| 10 | `10-xml-multi-turn-stream.ts` | Interactive multi-turn chat with streamed responses and XML thread |
+| 11 | `11-xml-tools-stream.ts` | Multi-turn streaming chat with bash tool, tool calls shown inline |

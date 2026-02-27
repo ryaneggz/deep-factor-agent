@@ -134,15 +134,21 @@ describe("HumanInput", () => {
 
   test("enter submits the input", async () => {
     const onSubmit = vi.fn();
-    const { stdin } = render(
+    const { lastFrame, stdin } = render(
       <HumanInput request={makeRequest()} onSubmit={onSubmit} />,
     );
     stdin.write("R");
-    await delay();
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("R");
+    });
     stdin.write("e");
-    await delay();
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Re");
+    });
     stdin.write("d");
-    await delay();
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Red");
+    });
     stdin.write("\r");
     await vi.waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith("Red");
