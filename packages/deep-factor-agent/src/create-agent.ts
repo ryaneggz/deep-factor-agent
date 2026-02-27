@@ -18,6 +18,7 @@ export function createDeepFactorAgent<
       errorRecoveryMiddleware(),
     ],
     interruptOn: settings.interruptOn ?? [],
+    contextMode: settings.contextMode ?? "standard",
     contextManagement: {
       maxContextTokens: 150000,
       keepRecentIterations: 3,

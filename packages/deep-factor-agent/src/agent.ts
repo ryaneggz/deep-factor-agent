@@ -14,6 +14,7 @@ import type { ComposedMiddleware } from "./middleware.js";
 import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "./human-in-the-loop.js";
 import { evaluateStopConditions } from "./stop-conditions.js";
 import { ContextManager } from "./context-manager.js";
+import { serializeThreadToXml } from "./xml-serializer.js";
 import { findToolByName } from "./tool-adapter.js";
 import type {
   AgentThread,
@@ -145,6 +146,7 @@ export class DeepFactorAgent<
   private onIterationEnd?: (iteration: number, result: unknown) => void;
   private modelId: string;
   private maxToolCallsPerIteration: number;
+  private contextMode: "standard" | "xml";
 
   constructor(settings: DeepFactorAgentSettings<TTools>) {
     this.modelOrString = settings.model;
@@ -162,6 +164,7 @@ export class DeepFactorAgent<
     this.onIterationStart = settings.onIterationStart;
     this.onIterationEnd = settings.onIterationEnd;
     this.maxToolCallsPerIteration = settings.maxToolCallsPerIteration ?? 20;
+    this.contextMode = settings.contextMode ?? "standard";
 
     // Normalize stopWhen
     if (!settings.stopWhen) {
@@ -226,10 +229,66 @@ export class DeepFactorAgent<
           // Summaries are injected via context injection in the system prompt
           break;
         }
-        default:
+        case "tool_call": {
+          messages.push(
+            new AIMessage({
+              content: "",
+              tool_calls: [
+                {
+                  id: event.toolCallId,
+                  name: event.toolName,
+                  args: event.args,
+                },
+              ],
+            }),
+          );
+          break;
+        }
+        case "tool_result": {
+          messages.push(
+            new ToolMessage({
+              tool_call_id: event.toolCallId,
+              content: String(event.result),
+            }),
+          );
+          break;
+        }
+        case "error": {
+          const recoverStr = event.recoverable
+            ? "recoverable"
+            : "non-recoverable";
+          messages.push(
+            new HumanMessage(
+              `[Error (${recoverStr})]: ${event.error}`,
+            ),
+          );
+          break;
+        }
+        case "completion":
+        case "human_input_requested":
           break;
       }
     }
+
+    return messages;
+  }
+
+  private buildXmlMessages(thread: AgentThread): BaseMessage[] {
+    const messages: BaseMessage[] = [];
+
+    // Build system prompt identically to standard mode
+    const contextInjection =
+      this.contextManager.buildContextInjection(thread);
+    if (this.instructions || contextInjection) {
+      const system = [contextInjection, this.instructions]
+        .filter(Boolean)
+        .join("\n\n");
+      messages.push(new SystemMessage(system));
+    }
+
+    // Serialize the entire thread into a single XML HumanMessage
+    const xml = serializeThreadToXml(thread.events);
+    messages.push(new HumanMessage(xml));
 
     return messages;
   }
@@ -313,7 +372,9 @@ export class DeepFactorAgent<
       }
 
       // Build messages from thread
-      const messages = this.buildMessages(thread);
+      const messages = this.contextMode === "xml"
+        ? this.buildXmlMessages(thread)
+        : this.buildMessages(thread);
 
       try {
         // Bind tools and run inner tool-calling loop
@@ -656,7 +717,10 @@ export class DeepFactorAgent<
       ...this.composedMiddleware.tools,
     ];
 
-    const messages = this.buildMessages(thread);
+    const messages =
+      this.contextMode === "xml"
+        ? this.buildXmlMessages(thread)
+        : this.buildMessages(thread);
 
     const modelWithTools =
       allTools.length > 0 && model.bindTools

@@ -175,6 +175,8 @@ export interface DeepFactorAgentSettings<
   contextManagement?: ContextManagementConfig;
   /** Maximum tool-call steps per outer iteration (default: 20). */
   maxToolCallsPerIteration?: number;
+  /** Context mode: "standard" converts events to individual LangChain messages; "xml" serializes the full thread into a single XML HumanMessage. Default: "standard". */
+  contextMode?: "standard" | "xml";
   onIterationStart?: (iteration: number) => void;
   onIterationEnd?: (iteration: number, result: unknown) => void;
 }

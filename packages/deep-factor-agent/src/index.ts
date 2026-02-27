@@ -73,3 +73,7 @@ export {
   toolArrayToMap,
   findToolByName,
 } from "./tool-adapter.js";
+
+// XML thread serializer
+export { serializeThreadToXml, escapeXml } from "./xml-serializer.js";
+export type { XmlSerializerOptions } from "./xml-serializer.js";
