@@ -73,9 +73,19 @@ export const MODEL_PRICING: Record<
 
 // --- Cost Calculation ---
 
+const warnedModels = new Set<string>();
+
 export function calculateCost(usage: TokenUsage, model: string): number {
   const pricing = MODEL_PRICING[model];
-  if (!pricing) return 0;
+  if (!pricing) {
+    if (!warnedModels.has(model)) {
+      warnedModels.add(model);
+      console.warn(
+        `[deep-factor-agent] Unknown model "${model}" — cost-based stop conditions (maxCost) will not trigger. Add pricing to MODEL_PRICING or use a known model ID.`,
+      );
+    }
+    return 0;
+  }
 
   let cost =
     usage.inputTokens * pricing.input + usage.outputTokens * pricing.output;

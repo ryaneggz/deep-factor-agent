@@ -15,7 +15,7 @@ import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "./human-in-the-loop.js";
 import { evaluateStopConditions } from "./stop-conditions.js";
 import { ContextManager } from "./context-manager.js";
 import { serializeThreadToXml } from "./xml-serializer.js";
-import { findToolByName } from "./tool-adapter.js";
+import { toolArrayToMap } from "./tool-adapter.js";
 import type {
   AgentThread,
   AgentResult,
@@ -349,6 +349,7 @@ export class DeepFactorAgent<
       ...this.tools,
       ...this.composedMiddleware.tools,
     ];
+    const toolMap = toolArrayToMap(allTools);
 
     while (true) {
       // Callback
@@ -473,8 +474,8 @@ export class DeepFactorAgent<
               continue;
             }
 
-            // Find and execute the tool
-            const foundTool = findToolByName(allTools, tc.name);
+            // Find and execute the tool (O(1) map lookup)
+            const foundTool = toolMap[tc.name];
             if (foundTool) {
               const toolResult = await foundTool.invoke(tc.args);
               const resultStr =

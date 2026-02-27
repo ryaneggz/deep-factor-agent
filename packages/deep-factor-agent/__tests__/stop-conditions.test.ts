@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   maxIterations,
   maxTokens,
@@ -157,6 +157,25 @@ describe("calculateCost", () => {
   it("returns 0 for unknown models", () => {
     const usage = makeUsage({ inputTokens: 1000, outputTokens: 500 });
     expect(calculateCost(usage, "unknown-model")).toBe(0);
+  });
+
+  it("warns once per unknown model (not on every call)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const usage = makeUsage({ inputTokens: 100, outputTokens: 50 });
+
+    // Use a unique model name to avoid interference from other tests
+    calculateCost(usage, "test-warn-model-abc");
+    calculateCost(usage, "test-warn-model-abc");
+    calculateCost(usage, "test-warn-model-abc");
+
+    const relevantCalls = warnSpy.mock.calls.filter(
+      (args) => typeof args[0] === "string" && args[0].includes("test-warn-model-abc"),
+    );
+    expect(relevantCalls).toHaveLength(1);
+    expect(relevantCalls[0][0]).toContain("Unknown model");
+    expect(relevantCalls[0][0]).toContain("maxCost");
+
+    warnSpy.mockRestore();
   });
 
   it("computes cost for gpt-4o", () => {

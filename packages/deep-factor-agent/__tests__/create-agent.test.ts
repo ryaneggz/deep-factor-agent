@@ -159,6 +159,8 @@ describe("barrel exports", () => {
 
     // Human-in-the-loop
     expect(exports.requestHumanInput).toBeDefined();
+    expect(exports.requestHumanInputSchema).toBeDefined();
+    expect(exports.TOOL_NAME_REQUEST_HUMAN_INPUT).toBeDefined();
 
     // Type guard
     expect(exports.isPendingResult).toBeDefined();
@@ -167,5 +169,12 @@ describe("barrel exports", () => {
     expect(exports.createLangChainTool).toBeDefined();
     expect(exports.toolArrayToMap).toBeDefined();
     expect(exports.findToolByName).toBeDefined();
+
+    // XML serializer
+    expect(exports.serializeThreadToXml).toBeDefined();
+    expect(exports.escapeXml).toBeDefined();
+
+    // Middleware constants
+    expect(exports.TOOL_NAME_WRITE_TODOS).toBeDefined();
   });
 });

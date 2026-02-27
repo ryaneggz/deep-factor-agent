@@ -8,7 +8,7 @@ export type {
 } from "./types.js";
 
 // Hook
-export { useAgent } from "./hooks/useAgent.js";
+export { useAgent, eventsToChatMessages } from "./hooks/useAgent.js";
 
 // Components
 export { App } from "./app.js";
