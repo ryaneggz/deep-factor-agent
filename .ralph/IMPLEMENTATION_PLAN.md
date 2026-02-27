@@ -1,47 +1,33 @@
-# Implementation Plan — Phase 0010
+# Implementation Plan — Phase 0011
 
 **Generated:** 2026-02-27
 **Branch:** `ryaneggz/4-parallel-tool-calling`
-**Baseline:** 283 tests passing (173 agent, 110 CLI), type-check clean, 0 TODOs/FIXMEs in source
+**Baseline:** 284 tests passing (174 agent, 110 CLI), type-check clean
 
 ## Status: COMPLETE
 
-## Primary Deliverable: SPEC-02 — Example 13: Parallel Tool Calling
+## Primary Deliverable: Fix P2.1 — interruptOn dangling tool_call event
 
 ---
 
-### P0 — Immediate (SPEC-02 Implementation) — DONE
+### P0 — Bug Fix: interruptOn orphaned tool_call (P2.1) — DONE
 
-- [x] Created `packages/deep-factor-agent/examples/13-parallel-tool-calls.ts` by forking Example 12
-- [x] Added `performance` import from `node:perf_hooks`
-- [x] Added `ParallelResult` interface and `executeToolsParallel()` helper function
-- [x] Modified `runToolLoop()` to use parallel execution via `executeToolsParallel()`
-- [x] Updated system prompt to encourage multi-tool responses
-- [x] Updated banner text in `main()`
-- [x] Updated `packages/deep-factor-agent/examples/README.md` with Example 13
-
-### Bug Fix (discovered during validation)
-
-- [x] Fixed stale closure bug in `packages/deep-factor-cli/src/components/PromptInput.tsx`
-  - Root cause: `useInput` handler's `key.return` branch read `input` from the render closure, which could be stale when React hadn't yet committed the latest state update from a preceding character keystroke
-  - Fix: Added `useRef` to track the latest input value synchronously, eliminating the stale closure race condition
-  - This fixed the flaky "enter submits the input" test in `PromptInput.test.tsx`
-
----
+- [x] Fixed in `packages/deep-factor-agent/src/agent.ts` (~line 450-467)
+  - Root cause: When `interruptOn` skipped a tool, a `tool_call` event was pushed to the thread but no matching `tool_result` event was created. This left an orphaned `AIMessage` with `tool_calls` that had no corresponding `ToolMessage`, producing an invalid message sequence that LLM APIs (OpenAI, Anthropic) would reject.
+  - Fix: When `interruptOn` skips a tool, push a synthetic `tool_result` event with descriptive text `[Tool "X" not executed — interrupted for human approval]` and a matching `ToolMessage` to the local messages array. This ensures the message sequence is always structurally valid.
+  - Why: LLM APIs require every `tool_call` in an `AIMessage` to have a matching `ToolMessage` response before the next user turn. Without this fix, both the inner-loop re-invocation and `buildMessages()` on resume produced malformed sequences.
+- [x] Updated 2 existing tests in `agent.test.ts` to expect synthetic tool_result events
+- [x] Added new test in `human-in-the-loop.test.ts`: "produces valid message sequence on resume" — validates every tool_call ID has a matching ToolMessage in the messages sent to the model on resume
 
 ### P1 — Validation — DONE
 
-- [x] Build passes — `pnpm -C packages/deep-factor-agent build`
 - [x] Type-check passes — `pnpm -C packages/deep-factor-agent type-check`
-- [x] All 283 tests pass — `pnpm -r test` (173 agent, 110 CLI)
-- [ ] Manual smoke test — `npx tsx examples/13-parallel-tool-calls.ts` (requires API key, deferred to user)
+- [x] All 284 tests pass — `pnpm -r test` (174 agent, 110 CLI)
 
 ---
 
-### P2 — Known Issues (Backlog, out of scope for this phase)
+### P2 — Known Issues (Backlog)
 
-- [ ] P2.1 — `interruptOn` leaves dangling unmatched `tool_call` event — `packages/deep-factor-agent/src/agent.ts` (~line 421-454)
-  - Severity: Medium. `buildMessages()` produces invalid message sequence after interrupt+resume (missing `ToolMessage` for interrupted tool). LLM APIs may reject.
 - [ ] P2.2 — Summarization token usage invisible to stop conditions — `packages/deep-factor-agent/src/context-manager.ts` + `agent.ts`
   - Severity: Low-Medium. `ContextManager.summarize()` internal `model.invoke()` not tracked in `totalUsage`. Cost tracking inaccurate for long-running agents with summarization.
 - [ ] P2.3 — `stream()` is an incomplete thin wrapper — `packages/deep-factor-agent/src/agent.ts`
@@ -86,3 +72,4 @@
 - [x] Phase 0008: XML thread serialization, buildMessages() retention fix, examples 10-11 (245 -> 283 tests)
 - [x] Phase 0009: SPEC-01 — Example 12 — Interactive HITL with Multiple Choice (283 tests maintained)
 - [x] Phase 0010: SPEC-02 — Example 13 — Parallel Tool Calling + PromptInput stale closure fix (283 tests maintained)
+- [x] Phase 0011: Fix P2.1 — interruptOn orphaned tool_call event + 1 new test (283 → 284 tests)

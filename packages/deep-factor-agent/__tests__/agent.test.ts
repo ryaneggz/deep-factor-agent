@@ -787,11 +787,14 @@ describe("DeepFactorAgent", () => {
       expect(result.stopReason).toBe("human_input_needed");
       expect(result.stopDetail).toContain("dangerous_action");
 
-      // The tool should NOT have been executed (no tool_result events)
+      // The tool should NOT have been executed — but a synthetic tool_result
+      // is recorded to keep the message sequence valid for LLM APIs
       const toolResultEvents = result.thread.events.filter(
         (e) => e.type === "tool_result",
       );
-      expect(toolResultEvents.length).toBe(0);
+      expect(toolResultEvents.length).toBe(1);
+      expect(String(toolResultEvents[0].result)).toContain("not executed");
+      expect(String(toolResultEvents[0].result)).toContain("interrupted");
     });
 
     it("executes non-interrupt tools but pauses on interrupt tool in mixed batch", async () => {
@@ -838,11 +841,16 @@ describe("DeepFactorAgent", () => {
       expect(isPendingResult(result)).toBe(true);
       expect(result.stopReason).toBe("human_input_needed");
 
-      // safe_search should have been executed (tool_result present)
+      // safe_search was executed (real tool_result) + deploy has a synthetic
+      // tool_result to keep the message sequence valid for LLM APIs
       const toolResultEvents = result.thread.events.filter(
         (e) => e.type === "tool_result",
       );
-      expect(toolResultEvents.length).toBe(1);
+      expect(toolResultEvents.length).toBe(2);
+      // safe_search result is real
+      expect(String(toolResultEvents[0].result)).toBe("result: test");
+      // deploy result is synthetic (interrupted)
+      expect(String(toolResultEvents[1].result)).toContain("not executed");
 
       // Both tool_call events should be recorded
       const toolCallEvents = result.thread.events.filter(

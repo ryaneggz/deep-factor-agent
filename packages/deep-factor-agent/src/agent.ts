@@ -449,7 +449,25 @@ export class DeepFactorAgent<
 
             // Check interruptOn before executing
             if (this.interruptOn.includes(tc.name)) {
-              // Don't execute - will be handled after the inner loop
+              // Push a synthetic tool_result so the message sequence stays valid
+              // (every AIMessage tool_call must have a matching ToolMessage)
+              const interruptedToolCallId =
+                tc.id ?? `call_${stepCount}_${tc.name}`;
+              const interruptedResult = `[Tool "${tc.name}" not executed — interrupted for human approval]`;
+              const toolResultEvent: ToolResultEvent = {
+                type: "tool_result",
+                toolCallId: interruptedToolCallId,
+                result: interruptedResult,
+                timestamp: now,
+                iteration,
+              };
+              thread.events.push(toolResultEvent);
+              messages.push(
+                new ToolMessage({
+                  tool_call_id: interruptedToolCallId,
+                  content: interruptedResult,
+                }),
+              );
               continue;
             }
 
