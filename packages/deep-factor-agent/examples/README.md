@@ -66,6 +66,9 @@ npx tsx examples/11-xml-tools-stream.ts
 
 # Interactive HITL with multiple choice (interactive)
 npx tsx examples/12-hitl-multiple-choice.ts
+
+# Parallel tool calling with HITL (interactive)
+npx tsx examples/13-parallel-tool-calls.ts
 ```
 
 ## Configuration
@@ -98,3 +101,4 @@ Supported models include any model supported by LangChain's `initChatModel`:
 | 10 | `10-xml-multi-turn-stream.ts` | Interactive multi-turn chat with streamed responses and XML thread |
 | 11 | `11-xml-tools-stream.ts` | Multi-turn streaming chat with bash tool, tool calls shown inline |
 | 12 | `12-hitl-multiple-choice.ts` | Interactive HITL with multiple-choice prompts, bash tool, streaming |
+| 13 | `13-parallel-tool-calls.ts` | Parallel tool execution with Promise.all, timing display, HITL sequential |
