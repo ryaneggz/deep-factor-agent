@@ -368,7 +368,9 @@ export class DeepFactorAgent<
 
       // Context management: check if summarization needed
       if (this.contextManager.needsSummarization(thread)) {
-        await this.contextManager.summarize(thread, model);
+        const { usage: summarizationUsage } =
+          await this.contextManager.summarize(thread, model);
+        totalUsage = addUsage(totalUsage, summarizationUsage);
       }
 
       // Build messages from thread

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { AIMessage } from "@langchain/core/messages";
 import { ContextManager, estimateTokens } from "../src/context-manager.js";
-import type { AgentThread, SummaryEvent, MessageEvent } from "../src/types.js";
+import type { AgentThread, SummaryEvent, MessageEvent, TokenUsage } from "../src/types.js";
 
 function makeThread(events: AgentThread["events"] = []): AgentThread {
   return {
@@ -180,7 +180,7 @@ describe("ContextManager", () => {
       const thread = makeThread(events);
       const cm = new ContextManager({ keepRecentIterations: 3 });
 
-      const result = await cm.summarize(thread, mockModel as any);
+      const { thread: result } = await cm.summarize(thread, mockModel as any);
 
       const summaryEvents = result.events.filter(
         (e) => e.type === "summary",
@@ -212,7 +212,7 @@ describe("ContextManager", () => {
       const thread = makeThread(events);
       const cm = new ContextManager({ keepRecentIterations: 3 });
 
-      const result = await cm.summarize(thread, mockModel as any);
+      const { thread: result, usage } = await cm.summarize(thread, mockModel as any);
 
       const summaryEvents = result.events.filter(
         (e) => e.type === "summary",
@@ -223,6 +223,11 @@ describe("ContextManager", () => {
       for (const s of summaryEvents) {
         expect(s.summary).toContain("summarization failed");
       }
+
+      // When model throws, no usage should be accumulated
+      expect(usage.inputTokens).toBe(0);
+      expect(usage.outputTokens).toBe(0);
+      expect(usage.totalTokens).toBe(0);
     });
 
     it("preserves recent iterations unchanged", async () => {
@@ -246,8 +251,77 @@ describe("ContextManager", () => {
       const thread = makeThread(events);
       const cm = new ContextManager({ keepRecentIterations: 3 });
 
-      const result = await cm.summarize(thread, {} as any);
+      const { thread: result, usage } = await cm.summarize(thread, {} as any);
       expect(result.events).toHaveLength(2);
+      // No summarization happened, so usage should be zero
+      expect(usage.totalTokens).toBe(0);
+    });
+
+    it("returns accumulated token usage from summarization calls", async () => {
+      const mockModel = {
+        invoke: vi.fn().mockResolvedValue(
+          new AIMessage({
+            content: "Summary of iteration",
+            usage_metadata: {
+              input_tokens: 100,
+              output_tokens: 50,
+              total_tokens: 150,
+            },
+          }),
+        ),
+      };
+
+      const events: MessageEvent[] = [];
+      for (let i = 0; i < 5; i++) {
+        events.push({
+          type: "message",
+          role: "user",
+          content: `Iteration ${i} content`,
+          timestamp: Date.now(),
+          iteration: i,
+        });
+      }
+
+      const thread = makeThread(events);
+      const cm = new ContextManager({ keepRecentIterations: 3 });
+
+      // Iterations 0-4, cutoff = 4-3 = 1, so iterations 0 and 1 are summarized
+      const { usage } = await cm.summarize(thread, mockModel as any);
+
+      expect(mockModel.invoke).toHaveBeenCalledTimes(2);
+      expect(usage.inputTokens).toBe(200);  // 2 calls × 100
+      expect(usage.outputTokens).toBe(100); // 2 calls × 50
+      expect(usage.totalTokens).toBe(300);  // 2 calls × 150
+    });
+
+    it("returns zero usage when model has no usage_metadata", async () => {
+      const mockModel = {
+        invoke: vi.fn().mockResolvedValue(
+          new AIMessage({ content: "Summary of iteration" }),
+        ),
+      };
+
+      const events: MessageEvent[] = [];
+      for (let i = 0; i < 5; i++) {
+        events.push({
+          type: "message",
+          role: "user",
+          content: `Iteration ${i} content`,
+          timestamp: Date.now(),
+          iteration: i,
+        });
+      }
+
+      const thread = makeThread(events);
+      const cm = new ContextManager({ keepRecentIterations: 3 });
+
+      const { usage } = await cm.summarize(thread, mockModel as any);
+
+      // Model was called but didn't return usage_metadata
+      expect(mockModel.invoke).toHaveBeenCalledTimes(2);
+      expect(usage.inputTokens).toBe(0);
+      expect(usage.outputTokens).toBe(0);
+      expect(usage.totalTokens).toBe(0);
     });
   });
 

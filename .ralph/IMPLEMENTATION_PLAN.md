@@ -1,41 +1,45 @@
-# Implementation Plan — Phase 0011
+# Implementation Plan — Phase 0012
 
 **Generated:** 2026-02-27
 **Branch:** `ryaneggz/4-parallel-tool-calling`
-**Baseline:** 284 tests passing (174 agent, 110 CLI), type-check clean
+**Baseline:** 287 tests passing (177 agent, 110 CLI), type-check clean
 
 ## Status: COMPLETE
 
-## Primary Deliverable: Fix P2.1 — interruptOn dangling tool_call event
+## Primary Deliverable: Fix P2.2 — Summarization token usage invisible to stop conditions
 
 ---
 
-### P0 — Bug Fix: interruptOn orphaned tool_call (P2.1) — DONE
+### P0 — Bug Fix: Summarization token usage (P2.2) — DONE
 
-- [x] Fixed in `packages/deep-factor-agent/src/agent.ts` (~line 450-467)
-  - Root cause: When `interruptOn` skipped a tool, a `tool_call` event was pushed to the thread but no matching `tool_result` event was created. This left an orphaned `AIMessage` with `tool_calls` that had no corresponding `ToolMessage`, producing an invalid message sequence that LLM APIs (OpenAI, Anthropic) would reject.
-  - Fix: When `interruptOn` skips a tool, push a synthetic `tool_result` event with descriptive text `[Tool "X" not executed — interrupted for human approval]` and a matching `ToolMessage` to the local messages array. This ensures the message sequence is always structurally valid.
-  - Why: LLM APIs require every `tool_call` in an `AIMessage` to have a matching `ToolMessage` response before the next user turn. Without this fix, both the inner-loop re-invocation and `buildMessages()` on resume produced malformed sequences.
-- [x] Updated 2 existing tests in `agent.test.ts` to expect synthetic tool_result events
-- [x] Added new test in `human-in-the-loop.test.ts`: "produces valid message sequence on resume" — validates every tool_call ID has a matching ToolMessage in the messages sent to the model on resume
+- [x] Fixed in `packages/deep-factor-agent/src/context-manager.ts`
+  - Root cause: `ContextManager.summarize()` called `model.invoke()` internally (once per old iteration needing summarization) but discarded the response's `usage_metadata`. The token usage from these LLM calls was never returned to the caller.
+  - Fix: Changed `summarize()` return type from `Promise<AgentThread>` to `Promise<{ thread: AgentThread; usage: TokenUsage }>`. Each internal `model.invoke()` response's `usage_metadata` is now extracted and accumulated into a `totalUsage` object that is returned alongside the thread.
+  - Why: Stop conditions (`maxTokens`, `maxInputTokens`, `maxOutputTokens`, `maxCost`) rely on `totalUsage` to enforce budget limits. Without tracking summarization costs, long-running agents with context compaction could silently exceed their configured budget. This is especially significant because summarization calls can be frequent (one per old iteration) and process large context windows.
+- [x] Fixed in `packages/deep-factor-agent/src/agent.ts` (~line 370-374)
+  - Captures the `usage` from `summarize()` and merges it into `totalUsage` via `addUsage()`.
+- [x] Updated 3 existing tests in `context-manager.test.ts` to use new `{ thread, usage }` return type
+- [x] Added 3 new tests:
+  - `context-manager.test.ts`: "returns accumulated token usage from summarization calls" — verifies correct usage accumulation across multiple summarize calls with known `usage_metadata`
+  - `context-manager.test.ts`: "returns zero usage when model has no usage_metadata" — verifies graceful handling when model doesn't report usage
+  - `agent.test.ts`: "includes summarization token usage in totalUsage" — end-to-end test verifying summarization usage flows through to the final `AgentResult.usage`
 
 ### P1 — Validation — DONE
 
-- [x] Type-check passes — `pnpm -C packages/deep-factor-agent type-check`
-- [x] All 284 tests pass — `pnpm -r test` (174 agent, 110 CLI)
+- [x] Type-check passes — `pnpm -r type-check`
+- [x] All 287 tests pass — `pnpm -r test` (177 agent, 110 CLI)
 
 ---
 
-### P2 — Known Issues (Backlog)
+### P2 — Known Issues
 
-- [ ] P2.2 — Summarization token usage invisible to stop conditions — `packages/deep-factor-agent/src/context-manager.ts` + `agent.ts`
-  - Severity: Low-Medium. `ContextManager.summarize()` internal `model.invoke()` not tracked in `totalUsage`. Cost tracking inaccurate for long-running agents with summarization.
+- [x] ~~P2.2 — Summarization token usage invisible to stop conditions~~ — RESOLVED in Phase 0012
 - [ ] P2.3 — `stream()` is an incomplete thin wrapper — `packages/deep-factor-agent/src/agent.ts`
   - Severity: Low. Single-shot stream only; no tool loop, events, stop conditions, HITL, or verification. Documented limitation per Phase 0009 decision.
 
 ---
 
-### P3 — Quality Improvements (Backlog)
+### P3 — Quality Improvements
 
 - [ ] P3.1 — `XmlSerializerOptions.responsePrefix` naming is misleading — `packages/deep-factor-agent/src/xml-serializer.ts`
 - [ ] P3.2 — `calculateCost` silently returns 0 for unknown models — `packages/deep-factor-agent/src/stop-conditions.ts`
@@ -73,3 +77,4 @@
 - [x] Phase 0009: SPEC-01 — Example 12 — Interactive HITL with Multiple Choice (283 tests maintained)
 - [x] Phase 0010: SPEC-02 — Example 13 — Parallel Tool Calling + PromptInput stale closure fix (283 tests maintained)
 - [x] Phase 0011: Fix P2.1 — interruptOn orphaned tool_call event + 1 new test (283 → 284 tests)
+- [x] Phase 0012: Fix P2.2 — Summarization token usage tracked in stop conditions + 3 new tests (284 → 287 tests)

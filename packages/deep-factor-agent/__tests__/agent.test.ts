@@ -748,6 +748,47 @@ describe("DeepFactorAgent", () => {
 
       expect(result.stopReason).toBe("completed");
     });
+
+    it("includes summarization token usage in totalUsage", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        // Iteration 1: main LLM response (100 input, 50 output, 150 total)
+        .mockResolvedValueOnce(makeAIMessage("First response"))
+        // Summarization call for iteration 0 — with explicit usage
+        .mockResolvedValueOnce(
+          new AIMessage({
+            content: "Summary: User asked about summarization.",
+            usage_metadata: {
+              input_tokens: 200,
+              output_tokens: 80,
+              total_tokens: 280,
+            },
+          }),
+        )
+        // Iteration 2: main LLM response (100 input, 50 output, 150 total)
+        .mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        contextManagement: {
+          maxContextTokens: 10,
+          keepRecentIterations: 1,
+        },
+        verifyCompletion: vi
+          .fn()
+          .mockResolvedValueOnce({ complete: false, reason: "Try again" })
+          .mockResolvedValueOnce({ complete: true }),
+      });
+
+      const result = await agent.loop("Test summarization usage tracking");
+
+      // Two main LLM calls: 2 × (100 + 50 + 150) = (200, 100, 300)
+      // One summarization call: (200, 80, 280)
+      // Total should include both: (400, 180, 580)
+      expect(result.usage.inputTokens).toBe(400);
+      expect(result.usage.outputTokens).toBe(180);
+      expect(result.usage.totalTokens).toBe(580);
+    });
   });
 
   describe("interruptOn", () => {
