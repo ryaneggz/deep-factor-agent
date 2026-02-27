@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import React from "react";
+import { Box, Text } from "ink";
 import type { HumanInputRequestedEvent } from "deep-factor-agent";
+import { useTextInput } from "../hooks/useTextInput.js";
 
 interface HumanInputProps {
   request: HumanInputRequestedEvent;
@@ -8,24 +9,7 @@ interface HumanInputProps {
 }
 
 export function HumanInput({ request, onSubmit }: HumanInputProps) {
-  const [input, setInput] = useState("");
-
-  useInput((inputChar, key) => {
-    if (key.return) {
-      if (input.trim().length > 0) {
-        onSubmit(input.trim());
-        setInput("");
-      }
-      return;
-    }
-    if (key.backspace || key.delete) {
-      setInput((prev) => prev.slice(0, -1));
-      return;
-    }
-    if (!key.ctrl && !key.meta && inputChar) {
-      setInput((prev) => prev + inputChar);
-    }
-  });
+  const { input } = useTextInput({ onSubmit });
 
   return (
     <Box flexDirection="column">

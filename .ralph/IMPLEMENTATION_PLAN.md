@@ -1,40 +1,27 @@
-# Implementation Plan — Phase 0013
+# Implementation Plan — Phase 0014
 
 **Generated:** 2026-02-27
 **Branch:** `ryaneggz/4-parallel-tool-calling`
-**Baseline:** 288 tests passing (178 agent, 110 CLI), type-check clean
+**Baseline:** 295 tests passing (178 agent, 117 CLI), type-check clean
 
 ## Status: COMPLETE
 
-## Primary Deliverable: Quality improvements P3.2, P3.3, P3.6, P3.7
+## Primary Deliverable: P3.5 — Extract shared `useTextInput` hook + fix stale-closure bug
 
 ---
 
-### P0 — Quality Fixes (Phase 0013) — DONE
+### P0 — Deliverable (Phase 0014) — DONE
 
-- [x] P3.2 — `calculateCost` warns on unknown models — `packages/deep-factor-agent/src/stop-conditions.ts`
-  - Root cause: `calculateCost()` silently returned 0 for models not in `MODEL_PRICING`. This meant `maxCost` stop conditions could never trigger for unknown model IDs, allowing unbounded spend.
-  - Fix: Added a `warnedModels` Set and `console.warn()` on first encounter of an unknown model. Warning fires once per unique model ID to avoid log spam. Still returns 0 (changing to throw would break existing usage).
-  - Why: Users relying on `maxCost` stop conditions need to know when their model isn't recognized — otherwise budget enforcement silently fails.
-  - Test: "warns once per unknown model (not on every call)" — verifies `console.warn` fires exactly once per unique model, with correct message content.
-
-- [x] P3.3 — `findToolByName` O(n*m) → O(1) lookup — `packages/deep-factor-agent/src/agent.ts`
-  - Root cause: `findToolByName(allTools, tc.name)` called on every tool call inside the inner loop, doing a linear scan of the tools array each time. With N tool calls and M tools, this was O(N*M) per step.
-  - Fix: Replaced `findToolByName` import with `toolArrayToMap`. Build `toolMap = toolArrayToMap(allTools)` once before the loop, then use `toolMap[tc.name]` for O(1) lookups.
-  - Why: In agents with many tools (10+) processing many tool calls per iteration, linear scans add unnecessary overhead. The `toolArrayToMap` utility already existed but wasn't being used.
-
-- [x] P3.6 — `eventsToChatMessages` exported from CLI `index.ts` — `packages/deep-factor-cli/src/index.ts`
-  - Fix: Added `eventsToChatMessages` to the named export from `./hooks/useAgent.js`.
-  - Why: The function was defined and tested but not part of the CLI's public API surface, limiting reuse.
-
-- [x] P3.7 — Barrel export test complete — `packages/deep-factor-agent/__tests__/create-agent.test.ts`
-  - Fix: Added assertions for 5 missing exports: `TOOL_NAME_WRITE_TODOS`, `requestHumanInputSchema`, `TOOL_NAME_REQUEST_HUMAN_INPUT`, `serializeThreadToXml`, `escapeXml`.
-  - Why: Barrel export tests catch accidental removal of public API surface. Missing assertions meant these exports could be dropped without test failure.
+- [x] P3.5 — CLI `HumanInput` and `PromptInput` duplicate `useInput` logic — `packages/deep-factor-cli/src/components/`
+  - Root cause: Both `HumanInput.tsx` and `PromptInput.tsx` independently implemented the same 17-line `useInput` callback (character append, backspace, enter-to-submit). `HumanInput` used functional updaters (`prev => ...`) which avoids stale closure on append/backspace but still reads `input` directly in the `key.return` branch — a latent stale-closure bug. `PromptInput` used `useRef` correctly throughout.
+  - Fix: Extracted `useTextInput` hook (`packages/deep-factor-cli/src/hooks/useTextInput.ts`) using the ref-based approach. Both components now call `useTextInput({ onSubmit })` and own only their UI layout. The hook is exported from `packages/deep-factor-cli/src/index.ts`.
+  - Why: Single source of truth for text-input behavior. Eliminates the stale-closure bug in HumanInput's submit path. Future input components (e.g. Ctrl+C cancel per P4.8) only need to modify the hook.
+  - Tests: 7 new tests in `__tests__/hooks/useTextInput.test.tsx` — accumulation, backspace, backspace-on-empty, submit-with-trim, empty-submit-noop, ctrl-ignore, and explicit stale-closure regression test. All 23 existing HumanInput + PromptInput tests pass unchanged.
 
 ### P1 — Validation — DONE
 
 - [x] Type-check passes — `pnpm -r type-check`
-- [x] All 288 tests pass — `pnpm -r test` (178 agent, 110 CLI)
+- [x] All 295 tests pass — `pnpm -r test` (178 agent, 117 CLI)
 
 ---
 
@@ -48,8 +35,9 @@
 ### P3 — Quality Improvements
 
 - [ ] P3.1 — `XmlSerializerOptions.responsePrefix` naming is misleading — `packages/deep-factor-agent/src/xml-serializer.ts`
+  - `responsePrefix` is appended after `</thread>` as a prefill nudge but the name suggests it's a prefix of the response. Better name: `assistantPrefill`. Only used in tests — never consumed by the live agent loop. Rename requires updating the type, function, tests, and re-export.
 - [ ] P3.4 — CLI `useAgent` creates new agent per prompt (no multi-turn memory) — `packages/deep-factor-cli/src/hooks/useAgent.ts`
-- [ ] P3.5 — CLI `HumanInput` and `PromptInput` duplicate `useInput` logic — `packages/deep-factor-cli/src/components/`
+  - Each `sendPrompt()` call creates a fresh `DeepFactorAgent` and `AgentThread`. Cross-prompt context is lost. Fix requires either a public `continueLoop(thread, prompt)` API on the agent, or persisting agent+thread refs across calls.
 
 ---
 
@@ -81,3 +69,4 @@
 - [x] Phase 0011: Fix P2.1 — interruptOn orphaned tool_call event + 1 new test (283 → 284 tests)
 - [x] Phase 0012: Fix P2.2 — Summarization token usage tracked in stop conditions + 3 new tests (284 → 287 tests)
 - [x] Phase 0013: Quality fixes P3.2, P3.3, P3.6, P3.7 + 1 new test (287 → 288 tests)
+- [x] Phase 0014: P3.5 — Extract shared useTextInput hook + fix stale-closure bug + 7 new tests (288 → 295 tests)
