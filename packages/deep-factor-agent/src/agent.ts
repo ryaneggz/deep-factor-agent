@@ -317,6 +317,28 @@ export class DeepFactorAgent<
     return this.runLoop(thread, prompt, 1);
   }
 
+  /**
+   * Continue an existing thread with a new user prompt.
+   * Reuses the thread's full conversation history so the model retains
+   * multi-turn context across calls.
+   */
+  async continueLoop(
+    thread: AgentThread,
+    prompt: string,
+  ): Promise<AgentResult | PendingResult> {
+    const nextIteration =
+      thread.events.reduce((max, e) => Math.max(max, e.iteration), 0) + 1;
+    thread.events.push({
+      type: "message",
+      role: "user",
+      content: prompt,
+      timestamp: Date.now(),
+      iteration: nextIteration,
+    });
+    thread.updatedAt = Date.now();
+    return this.runLoop(thread, prompt, nextIteration);
+  }
+
   private async runLoop(
     thread: AgentThread,
     prompt: string,

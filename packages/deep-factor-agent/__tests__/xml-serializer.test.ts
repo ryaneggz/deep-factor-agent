@@ -299,7 +299,7 @@ describe("serializeThreadToXml", () => {
     expect(xml).toContain('id="2"');
   });
 
-  it("appends responsePrefix after closing tag", () => {
+  it("appends assistantPrefill after closing tag", () => {
     const events: AgentEvent[] = [
       {
         type: "message",
@@ -310,14 +310,14 @@ describe("serializeThreadToXml", () => {
       },
     ];
     const xml = serializeThreadToXml(events, {
-      responsePrefix: "Based on the above, I will now",
+      assistantPrefill: "Based on the above, I will now",
     });
     expect(xml).toContain("</thread>\nBased on the above, I will now");
   });
 
-  it("appends responsePrefix to empty thread", () => {
+  it("appends assistantPrefill to empty thread", () => {
     const xml = serializeThreadToXml([], {
-      responsePrefix: "Starting fresh",
+      assistantPrefill: "Starting fresh",
     });
     expect(xml).toBe("<thread>\n</thread>\nStarting fresh");
   });

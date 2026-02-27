@@ -1,8 +1,8 @@
 import type { AgentEvent, ToolCallEvent } from "./types.js";
 
 export interface XmlSerializerOptions {
-  /** Optional text appended after the closing </thread> tag, used as a response prefix / nudge. */
-  responsePrefix?: string;
+  /** Optional text appended after the closing </thread> tag as an assistant prefill nudge. */
+  assistantPrefill?: string;
 }
 
 /**
@@ -26,7 +26,7 @@ export function serializeThreadToXml(
 ): string {
   if (events.length === 0) {
     const xml = "<thread>\n</thread>";
-    return options?.responsePrefix ? `${xml}\n${options.responsePrefix}` : xml;
+    return options?.assistantPrefill ? `${xml}\n${options.assistantPrefill}` : xml;
   }
 
   // Build toolCallId -> toolName map in a single pass
@@ -106,5 +106,5 @@ export function serializeThreadToXml(
 
   lines.push("</thread>");
   const xml = lines.join("\n");
-  return options?.responsePrefix ? `${xml}\n${options.responsePrefix}` : xml;
+  return options?.assistantPrefill ? `${xml}\n${options.assistantPrefill}` : xml;
 }

@@ -342,6 +342,93 @@ describe("DeepFactorAgent", () => {
     });
   });
 
+  describe("continueLoop()", () => {
+    it("reuses existing thread and appends new user message", async () => {
+      const mockModel = makeMockModel();
+      // First turn
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("First response"));
+      // Second turn (continueLoop)
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({ model: mockModel });
+
+      const result1 = await agent.loop("Hello");
+      expect(result1.thread.id).toBeDefined();
+
+      const result2 = await agent.continueLoop(result1.thread, "Follow up");
+      // Same thread ID — proves reuse
+      expect(result2.thread.id).toBe(result1.thread.id);
+      // Thread contains both user messages
+      const userMessages = result2.thread.events.filter(
+        (e) => e.type === "message" && e.role === "user",
+      );
+      expect(userMessages.length).toBe(2);
+      expect(userMessages[0].type === "message" && userMessages[0].content).toBe("Hello");
+      expect(userMessages[1].type === "message" && userMessages[1].content).toBe("Follow up");
+    });
+
+    it("starts iteration from thread's max iteration + 1", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("First"));
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Second"));
+
+      const agent = new DeepFactorAgent({ model: mockModel });
+
+      const result1 = await agent.loop("Turn one");
+      expect(result1.iterations).toBe(1);
+
+      const result2 = await agent.continueLoop(result1.thread, "Turn two");
+      // Iteration should be > 1 (the completion event from turn 1 is at iteration 1)
+      expect(result2.iterations).toBeGreaterThan(result1.iterations);
+    });
+
+    it("model receives full conversation history from prior turns", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("First response"));
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        instructions: "You are helpful.",
+      });
+
+      const result1 = await agent.loop("Hello");
+      await agent.continueLoop(result1.thread, "Follow up");
+
+      // Second invoke should receive messages from both turns
+      const secondCall = mockModel.invoke.mock.calls[1];
+      const messages = secondCall[0] as Array<{ content: string }>;
+      // Should have: SystemMessage, HumanMessage("Hello"), AIMessage("First response"),
+      // HumanMessage("Follow up") — at minimum 4 messages
+      expect(messages.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("returns independent usage per turn", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("First", {
+            usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 },
+          }),
+        )
+        .mockResolvedValueOnce(
+          makeAIMessage("Second", {
+            usage: { input_tokens: 200, output_tokens: 80, total_tokens: 280 },
+          }),
+        );
+
+      const agent = new DeepFactorAgent({ model: mockModel });
+
+      const result1 = await agent.loop("Turn one");
+      expect(result1.usage.inputTokens).toBe(100);
+
+      const result2 = await agent.continueLoop(result1.thread, "Turn two");
+      // Usage from continueLoop is only for the second turn
+      expect(result2.usage.inputTokens).toBe(200);
+      expect(result2.usage.outputTokens).toBe(80);
+    });
+  });
+
   describe("stream()", () => {
     it("returns a streaming result", async () => {
       const mockModel = makeMockModel();

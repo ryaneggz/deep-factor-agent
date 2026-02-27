@@ -1,18 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // --- hoisted mocks (must be defined before vi.mock factory references them) ---
-const { mockLoop, mockResume, mockCreateAgent, mockIsPendingResult } =
-  vi.hoisted(() => {
-    const mockResume = vi.fn();
-    const mockLoop = vi.fn();
-    const mockCreateAgent = vi.fn(() => ({ loop: mockLoop }));
-    const mockIsPendingResult = vi.fn(() => false);
-    return { mockLoop, mockResume, mockCreateAgent, mockIsPendingResult };
-  });
+const {
+  mockLoop,
+  mockResume,
+  mockContinueLoop,
+  mockCreateAgent,
+  mockIsPendingResult,
+  mockAddUsage,
+} = vi.hoisted(() => {
+  const mockResume = vi.fn();
+  const mockLoop = vi.fn();
+  const mockContinueLoop = vi.fn();
+  const mockCreateAgent = vi.fn(() => ({
+    loop: mockLoop,
+    continueLoop: mockContinueLoop,
+  }));
+  const mockIsPendingResult = vi.fn(() => false);
+  const mockAddUsage = vi.fn(
+    (a: Record<string, number>, b: Record<string, number>) => ({
+      inputTokens: (a.inputTokens ?? 0) + (b.inputTokens ?? 0),
+      outputTokens: (a.outputTokens ?? 0) + (b.outputTokens ?? 0),
+      totalTokens: (a.totalTokens ?? 0) + (b.totalTokens ?? 0),
+    }),
+  );
+  return {
+    mockLoop,
+    mockResume,
+    mockContinueLoop,
+    mockCreateAgent,
+    mockIsPendingResult,
+    mockAddUsage,
+  };
+});
 
 vi.mock("deep-factor-agent", () => ({
   createDeepFactorAgent: mockCreateAgent,
   isPendingResult: mockIsPendingResult,
+  addUsage: mockAddUsage,
   requestHumanInput: { name: "requestHumanInput" },
   TOOL_NAME_REQUEST_HUMAN_INPUT: "requestHumanInput",
   maxIterations: vi.fn(() => () => ({ stop: false })),
@@ -513,6 +538,68 @@ describe("useAgent hook", () => {
         expect(lastFrame()).toContain("STATUS:error");
         expect(lastFrame()).toContain("ERROR:Resume failed");
       });
+    });
+  });
+
+  describe("multi-turn memory (P3.4)", () => {
+    it("first sendPrompt uses loop(), second uses continueLoop()", async () => {
+      const firstResult = makeAgentResult();
+      mockLoop.mockResolvedValueOnce(firstResult);
+      mockIsPendingResult.mockReturnValue(false);
+
+      const { lastFrame } = render(
+        <TestHarness options={defaultOptions} autoPrompt="hello" />,
+      );
+
+      // Wait for first prompt to complete
+      await vi.waitFor(() => {
+        expect(lastFrame()).toContain("STATUS:done");
+      });
+
+      // First call used loop()
+      expect(mockLoop).toHaveBeenCalledWith("hello");
+      expect(mockContinueLoop).not.toHaveBeenCalled();
+
+      // Second sendPrompt should use continueLoop with the existing thread
+      const secondResult = makeAgentResult({
+        response: "follow up response",
+        thread: firstResult.thread, // Same thread object
+        usage: { inputTokens: 20, outputTokens: 10, totalTokens: 30 },
+        iterations: 2,
+      });
+      mockContinueLoop.mockResolvedValueOnce(secondResult);
+      mockIsPendingResult.mockReturnValue(false);
+
+      hookRef!.sendPrompt("follow up");
+
+      await vi.waitFor(() => {
+        expect(mockContinueLoop).toHaveBeenCalledWith(
+          firstResult.thread,
+          "follow up",
+        );
+      });
+    });
+
+    it("accumulates usage across turns", async () => {
+      const firstResult = makeAgentResult({
+        usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      });
+      mockLoop.mockResolvedValueOnce(firstResult);
+      mockIsPendingResult.mockReturnValue(false);
+
+      const { lastFrame } = render(
+        <TestHarness options={defaultOptions} autoPrompt="hello" />,
+      );
+
+      await vi.waitFor(() => {
+        expect(lastFrame()).toContain("STATUS:done");
+      });
+
+      // addUsage mock was called with (prev={0,0,0}, result.usage={10,5,15})
+      expect(mockAddUsage).toHaveBeenCalledWith(
+        { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      );
     });
   });
 });
