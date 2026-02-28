@@ -22,3 +22,9 @@ export { PromptInput } from "./components/PromptInput.js";
 
 // Tools
 export { bashTool } from "./tools/bash.js";
+
+// TUI Components
+export { TuiApp } from "./tui/TuiApp.js";
+export { SideBar } from "./tui/SideBar.js";
+export { ChatPane } from "./tui/ChatPane.js";
+export { SettingsPane } from "./tui/SettingsPane.js";
