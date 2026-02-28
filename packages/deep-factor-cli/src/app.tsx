@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Box, Text, useApp } from "ink";
 import { useAgent } from "./hooks/useAgent.js";
+import { useAgentContext } from "./testing/agent-context.js";
 import { Chat } from "./components/Chat.js";
 import { Spinner } from "./components/Spinner.js";
 import { HumanInput } from "./components/HumanInput.js";
@@ -16,6 +17,9 @@ export function App({ prompt, model, maxIter, verbose, enableBash, interactive }
 
   const tools: AgentTools = enableBash ? [bashTool] : [];
 
+  const agentFromContext = useAgentContext();
+  const agentFromHook = useAgent({ model, maxIter, tools });
+
   const {
     messages,
     status,
@@ -25,7 +29,7 @@ export function App({ prompt, model, maxIter, verbose, enableBash, interactive }
     sendPrompt,
     submitHumanInput,
     humanInputRequest,
-  } = useAgent({ model, maxIter, tools });
+  } = agentFromContext ?? agentFromHook;
 
   // Single-prompt mode: run on mount
   useEffect(() => {
