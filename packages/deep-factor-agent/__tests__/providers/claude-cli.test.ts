@@ -7,11 +7,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile } from "node:child_process";
-import {
-  createClaudeCliProvider,
-  messagesToPrompt,
-  parseToolCalls,
-} from "../../src/providers/claude-cli.js";
+import { createClaudeCliProvider } from "../../src/providers/claude-cli.js";
 import { isModelAdapter } from "../../src/providers/types.js";
 
 const mockExecFile = vi.mocked(execFile);
@@ -62,6 +58,35 @@ describe("createClaudeCliProvider", () => {
     expect(result).toBeInstanceOf(AIMessage);
     expect(result.content).toBe("Hello from Claude CLI");
     expect(result.tool_calls).toEqual([]);
+  });
+
+  it("uses XML encoding by default (prompt contains <thread>)", async () => {
+    simulateExecFile("Response");
+    const provider = createClaudeCliProvider();
+
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    const prompt = args[1]; // -p <prompt>
+    expect(prompt).toContain("<thread>");
+    expect(prompt).toContain('<event type="human"');
+    expect(prompt).not.toContain("[User]");
+  });
+
+  it("uses text encoding when inputEncoding: 'text'", async () => {
+    simulateExecFile("Response");
+    const provider = createClaudeCliProvider({ inputEncoding: "text" });
+
+    await provider.invoke([
+      new SystemMessage("Be concise."),
+      new HumanMessage("What is 2+2?"),
+    ]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    const prompt = args[1];
+    expect(prompt).toContain("[System]");
+    expect(prompt).toContain("[User]");
+    expect(prompt).not.toContain("<thread>");
   });
 
   it("passes --model flag when model option is set", async () => {
@@ -186,84 +211,6 @@ describe("createClaudeCliProvider", () => {
     const opts = (mockExecFile.mock.calls[0] as any[])[2];
     expect(opts.timeout).toBe(60_000);
     expect(opts.maxBuffer).toBe(5 * 1024 * 1024);
-  });
-});
-
-describe("messagesToPrompt", () => {
-  it("serializes system/human/ai/tool messages", () => {
-    const messages = [
-      new SystemMessage("You are helpful"),
-      new HumanMessage("Hello"),
-      new AIMessage("Hi there"),
-      new ToolMessage({ tool_call_id: "call_1", content: "result" }),
-    ];
-
-    const prompt = messagesToPrompt(messages);
-
-    expect(prompt).toContain("[System]\nYou are helpful");
-    expect(prompt).toContain("[User]\nHello");
-    expect(prompt).toContain("[Assistant]\nHi there");
-    expect(prompt).toContain("[Tool Result]\nresult");
-  });
-
-  it("separates messages with double newlines", () => {
-    const messages = [
-      new HumanMessage("First"),
-      new HumanMessage("Second"),
-    ];
-
-    const prompt = messagesToPrompt(messages);
-    expect(prompt).toBe("[User]\nFirst\n\n[User]\nSecond");
-  });
-});
-
-describe("parseToolCalls", () => {
-  it("extracts tool calls from a JSON code block", () => {
-    const text = `Some text
-
-\`\`\`json
-{
-  "tool_calls": [
-    { "name": "calc", "args": { "x": 1 }, "id": "c1" }
-  ]
-}
-\`\`\`
-
-More text`;
-
-    const result = parseToolCalls(text);
-    expect(result).toEqual([{ name: "calc", args: { x: 1 }, id: "c1" }]);
-  });
-
-  it("returns empty array when no JSON block present", () => {
-    expect(parseToolCalls("Just plain text")).toEqual([]);
-  });
-
-  it("returns empty array for malformed JSON", () => {
-    const text = "```json\n{ invalid json }\n```";
-    expect(parseToolCalls(text)).toEqual([]);
-  });
-
-  it("assigns default ids when missing", () => {
-    const text = '```json\n{"tool_calls": [{"name": "t", "args": {}}]}\n```';
-    const result = parseToolCalls(text);
-    expect(result[0].id).toBe("call_0");
-  });
-
-  it("handles multiple tool calls", () => {
-    const text = `\`\`\`json
-{
-  "tool_calls": [
-    { "name": "a", "args": {}, "id": "1" },
-    { "name": "b", "args": { "k": "v" }, "id": "2" }
-  ]
-}
-\`\`\``;
-    const result = parseToolCalls(text);
-    expect(result).toHaveLength(2);
-    expect(result[0].name).toBe("a");
-    expect(result[1].name).toBe("b");
-    expect(result[1].args).toEqual({ k: "v" });
   });
 });
 

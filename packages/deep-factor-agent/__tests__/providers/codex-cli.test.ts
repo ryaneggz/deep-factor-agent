@@ -7,11 +7,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile } from "node:child_process";
-import {
-  createCodexCliProvider,
-  messagesToPrompt,
-  parseToolCalls,
-} from "../../src/providers/codex-cli.js";
+import { createCodexCliProvider } from "../../src/providers/codex-cli.js";
 import { isModelAdapter } from "../../src/providers/types.js";
 
 const mockExecFile = vi.mocked(execFile);
@@ -64,6 +60,35 @@ describe("createCodexCliProvider", () => {
     expect(result).toBeInstanceOf(AIMessage);
     expect(result.content).toBe("Hello from Codex CLI");
     expect(result.tool_calls).toEqual([]);
+  });
+
+  it("uses XML encoding by default (prompt contains <thread>)", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider();
+
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    const prompt = args[1]; // exec <prompt>
+    expect(prompt).toContain("<thread>");
+    expect(prompt).toContain('<event type="human"');
+    expect(prompt).not.toContain("[User]");
+  });
+
+  it("uses text encoding when inputEncoding: 'text'", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider({ inputEncoding: "text" });
+
+    await provider.invoke([
+      new SystemMessage("Be concise."),
+      new HumanMessage("What is 2+2?"),
+    ]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    const prompt = args[1];
+    expect(prompt).toContain("[System]");
+    expect(prompt).toContain("[User]");
+    expect(prompt).not.toContain("<thread>");
   });
 
   it("passes --model flag when model option is set", async () => {
@@ -205,38 +230,5 @@ describe("createCodexCliProvider", () => {
     expect(args[4]).toBe("read-only");
     expect(args[5]).toBe("--model");
     expect(args[6]).toBe("o4-mini");
-  });
-});
-
-describe("messagesToPrompt (codex)", () => {
-  it("serializes system/human/ai/tool messages", () => {
-    const messages = [
-      new SystemMessage("You are helpful"),
-      new HumanMessage("Hello"),
-      new AIMessage("Hi there"),
-      new ToolMessage({ tool_call_id: "call_1", content: "result" }),
-    ];
-
-    const prompt = messagesToPrompt(messages);
-
-    expect(prompt).toContain("[System]\nYou are helpful");
-    expect(prompt).toContain("[User]\nHello");
-    expect(prompt).toContain("[Assistant]\nHi there");
-    expect(prompt).toContain("[Tool Result]\nresult");
-  });
-});
-
-describe("parseToolCalls (codex)", () => {
-  it("extracts tool calls from a JSON code block", () => {
-    const text = `\`\`\`json
-{ "tool_calls": [{ "name": "calc", "args": { "x": 1 }, "id": "c1" }] }
-\`\`\``;
-
-    const result = parseToolCalls(text);
-    expect(result).toEqual([{ name: "calc", args: { x: 1 }, id: "c1" }]);
-  });
-
-  it("returns empty array when no JSON block present", () => {
-    expect(parseToolCalls("Just plain text")).toEqual([]);
   });
 });

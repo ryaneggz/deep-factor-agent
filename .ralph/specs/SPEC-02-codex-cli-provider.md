@@ -421,20 +421,25 @@ describe("createCodexCliProvider", () => {
 - `packages/deep-factor-agent/src/providers/codex-cli.ts`
 - `packages/deep-factor-agent/__tests__/providers/codex-cli.test.ts`
 
-### Modified
+### Modified (no new files — uses shared module from SPEC-01)
 - `packages/deep-factor-agent/src/index.ts` — Export `createCodexCliProvider`, `CodexCliProviderOptions`
+
+### Shared Dependencies (from SPEC-01)
+- `packages/deep-factor-agent/src/providers/messages-to-xml.ts` — `messagesToXml()`, `messagesToPrompt()`, `parseToolCalls()`, `execFileAsync()`
 
 ---
 
 ## DESIGN DECISIONS
 
-1. **Same tool-call JSON format as Claude CLI**: Both providers use the same `{"tool_calls": [...]}` JSON block format for tool call output. This keeps the parsing logic consistent and makes it easy for humans to reason about. A future refactor could extract `parseToolCalls` and `messagesToPrompt` into a shared utility.
+1. **Same tool-call JSON format as Claude CLI**: Both providers use the same `{"tool_calls": [...]}` JSON block format for tool call output. This keeps the parsing logic consistent and makes it easy for humans to reason about.
 
-2. **`codex exec` with `--full-auto --sandbox read-only`**: `exec` is the non-interactive mode for Codex CLI. `--full-auto` skips confirmation prompts. `--sandbox read-only` prevents the CLI from making filesystem changes — our agent loop handles all tool execution.
+2. **Shared utility module**: `messagesToXml()`, `messagesToPrompt()`, `parseToolCalls()`, and `execFileAsync()` are imported from `src/providers/messages-to-xml.ts` (introduced in SPEC-01), eliminating ~150 lines of duplication between the two providers.
 
-3. **Parallel structure to Claude CLI provider**: The Codex provider mirrors `claude-cli.ts` almost exactly. The only differences are the CLI binary name, the command structure (`exec <prompt>` vs `-p <prompt>`), and the flags. This consistency makes both providers easy to maintain.
+3. **`codex exec` with `--full-auto --sandbox read-only`**: `exec` is the non-interactive mode for Codex CLI. `--full-auto` skips confirmation prompts. `--sandbox read-only` prevents the CLI from making filesystem changes — our agent loop handles all tool execution.
 
-4. **No shared base class**: Despite the near-identical structure, we don't extract a shared base. Two small files with some duplication is clearer than an abstraction hierarchy. If a third CLI provider is added, extraction makes sense then (Rule of Three).
+4. **Parallel structure to Claude CLI provider**: The Codex provider mirrors `claude-cli.ts` almost exactly. The only differences are the CLI binary name, the command structure (`exec <prompt>` vs `-p <prompt>`), and the flags. This consistency makes both providers easy to maintain.
+
+5. **XML by default**: `inputEncoding` defaults to `"xml"`, matching the codebase's `contextMode: "xml"` pattern and the Claude CLI provider. The `"text"` fallback is retained for compatibility.
 
 ---
 
@@ -449,6 +454,9 @@ describe("createCodexCliProvider", () => {
 - [ ] Plain text responses return `AIMessage` with empty `tool_calls`
 - [ ] CLI errors propagate as rejected promises
 - [ ] `createCodexCliProvider` is exported from `src/index.ts`
+- [ ] **`inputEncoding` option** defaults to `"xml"`; `"text"` falls back to `messagesToPrompt()`
+- [ ] **Default prompt contains `<thread>` XML**, not `[User]` labels
+- [ ] **Imports shared utilities** from `src/providers/messages-to-xml.ts` (no duplicated `messagesToPrompt`, `parseToolCalls`, `execFileAsync`)
 - [ ] All unit tests pass: `pnpm -C packages/deep-factor-agent test`
 - [ ] Build succeeds: `pnpm -C packages/deep-factor-agent build`
 - [ ] Type-check passes: `pnpm -C packages/deep-factor-agent type-check`
