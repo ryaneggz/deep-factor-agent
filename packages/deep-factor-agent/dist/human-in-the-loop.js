@@ -14,10 +14,7 @@ export const requestHumanInputSchema = z.object({
         .optional()
         .default("free_text")
         .describe("Expected response format"),
-    choices: z
-        .array(z.string())
-        .optional()
-        .describe("Options for multiple_choice format"),
+    choices: z.array(z.string()).optional().describe("Options for multiple_choice format"),
 });
 export const requestHumanInput = tool(async (args) => {
     return JSON.stringify({

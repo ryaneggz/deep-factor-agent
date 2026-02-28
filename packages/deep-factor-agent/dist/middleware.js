@@ -72,7 +72,7 @@ export function todoMiddleware() {
 export function errorRecoveryMiddleware() {
     return {
         name: "errorRecovery",
-        afterIteration: async (ctx, _result) => {
+        afterIteration: async (ctx) => {
             const { thread } = ctx;
             if (thread.events.length === 0)
                 return;

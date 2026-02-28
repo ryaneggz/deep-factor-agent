@@ -62,9 +62,7 @@ export class ContextManager {
             const events = iterationMap.get(iter);
             if (events.length === 1 && events[0].type === "summary")
                 continue;
-            const eventsText = events
-                .map((e) => JSON.stringify(e))
-                .join("\n");
+            const eventsText = events.map((e) => JSON.stringify(e)).join("\n");
             try {
                 const response = await model.invoke([
                     new HumanMessage(`Summarize the following agent iteration events in 2-3 sentences. Focus on what tools were called, what was accomplished, and any errors:\n\n${eventsText}`),

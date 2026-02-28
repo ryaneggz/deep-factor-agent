@@ -54,9 +54,7 @@ function extractTextContent(content) {
     return JSON.stringify(content);
 }
 function compactError(error, maxLen = 500) {
-    const msg = error instanceof Error
-        ? `${error.name}: ${error.message}`
-        : String(error);
+    const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     return msg.length > maxLen ? msg.substring(0, maxLen) + "..." : msg;
 }
 function extractModelId(model) {
@@ -148,9 +146,7 @@ export class DeepFactorAgent {
         // Build context injection from summaries
         const contextInjection = this.contextManager.buildContextInjection(thread);
         if (this.instructions || contextInjection) {
-            const system = [contextInjection, this.instructions]
-                .filter(Boolean)
-                .join("\n\n");
+            const system = [contextInjection, this.instructions].filter(Boolean).join("\n\n");
             messages.push(new SystemMessage(system));
         }
         // Convert thread events to messages
@@ -197,9 +193,7 @@ export class DeepFactorAgent {
                     break;
                 }
                 case "error": {
-                    const recoverStr = event.recoverable
-                        ? "recoverable"
-                        : "non-recoverable";
+                    const recoverStr = event.recoverable ? "recoverable" : "non-recoverable";
                     messages.push(new HumanMessage(`[Error (${recoverStr})]: ${event.error}`));
                     break;
                 }
@@ -215,9 +209,7 @@ export class DeepFactorAgent {
         // Build system prompt identically to standard mode
         const contextInjection = this.contextManager.buildContextInjection(thread);
         if (this.instructions || contextInjection) {
-            const system = [contextInjection, this.instructions]
-                .filter(Boolean)
-                .join("\n\n");
+            const system = [contextInjection, this.instructions].filter(Boolean).join("\n\n");
             messages.push(new SystemMessage(system));
         }
         // Serialize the entire thread into a single XML HumanMessage
@@ -232,8 +224,7 @@ export class DeepFactorAgent {
             const event = thread.events[i];
             if (event.iteration !== iteration)
                 break;
-            if (event.type === "tool_call" &&
-                this.interruptOn.includes(event.toolName)) {
+            if (event.type === "tool_call" && this.interruptOn.includes(event.toolName)) {
                 return event.toolName;
             }
         }
@@ -281,10 +272,7 @@ export class DeepFactorAgent {
         let consecutiveErrors = 0;
         let lastResponse = "";
         // Merge middleware tools with user tools
-        const allTools = [
-            ...this.tools,
-            ...this.composedMiddleware.tools,
-        ];
+        const allTools = [...this.tools, ...this.composedMiddleware.tools];
         const toolMap = toolArrayToMap(allTools);
         while (true) {
             // Callback
@@ -302,15 +290,12 @@ export class DeepFactorAgent {
             await this.composedMiddleware.beforeIteration(middlewareCtx);
             // Context management: check if summarization needed
             // Summarization requires BaseChatModel (not ModelAdapter) for LLM calls
-            if (this.contextManager.needsSummarization(thread) &&
-                !isModelAdapter(model)) {
+            if (this.contextManager.needsSummarization(thread) && !isModelAdapter(model)) {
                 const { usage: summarizationUsage } = await this.contextManager.summarize(thread, model);
                 totalUsage = addUsage(totalUsage, summarizationUsage);
             }
             // Build messages from thread
-            const messages = this.contextMode === "xml"
-                ? this.buildXmlMessages(thread)
-                : this.buildMessages(thread);
+            const messages = this.contextMode === "xml" ? this.buildXmlMessages(thread) : this.buildMessages(thread);
             try {
                 // Bind tools and run inner tool-calling loop
                 const modelWithTools = allTools.length > 0 && "bindTools" in model && model.bindTools
@@ -389,9 +374,7 @@ export class DeepFactorAgent {
                         const foundTool = toolMap[tc.name];
                         if (foundTool) {
                             const toolResult = await foundTool.invoke(tc.args);
-                            const resultStr = typeof toolResult === "string"
-                                ? toolResult
-                                : JSON.stringify(toolResult);
+                            const resultStr = typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
                             // Handle todoMiddleware special cases
                             if (tc.name === TOOL_NAME_WRITE_TODOS) {
                                 try {
@@ -628,16 +611,9 @@ export class DeepFactorAgent {
             timestamp: Date.now(),
             iteration: 0,
         });
-        const allTools = [
-            ...this.tools,
-            ...this.composedMiddleware.tools,
-        ];
-        const messages = this.contextMode === "xml"
-            ? this.buildXmlMessages(thread)
-            : this.buildMessages(thread);
-        const modelWithTools = allTools.length > 0 && model.bindTools
-            ? model.bindTools(allTools)
-            : model;
+        const allTools = [...this.tools, ...this.composedMiddleware.tools];
+        const messages = this.contextMode === "xml" ? this.buildXmlMessages(thread) : this.buildMessages(thread);
+        const modelWithTools = allTools.length > 0 && model.bindTools ? model.bindTools(allTools) : model;
         return modelWithTools.stream(messages);
     }
 }

@@ -69,8 +69,7 @@ export function calculateCost(usage, model) {
     if (usage.cacheReadTokens !== undefined && pricing.cacheRead !== undefined) {
         cost += usage.cacheReadTokens * pricing.cacheRead;
     }
-    if (usage.cacheWriteTokens !== undefined &&
-        pricing.cacheWrite !== undefined) {
+    if (usage.cacheWriteTokens !== undefined && pricing.cacheWrite !== undefined) {
         cost += usage.cacheWriteTokens * pricing.cacheWrite;
     }
     return cost;

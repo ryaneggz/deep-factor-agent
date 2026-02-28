@@ -23,9 +23,7 @@ export function execFileAsync(file, args, options) {
 export function messagesToPrompt(messages) {
     return messages
         .map((msg) => {
-        const content = typeof msg.content === "string"
-            ? msg.content
-            : JSON.stringify(msg.content);
+        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
         const type = msg._getType();
         switch (type) {
             case "system":
@@ -80,9 +78,7 @@ export function messagesToXml(messages) {
     const lines = ["<thread>"];
     let id = 0;
     for (const msg of messages) {
-        const content = typeof msg.content === "string"
-            ? msg.content
-            : JSON.stringify(msg.content);
+        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
         const type = msg._getType();
         switch (type) {
             case "system":
