@@ -33,29 +33,13 @@
 ## Priority 2 — SPEC-02: Codex CLI Provider
 
 **Dependency**: SPEC-01 (COMPLETE)
-**Status**: NOT STARTED — 0/11 acceptance criteria met
+**Status**: COMPLETE — 11/11 acceptance criteria met
 
-### Tasks
+### Implementation Notes
 
-- [ ] Create `packages/deep-factor-agent/src/providers/codex-cli.ts`
-  - `CodexCliProviderOptions` interface (`model?`, `cliPath?`, `timeout?`, `maxBuffer?`)
-  - Reuse pattern from `claude-cli.ts` (duplicated `messagesToPrompt`, `parseToolCalls`, `execFileAsync`, `TOOL_CALL_FORMAT` — intentional per Rule of Three)
-  - `createCodexCliProvider()` factory returning `ModelAdapter`
-  - CLI invocation: `codex exec <prompt> --full-auto --sandbox read-only` with optional `--model` flag
-  - Key difference from Claude: `["exec", prompt, "--full-auto", "--sandbox", "read-only"]` vs `["-p", prompt, "--no-input"]`
-
-- [ ] Modify `packages/deep-factor-agent/src/index.ts`
-  - Export `createCodexCliProvider`, `CodexCliProviderOptions` (type)
-
-- [ ] Create `packages/deep-factor-agent/__tests__/providers/codex-cli.test.ts`
-  - Same test pattern as Claude CLI test
-  - Test: calls `codex exec` with `--full-auto --sandbox read-only`
-  - Test: passes `--model` flag
-  - Test: custom `cliPath`
-  - Test: error propagation
-  - Test: tool call parsing
-  - Test: plain text response
-  - Test: tool definition injection
+- `src/providers/codex-cli.ts` — `createCodexCliProvider()` factory, mirrors Claude CLI structure with Codex-specific args: `codex exec <prompt> --full-auto --sandbox read-only`
+- `src/index.ts` — exports `createCodexCliProvider`, `CodexCliProviderOptions`
+- `__tests__/providers/codex-cli.test.ts` — 14 tests covering all acceptance criteria
 
 ---
 

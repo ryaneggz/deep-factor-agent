@@ -83,3 +83,5 @@ export type { ModelAdapter } from "./providers/types.js";
 export { isModelAdapter } from "./providers/types.js";
 export { createClaudeCliProvider } from "./providers/claude-cli.js";
 export type { ClaudeCliProviderOptions } from "./providers/claude-cli.js";
+export { createCodexCliProvider } from "./providers/codex-cli.js";
+export type { CodexCliProviderOptions } from "./providers/codex-cli.js";
