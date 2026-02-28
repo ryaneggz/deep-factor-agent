@@ -1,4 +1,4 @@
-.PHONY: help install build dev test test-watch type-check check install-cli build-cli dev-cli test-cli type-check-cli install-all build-all test-all check-all huntley.loop huntley.loop-plan huntley.review huntley.archive snarktank.ralph snarktank.archive
+.PHONY: help install build dev test test-watch type-check check install-cli build-cli dev-cli test-cli type-check-cli install-tui build-tui dev-tui test-tui type-check-tui install-all build-all test-all check-all huntley.loop huntley.loop-plan huntley.review huntley.archive snarktank.ralph snarktank.archive
 
 
 ENV ?= dev
@@ -44,6 +44,22 @@ test-cli:        ## Test CLI (vitest run)
 
 type-check-cli:  ## Type-check CLI (tsc --noEmit)
 	pnpm -C packages/deep-factor-cli type-check
+
+# TUI package targets
+install-tui:     ## Install TUI deps
+	pnpm -C packages/deep-factor-tui install
+
+build-tui:       ## Build TUI (tsc + shebang)
+	pnpm -C packages/deep-factor-tui build
+
+dev-tui:         ## Dev TUI (tsc --watch)
+	pnpm -C packages/deep-factor-tui dev
+
+test-tui:        ## Test TUI (vitest run)
+	pnpm -C packages/deep-factor-tui test
+
+type-check-tui:  ## Type-check TUI (tsc --noEmit)
+	pnpm -C packages/deep-factor-tui type-check
 
 # Workspace-wide targets
 install-all:     ## Install all packages

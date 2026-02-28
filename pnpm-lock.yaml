@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  fullscreen-ink>ink: ^6.8.0
+  fullscreen-ink>react: ^19.0.0
+
 importers:
 
   .:
@@ -78,9 +82,58 @@ importers:
       deep-factor-agent:
         specifier: workspace:*
         version: link:../deep-factor-agent
+      deep-factor-tui:
+        specifier: workspace:*
+        version: link:../deep-factor-tui
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
+      fullscreen-ink:
+        specifier: ^0.1.0
+        version: 0.1.0(@types/react@19.2.14)
+      ink:
+        specifier: ^6.8.0
+        version: 6.8.0(@types/react@19.2.14)(react@19.2.4)
+      meow:
+        specifier: ^13.2.0
+        version: 13.2.0
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.0
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@vitest/coverage-v8':
+        specifier: ^4.0.18
+        version: 4.0.18(vitest@4.0.18(@types/node@25.3.0)(tsx@4.21.0)(yaml@2.8.2))
+      ink-testing-library:
+        specifier: ^4.0.0
+        version: 4.0.0(@types/react@19.2.14)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@25.3.0)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/deep-factor-tui:
+    dependencies:
+      deep-factor-agent:
+        specifier: workspace:*
+        version: link:../deep-factor-agent
+      dotenv:
+        specifier: ^16.6.1
+        version: 16.6.1
+      fullscreen-ink:
+        specifier: ^0.1.0
+        version: 0.1.0(@types/react@19.2.14)
       ink:
         specifier: ^6.8.0
         version: 6.8.0(@types/react@19.2.14)(react@19.2.4)
@@ -1177,6 +1230,9 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  fullscreen-ink@0.1.0:
+    resolution: {integrity: sha512-GkyPG5Y8YxRT6i1Q8mZ0BCMSpgQjdBY+C39DnCUMswBpSypTk0G80rAYs6FoEp6Da2gzAwygXbJbju6GahbrFQ==}
 
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
@@ -3337,6 +3393,16 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  fullscreen-ink@0.1.0(@types/react@19.2.14):
+    dependencies:
+      ink: 6.8.0(@types/react@19.2.14)(react@19.2.4)
+      react: 19.2.4
+    transitivePeerDependencies:
+      - '@types/react'
+      - bufferutil
+      - react-devtools-core
+      - utf-8-validate
 
   function-bind@1.1.2: {}
 

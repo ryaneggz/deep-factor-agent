@@ -18,24 +18,35 @@
 - Run: `node packages/deep-factor-cli/dist/cli.js "your prompt"`
 - Run (interactive): `node packages/deep-factor-cli/dist/cli.js --interactive`
 
+### TUI Package (deep-factor-tui)
+
+- Install deps: `pnpm -C packages/deep-factor-tui install`
+- Build: `pnpm -C packages/deep-factor-tui build` (runs `tsc` + postbuild shebang)
+- Dev mode: `pnpm -C packages/deep-factor-tui dev` (runs `tsc --watch`)
+- Run: `node packages/deep-factor-tui/dist/cli.js`
+- Run (via CLI): `node packages/deep-factor-cli/dist/cli.js --tui`
+
 ## Validation
 
 - Tests (agent): `pnpm -C packages/deep-factor-agent test`
 - Tests (CLI): `pnpm -C packages/deep-factor-cli test`
+- Tests (TUI): `pnpm -C packages/deep-factor-tui test`
 - Tests (all): `pnpm -r test`
 - Typecheck (agent): `pnpm -C packages/deep-factor-agent type-check`
 - Typecheck (CLI): `pnpm -C packages/deep-factor-cli type-check`
+- Typecheck (TUI): `pnpm -C packages/deep-factor-tui type-check`
 - Typecheck (all): `pnpm -r type-check`
 
 ## Operational Notes
 
-- ESM only (`"type": "module"` in both packages)
+- ESM only (`"type": "module"` in all packages)
 - LangChain `BaseChatModel` is the model type; `initChatModel` resolves string IDs lazily
 - Tools use LangChain `tool()` factory from `@langchain/core/tools` — returns `StructuredToolInterface`
 - Messages use LangChain classes: `HumanMessage`, `AIMessage`, `SystemMessage`, `ToolMessage`
 - Agent loop manually handles tool calling (bind tools, invoke, check tool_calls, execute, loop)
 - Token usage from `response.usage_metadata` (`input_tokens`, `output_tokens`, `total_tokens`)
 - CLI uses Ink (React for terminal) with meow for arg parsing
+- TUI uses fullscreen-ink (alternate screen buffer) with Ink + meow
 
 ### Agent Codebase Patterns
 
@@ -58,6 +69,17 @@
 - Bash tool: `packages/deep-factor-cli/src/tools/bash.ts` (optional, --bash flag)
 - CLI types: `packages/deep-factor-cli/src/types.ts` (ChatMessage, AgentStatus)
 - Tests: `packages/deep-factor-cli/__tests__/` (ink-testing-library)
+
+### TUI Codebase Patterns
+
+- Entry point: `packages/deep-factor-tui/src/cli.tsx` (meow + withFullScreen)
+- App shell: `packages/deep-factor-tui/src/app.tsx` (Header/Content/Footer layout)
+- Agent hook: `packages/deep-factor-tui/src/hooks/useAgent.ts` (React state bridge)
+- Text input hook: `packages/deep-factor-tui/src/hooks/useTextInput.ts` (cursor input handling)
+- Components: `packages/deep-factor-tui/src/components/` (Header, Content, Footer, MessageList, MessageBubble, ToolCallBlock, InputBar, StatusLine)
+- Bash tool: `packages/deep-factor-tui/src/tools/bash.ts` (optional, --bash flag)
+- TUI types: `packages/deep-factor-tui/src/types.ts` (TuiAppProps, ChatMessage, AgentStatus)
+- Tests: `packages/deep-factor-tui/__tests__/` (placeholder)
 
 ### Huntley Layout
 

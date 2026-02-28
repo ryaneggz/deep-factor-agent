@@ -26,3 +26,4 @@ coverage/
 *.tsbuildinfo
 logs/
 archive/
+**/dist/

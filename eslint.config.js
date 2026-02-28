@@ -14,6 +14,7 @@ export default tseslint.config(
       ".ralph/",
       ".claude/",
       "**/coverage/",
+      "**/vitest.config.ts",
       "packages/deep-factor-agent/logs/",
       "packages/deep-factor-agent/examples/",
     ],
@@ -42,6 +43,38 @@ export default tseslint.config(
     files: [
       "packages/deep-factor-cli/src/**/*.{ts,tsx}",
       "packages/deep-factor-cli/__tests__/**/*.{ts,tsx}",
+    ],
+    extends: [...tseslint.configs.recommended],
+    languageOptions: {
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    plugins: {
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
+    },
+    rules: {
+      ...reactPlugin.configs.recommended.rules,
+      ...reactHooksPlugin.configs.recommended.rules,
+      "react/react-in-jsx-scope": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
+  },
+
+  // TypeScript + React rules for TUI package (.ts/.tsx files)
+  {
+    files: [
+      "packages/deep-factor-tui/src/**/*.{ts,tsx}",
+      "packages/deep-factor-tui/__tests__/**/*.{ts,tsx}",
     ],
     extends: [...tseslint.configs.recommended],
     languageOptions: {

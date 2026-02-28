@@ -21,6 +21,7 @@ const cli = meow(
     --verbose, -v    Show tool calls and detailed output
     --bash           Enable bash execution tool
     --interactive    Interactive REPL mode for multi-turn chat
+    --tui            Launch fullscreen TUI mode
 
   Examples
     $ deep-factor "Explain how React hooks work"
@@ -53,13 +54,30 @@ const cli = meow(
         type: "boolean",
         default: false,
       },
+      tui: {
+        type: "boolean",
+        default: false,
+      },
     },
   },
 );
 
 const prompt = cli.input.join(" ") || undefined;
 
-if (!prompt && !cli.flags.interactive) {
+if (cli.flags.tui) {
+  const { withFullScreen } = await import("fullscreen-ink");
+  const { TuiApp } = await import("deep-factor-tui");
+  const ink = withFullScreen(
+    <TuiApp
+      prompt={prompt}
+      model={cli.flags.model}
+      maxIter={cli.flags.maxIter}
+      enableBash={cli.flags.bash}
+    />,
+  );
+  await ink.start();
+  await ink.waitUntilExit();
+} else if (!prompt && !cli.flags.interactive) {
   cli.showHelp();
 } else {
   const { waitUntilExit } = render(

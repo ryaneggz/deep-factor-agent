@@ -1,9 +1,9 @@
 {
-  "name": "deep-factor-cli",
+  "name": "deep-factor-tui",
   "version": "0.0.0",
   "type": "module",
   "bin": {
-    "deep-factor": "./dist/cli.js"
+    "deep-factor-tui": "./dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,12 +19,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "coverage": "vitest run --coverage",
-    "link": "npm i && npm run build && npm link"
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "deep-factor-agent": "workspace:*",
-    "deep-factor-tui": "workspace:*",
     "dotenv": "^16.6.1",
     "fullscreen-ink": "^0.1.0",
     "ink": "^6.8.0",
