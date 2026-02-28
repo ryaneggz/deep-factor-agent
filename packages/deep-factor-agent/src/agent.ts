@@ -545,6 +545,24 @@ export class DeepFactorAgent<
                   content: resultStr,
                 }),
               );
+            } else {
+              // Tool not found — record error to keep message sequence consistent
+              const errorMsg = `Tool not found: "${tc.name}"`;
+              const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+              const toolResultEvent: ToolResultEvent = {
+                type: "tool_result",
+                toolCallId,
+                result: errorMsg,
+                timestamp: now,
+                iteration,
+              };
+              thread.events.push(toolResultEvent);
+              messages.push(
+                new ToolMessage({
+                  tool_call_id: toolCallId,
+                  content: errorMsg,
+                }),
+              );
             }
           }
 

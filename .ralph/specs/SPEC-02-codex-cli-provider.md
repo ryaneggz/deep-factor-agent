@@ -19,14 +19,16 @@ With the `ModelAdapter` interface established in SPEC-01, we need a second concr
 | File | Purpose |
 |------|---------|
 | `packages/deep-factor-agent/src/providers/types.ts` | `ModelAdapter` interface (from SPEC-01) |
+| `packages/deep-factor-agent/src/providers/messages-to-xml.ts` | Shared utility (from SPEC-01): `messagesToXml()`, `messagesToPrompt()`, `parseToolCalls()`, `execFileAsync()` |
 | `packages/deep-factor-agent/src/providers/claude-cli.ts` | Reference — parallel structure |
+| `packages/deep-factor-agent/src/xml-serializer.ts` | `escapeXml()` — used by shared utility |
 | `packages/deep-factor-agent/src/index.ts` | Needs export of `createCodexCliProvider` |
 
 ---
 
 ## OVERVIEW
 
-1. **Create `src/providers/codex-cli.ts`** — Factory function `createCodexCliProvider()` that shells out to `codex exec`
+1. **Create `src/providers/codex-cli.ts`** — Factory function `createCodexCliProvider()` that shells out to `codex exec`, defaults to XML input encoding, imports shared utilities from `messages-to-xml.ts`
 2. **Create `__tests__/providers/codex-cli.test.ts`** — Unit tests with mocked `child_process`
 3. **Modify `src/index.ts`** — Export new provider
 
@@ -37,168 +39,125 @@ With the `ModelAdapter` interface established in SPEC-01, we need a second concr
 ### `src/providers/codex-cli.ts` — Codex CLI Provider
 
 ```ts
-import { execFile } from "node:child_process";
 import { AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { ModelAdapter } from "./types.js";
+import {
+  execFileAsync,
+  messagesToXml,
+  messagesToPrompt,
+  parseToolCalls,
+} from "./messages-to-xml.js";
 
 export interface CodexCliProviderOptions {
-  /** OpenAI model to use (e.g. "o4-mini", "gpt-4.1"). Passed as --model flag. */
+  /** Codex model to use (e.g. "o4-mini"). Passed as `--model <model>`. */
   model?: string;
-  /** Path to codex binary. Default: "codex" (resolved via PATH). */
+  /** Path to the codex CLI binary. Default: "codex" */
   cliPath?: string;
-  /** Timeout in ms. Default: 120_000 (2 minutes). */
+  /** Timeout in milliseconds for the CLI process. Default: 120000 (2 min) */
   timeout?: number;
-  /** Max output buffer in bytes. Default: 10MB. */
+  /** Max stdout buffer in bytes. Default: 10 MB */
   maxBuffer?: number;
+  /** Input encoding for messages. Default: "xml". Use "text" for plain-text labels. */
+  inputEncoding?: "xml" | "text";
 }
 
-/**
- * Tool-call JSON format embedded in the system prompt when bindTools is called.
- * Same format as Claude CLI provider for consistency.
- */
-const TOOL_CALL_FORMAT = `When you want to use a tool, respond with ONLY a JSON block in this exact format (no other text):
+/** Prompt-engineered instruction telling the CLI model how to format tool calls. */
+const TOOL_CALL_FORMAT = `When you need to call a tool, respond with ONLY a JSON block in this exact format:
+
 \`\`\`json
-{"tool_calls": [{"name": "<tool_name>", "id": "<unique_id>", "args": {<arguments>}}]}
+{
+  "tool_calls": [
+    {
+      "name": "tool_name",
+      "args": { "param": "value" },
+      "id": "call_1"
+    }
+  ]
+}
 \`\`\`
-You may include multiple tool calls in the array if they are independent.
-If you do NOT need to use a tool, respond with plain text (no JSON block).`;
 
-function execFileAsync(
-  file: string,
-  args: string[],
-  options: { timeout: number; maxBuffer: number },
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(file, args, { ...options, encoding: "utf8" }, (error, stdout) => {
-      if (error) reject(error);
-      else resolve(stdout);
-    });
-  });
-}
+If you do not need to call any tools, respond with plain text (no JSON block).`;
 
 /**
- * Serialize LangChain messages to a prompt string for the CLI.
- * Same format as Claude CLI provider.
+ * Create a Codex CLI model adapter.
+ *
+ * Shells out to `codex exec <prompt> --full-auto --sandbox read-only` for each
+ * invocation. Tool calling is handled via prompt engineering: tool definitions
+ * are injected into the prompt when `bindTools()` is called, and tool calls are
+ * parsed from JSON code blocks in the response.
+ *
+ * By default, messages are serialized as `<thread>` XML (matching the agent's
+ * `contextMode: "xml"` pattern). Set `inputEncoding: "text"` for plain-text labels.
  */
-function messagesToPrompt(messages: BaseMessage[]): string {
-  const parts: string[] = [];
-  for (const msg of messages) {
-    const content =
-      typeof msg.content === "string"
-        ? msg.content
-        : JSON.stringify(msg.content);
-    const role = msg.getType();
-
-    switch (role) {
-      case "system":
-        parts.push(`[System]\n${content}`);
-        break;
-      case "human":
-        parts.push(`[User]\n${content}`);
-        break;
-      case "ai":
-        parts.push(`[Assistant]\n${content}`);
-        break;
-      case "tool":
-        parts.push(`[Tool Result (${(msg as any).tool_call_id})]\n${content}`);
-        break;
-      default:
-        parts.push(`[${role}]\n${content}`);
-    }
-  }
-  return parts.join("\n\n");
-}
-
-/**
- * Parse tool calls from CLI response text.
- * Looks for a JSON code block with {"tool_calls": [...]}.
- */
-function parseToolCalls(
-  text: string,
-): { name: string; id: string; args: Record<string, unknown> }[] | null {
-  const jsonBlockMatch = text.match(
-    /```json\s*\n?([\s\S]*?)\n?\s*```/,
-  );
-  if (!jsonBlockMatch) return null;
-
-  try {
-    const parsed = JSON.parse(jsonBlockMatch[1]);
-    if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
-      return parsed.tool_calls.map(
-        (tc: { name: string; id?: string; args?: Record<string, unknown> }) => ({
-          name: tc.name,
-          id: tc.id ?? `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          args: tc.args ?? {},
-        }),
-      );
-    }
-  } catch {
-    // Not valid JSON — treat as plain text
-  }
-  return null;
-}
-
 export function createCodexCliProvider(
   opts?: CodexCliProviderOptions,
 ): ModelAdapter {
   const cliPath = opts?.cliPath ?? "codex";
-  const modelFlag = opts?.model;
+  const model = opts?.model;
   const timeout = opts?.timeout ?? 120_000;
   const maxBuffer = opts?.maxBuffer ?? 10 * 1024 * 1024;
-  let boundToolDefs: string | null = null;
+  const inputEncoding = opts?.inputEncoding ?? "xml";
+
+  let boundToolDefs: StructuredToolInterface[] = [];
 
   function buildAdapter(): ModelAdapter {
-    const adapter: ModelAdapter = {
+    return {
       async invoke(messages: BaseMessage[]): Promise<AIMessage> {
-        let prompt = messagesToPrompt(messages);
+        let prompt = "";
 
-        // Inject tool definitions into the prompt if tools are bound
-        if (boundToolDefs) {
-          prompt = `${boundToolDefs}\n\n${TOOL_CALL_FORMAT}\n\n${prompt}`;
+        // Inject tool definitions if tools are bound
+        if (boundToolDefs.length > 0) {
+          const toolDefs = boundToolDefs.map((t) => ({
+            name: t.name,
+            description: t.description,
+            parameters:
+              "schema" in t && t.schema
+                ? JSON.parse(JSON.stringify(t.schema))
+                : {},
+          }));
+          prompt += `[Available Tools]\n${JSON.stringify(toolDefs, null, 2)}\n\n${TOOL_CALL_FORMAT}\n\n`;
         }
 
-        // codex exec "<prompt>" --full-auto --sandbox read-only
+        // Serialize messages using the configured encoding
+        prompt +=
+          inputEncoding === "xml"
+            ? messagesToXml(messages)
+            : messagesToPrompt(messages);
+
         const args = ["exec", prompt, "--full-auto", "--sandbox", "read-only"];
-        if (modelFlag) args.push("--model", modelFlag);
+        if (model) {
+          args.push("--model", model);
+        }
 
         const stdout = await execFileAsync(cliPath, args, {
           timeout,
           maxBuffer,
         });
 
-        const trimmed = stdout.trim();
-        const toolCalls = boundToolDefs ? parseToolCalls(trimmed) : null;
+        const text = stdout.trim();
+        const toolCalls = parseToolCalls(text);
 
-        if (toolCalls && toolCalls.length > 0) {
-          const textContent = trimmed
+        if (toolCalls.length > 0) {
+          // Extract any text outside the JSON block as content
+          const contentOutsideJson = text
             .replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "")
             .trim();
-
           return new AIMessage({
-            content: textContent || "",
+            content: contentOutsideJson || "",
             tool_calls: toolCalls,
           });
         }
 
-        return new AIMessage({ content: trimmed });
+        return new AIMessage({ content: text, tool_calls: [] });
       },
 
       bindTools(tools: StructuredToolInterface[]): ModelAdapter {
-        const toolDefs = tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          parameters: t.schema
-            ? JSON.parse(JSON.stringify(t.schema))
-            : {},
-        }));
-        boundToolDefs = `Available tools:\n${JSON.stringify(toolDefs, null, 2)}`;
-        return adapter;
+        boundToolDefs = tools;
+        return this;
       },
     };
-
-    return adapter;
   }
 
   return buildAdapter();
@@ -219,32 +178,32 @@ export type { CodexCliProviderOptions } from "./providers/codex-cli.js";
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { tool } from "@langchain/core/tools";
-import { z } from "zod";
+import { HumanMessage, SystemMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 
+// Mock node:child_process before importing the module under test
 vi.mock("node:child_process", () => ({
   execFile: vi.fn(),
 }));
 
-import { createCodexCliProvider } from "../../src/providers/codex-cli.js";
 import { execFile } from "node:child_process";
+import { createCodexCliProvider } from "../../src/providers/codex-cli.js";
+import { isModelAdapter } from "../../src/providers/types.js";
 
 const mockExecFile = vi.mocked(execFile);
 
-function mockCliResponse(stdout: string) {
+function simulateExecFile(stdout: string) {
   mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, callback: any) => {
-      callback(null, stdout, "");
+    (_file: any, _args: any, _opts: any, cb: any) => {
+      cb(null, stdout, "");
       return {} as any;
     },
   );
 }
 
-function mockCliError(message: string) {
+function simulateExecFileError(message: string) {
   mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, callback: any) => {
-      callback(new Error(message), "", message);
+    (_file: any, _args: any, _opts: any, cb: any) => {
+      cb(new Error(message), "", "");
       return {} as any;
     },
   );
@@ -257,115 +216,199 @@ beforeEach(() => {
 describe("createCodexCliProvider", () => {
   it("returns a ModelAdapter with invoke and bindTools", () => {
     const provider = createCodexCliProvider();
-    expect(provider.invoke).toBeInstanceOf(Function);
-    expect(provider.bindTools).toBeInstanceOf(Function);
+    expect(provider).toBeDefined();
+    expect(typeof provider.invoke).toBe("function");
+    expect(typeof provider.bindTools).toBe("function");
+    expect(isModelAdapter(provider)).toBe(true);
   });
 
-  describe("invoke", () => {
-    it("calls codex exec with --full-auto --sandbox read-only", async () => {
-      mockCliResponse("4");
+  it("calls codex exec <prompt> --full-auto --sandbox read-only via execFile", async () => {
+    simulateExecFile("Hello from Codex CLI");
+    const provider = createCodexCliProvider();
 
-      const provider = createCodexCliProvider();
-      const result = await provider.invoke([
-        new HumanMessage("What is 2+2?"),
-      ]);
+    const result = await provider.invoke([new HumanMessage("Hi")]);
 
-      expect(result.content).toBe("4");
-      expect(mockExecFile).toHaveBeenCalledOnce();
+    expect(mockExecFile).toHaveBeenCalledOnce();
+    const [file, args] = mockExecFile.mock.calls[0] as any[];
+    expect(file).toBe("codex");
+    expect(args[0]).toBe("exec");
+    expect(args).toContain("--full-auto");
+    expect(args).toContain("--sandbox");
+    expect(args).toContain("read-only");
 
-      const [file, args] = mockExecFile.mock.calls[0] as any[];
-      expect(file).toBe("codex");
-      expect(args[0]).toBe("exec");
-      expect(args).toContain("--full-auto");
-      expect(args).toContain("--sandbox");
-      expect(args).toContain("read-only");
+    expect(result).toBeInstanceOf(AIMessage);
+    expect(result.content).toBe("Hello from Codex CLI");
+    expect(result.tool_calls).toEqual([]);
+  });
+
+  it("uses XML encoding by default (prompt contains <thread>)", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider();
+
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    const prompt = args[1]; // exec <prompt>
+    expect(prompt).toContain("<thread>");
+    expect(prompt).toContain('<event type="human"');
+    expect(prompt).not.toContain("[User]");
+  });
+
+  it("uses text encoding when inputEncoding: 'text'", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider({ inputEncoding: "text" });
+
+    await provider.invoke([
+      new SystemMessage("Be concise."),
+      new HumanMessage("What is 2+2?"),
+    ]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    const prompt = args[1];
+    expect(prompt).toContain("[System]");
+    expect(prompt).toContain("[User]");
+    expect(prompt).not.toContain("<thread>");
+  });
+
+  it("passes --model flag when model option is set", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider({ model: "o4-mini" });
+
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    expect(args).toContain("--model");
+    expect(args).toContain("o4-mini");
+  });
+
+  it("uses custom cliPath", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider({
+      cliPath: "/usr/local/bin/codex-dev",
     });
 
-    it("passes --model flag when model option is set", async () => {
-      mockCliResponse("Response");
+    await provider.invoke([new HumanMessage("Hi")]);
 
-      const provider = createCodexCliProvider({ model: "o4-mini" });
-      await provider.invoke([new HumanMessage("test")]);
+    const file = (mockExecFile.mock.calls[0] as any[])[0];
+    expect(file).toBe("/usr/local/bin/codex-dev");
+  });
 
-      const [, args] = mockExecFile.mock.calls[0] as any[];
-      expect(args).toContain("--model");
-      expect(args).toContain("o4-mini");
-    });
+  it("throws on CLI error", async () => {
+    simulateExecFileError("CLI process exited with code 1");
+    const provider = createCodexCliProvider();
 
-    it("uses custom cliPath", async () => {
-      mockCliResponse("Response");
+    await expect(
+      provider.invoke([new HumanMessage("Hi")]),
+    ).rejects.toThrow("CLI process exited with code 1");
+  });
 
-      const provider = createCodexCliProvider({ cliPath: "/usr/local/bin/codex" });
-      await provider.invoke([new HumanMessage("test")]);
+  it("parses tool calls from JSON code block", async () => {
+    const cliOutput = `I need to calculate something.
 
-      const [file] = mockExecFile.mock.calls[0] as any[];
-      expect(file).toBe("/usr/local/bin/codex");
-    });
+\`\`\`json
+{
+  "tool_calls": [
+    {
+      "name": "calculator",
+      "args": { "expression": "2 + 2" },
+      "id": "call_1"
+    }
+  ]
+}
+\`\`\``;
+    simulateExecFile(cliOutput);
+    const provider = createCodexCliProvider();
 
-    it("throws on CLI error", async () => {
-      mockCliError("Command not found: codex");
+    const result = await provider.invoke([new HumanMessage("What is 2+2?")]);
 
-      const provider = createCodexCliProvider();
-      await expect(
-        provider.invoke([new HumanMessage("test")]),
-      ).rejects.toThrow("Command not found: codex");
+    expect(result.tool_calls).toHaveLength(1);
+    expect(result.tool_calls![0]).toEqual({
+      name: "calculator",
+      args: { expression: "2 + 2" },
+      id: "call_1",
     });
   });
 
-  describe("bindTools + tool call parsing", () => {
-    const calculatorTool = tool(
-      async ({ expression }: { expression: string }) => String(eval(expression)),
-      {
-        name: "calculator",
-        description: "Evaluate a math expression",
-        schema: z.object({ expression: z.string() }),
-      },
-    );
+  it("returns plain text with empty tool_calls when no JSON block", async () => {
+    simulateExecFile("The answer is 42.");
+    const provider = createCodexCliProvider();
 
-    it("parses tool calls from JSON code block in response", async () => {
-      const toolCallResponse = [
-        "```json",
-        '{"tool_calls": [{"name": "calculator", "id": "call_1", "args": {"expression": "2+2"}}]}',
-        "```",
-      ].join("\n");
+    const result = await provider.invoke([new HumanMessage("What is the meaning of life?")]);
 
-      mockCliResponse(toolCallResponse);
+    expect(result.content).toBe("The answer is 42.");
+    expect(result.tool_calls).toEqual([]);
+  });
 
-      const provider = createCodexCliProvider();
-      const bound = provider.bindTools!([calculatorTool]);
-      const result = await bound.invoke([new HumanMessage("What is 2+2?")]);
+  it("handles multiple tool calls in one response", async () => {
+    const cliOutput = `\`\`\`json
+{
+  "tool_calls": [
+    { "name": "calculator", "args": { "expression": "2 + 2" }, "id": "call_1" },
+    { "name": "get_time", "args": {}, "id": "call_2" }
+  ]
+}
+\`\`\``;
+    simulateExecFile(cliOutput);
+    const provider = createCodexCliProvider();
 
-      expect(result.tool_calls).toHaveLength(1);
-      expect(result.tool_calls![0]).toMatchObject({
-        name: "calculator",
-        id: "call_1",
-        args: { expression: "2+2" },
-      });
+    const result = await provider.invoke([new HumanMessage("Calculate and get time")]);
+
+    expect(result.tool_calls).toHaveLength(2);
+    expect(result.tool_calls![0].name).toBe("calculator");
+    expect(result.tool_calls![1].name).toBe("get_time");
+  });
+
+  it("injects tool definitions into prompt when tools bound", async () => {
+    simulateExecFile("Plain response");
+    const provider = createCodexCliProvider();
+
+    const mockTool = {
+      name: "calculator",
+      description: "Evaluate math",
+      schema: { type: "object", properties: { expr: { type: "string" } } },
+      invoke: vi.fn(),
+      lc_namespace: ["test"],
+    } as any;
+
+    provider.bindTools!([mockTool]);
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    // args[0] = "exec", args[1] = prompt
+    const prompt = args[1];
+    expect(prompt).toContain("[Available Tools]");
+    expect(prompt).toContain("calculator");
+    expect(prompt).toContain("tool_calls");
+  });
+
+  it("passes timeout and maxBuffer options", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider({
+      timeout: 60_000,
+      maxBuffer: 5 * 1024 * 1024,
     });
 
-    it("returns plain text when no JSON block is present", async () => {
-      mockCliResponse("The answer is 4.");
+    await provider.invoke([new HumanMessage("Hi")]);
 
-      const provider = createCodexCliProvider();
-      const bound = provider.bindTools!([calculatorTool]);
-      const result = await bound.invoke([new HumanMessage("What is 2+2?")]);
+    const opts = (mockExecFile.mock.calls[0] as any[])[2];
+    expect(opts.timeout).toBe(60_000);
+    expect(opts.maxBuffer).toBe(5 * 1024 * 1024);
+  });
 
-      expect(result.content).toBe("The answer is 4.");
-      expect(result.tool_calls).toEqual([]);
-    });
+  it("uses correct CLI argument structure (exec, prompt, flags)", async () => {
+    simulateExecFile("Response");
+    const provider = createCodexCliProvider({ model: "o4-mini" });
 
-    it("injects tool definitions into prompt when tools are bound", async () => {
-      mockCliResponse("The answer is 4.");
+    await provider.invoke([new HumanMessage("Test prompt")]);
 
-      const provider = createCodexCliProvider();
-      provider.bindTools!([calculatorTool]);
-      await provider.invoke([new HumanMessage("test")]);
-
-      const [, args] = mockExecFile.mock.calls[0] as any[];
-      const prompt = args[1]; // exec <prompt>
-      expect(prompt).toContain("Available tools:");
-      expect(prompt).toContain("calculator");
-    });
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    // Expected: ["exec", <prompt>, "--full-auto", "--sandbox", "read-only", "--model", "o4-mini"]
+    expect(args[0]).toBe("exec");
+    expect(args[2]).toBe("--full-auto");
+    expect(args[3]).toBe("--sandbox");
+    expect(args[4]).toBe("read-only");
+    expect(args[5]).toBe("--model");
+    expect(args[6]).toBe("o4-mini");
   });
 });
 ```

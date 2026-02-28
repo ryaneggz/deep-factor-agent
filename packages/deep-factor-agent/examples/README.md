@@ -69,6 +69,10 @@ npx tsx examples/12-hitl-multiple-choice.ts
 
 # Parallel tool calling with HITL (interactive)
 npx tsx examples/13-parallel-tool-calls.ts
+
+# Claude/Codex CLI delegation (non-interactive, requires claude/codex CLI)
+npx tsx examples/14-claude-codex-delegation.ts
+npx tsx examples/14-claude-codex-delegation.ts --provider codex
 ```
 
 ## Configuration
@@ -102,3 +106,4 @@ Supported models include any model supported by LangChain's `initChatModel`:
 | 11 | `11-xml-tools-stream.ts` | Multi-turn streaming chat with bash tool, tool calls shown inline |
 | 12 | `12-hitl-multiple-choice.ts` | Interactive HITL with multiple-choice prompts, bash tool, streaming |
 | 13 | `13-parallel-tool-calls.ts` | Parallel tool execution with Promise.all, timing display, HITL sequential |
+| 14 | `14-claude-codex-delegation.ts` | CLI provider delegation via ModelAdapter (Claude CLI or Codex CLI) |

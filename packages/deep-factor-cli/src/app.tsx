@@ -32,7 +32,7 @@ export function App({
     sendPrompt,
     submitHumanInput,
     humanInputRequest,
-  } = useAgent({ model, maxIter, tools, verbose });
+  } = useAgent({ model, maxIter, tools });
 
   // Single-prompt mode: run on mount
   useEffect(() => {

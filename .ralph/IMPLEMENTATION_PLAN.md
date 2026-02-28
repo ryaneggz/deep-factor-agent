@@ -2,7 +2,7 @@
 
 > Generated: 2026-02-27
 > Branch: `ryaneggz/4-parallel-tool-calling`
-> Status: SPEC-01 **COMPLETE**, SPEC-02/03/04 unimplemented.
+> Status: ALL SPECS COMPLETE. All quality fixes applied.
 
 ---
 
@@ -61,42 +61,42 @@
 
 ## Priority 4 — SPEC-04: Example 14 — Claude/Codex CLI Delegation Demo
 
-**Dependency**: SPEC-01 (COMPLETE) + SPEC-02 (NOT STARTED)
-**Status**: NOT STARTED — 0/7 acceptance criteria met
+**Dependency**: SPEC-01 (COMPLETE) + SPEC-02 (COMPLETE)
+**Status**: COMPLETE — 7/7 acceptance criteria met
 
-### Tasks
+### Implementation Notes
 
-- [ ] Create `packages/deep-factor-agent/examples/14-claude-codex-delegation.ts`
-- [ ] Modify `packages/deep-factor-agent/examples/README.md`
+- `examples/14-claude-codex-delegation.ts` — Non-interactive demo with `--provider claude|codex` flag, uses `calculator` and `get_current_time` tools
+- `examples/README.md` — Added Example 14 to running commands and overview table
 
 ---
 
 ## Priority 5 — Code Quality Issues (discovered during audit)
 
-### P5.1 — HIGH: Silent tool-not-found drop (`agent.ts:500-538`)
+### P5.1 — FIXED: Silent tool-not-found drop (`agent.ts`)
 
-- **Issue**: When the model calls a tool name not in `toolMap`, the call is silently dropped — no `ToolMessage` appended, no error event. This leaves the LangChain message sequence inconsistent.
-- **Fix**: Add an `else` branch that pushes a `ToolResultEvent` with an error message and appends a `ToolMessage`.
+- **Issue**: When the model calls a tool name not in `toolMap`, the call was silently dropped.
+- **Fix**: Added `else` branch that pushes `ToolResultEvent` with error message and appends `ToolMessage` with `"Tool not found: ..."` content.
 
 ### P5.2 — FIXED
 
 - Fixed as part of SPEC-01 implementation. `context-manager.ts` now uses `"usage_metadata" in response` guard consistent with `agent.ts`.
 
-### P5.3 — LOW: Dead `verbose` prop in `useAgent` hook
+### P5.3 — FIXED: Dead `verbose` prop in `useAgent` hook
 
 - **Issue**: `UseAgentOptions.verbose` declared but never read. Dead API surface.
-- **Fix**: Remove the prop or implement verbose logging.
+- **Fix**: Removed `verbose` from `UseAgentOptions` in `packages/deep-factor-cli/src/types.ts` and removed its usage from `app.tsx`.
 
 ---
 
 ## Implementation Order Summary
 
 ```
-SPEC-01 (ModelAdapter + Claude CLI) ── DONE
-                                       ├──→ SPEC-04 (Example 14)
-SPEC-02 (Codex CLI, depends on 01) ──┘
+SPEC-01 (ModelAdapter + Claude CLI) ── DONE (v0.0.28)
+                                       ├──→ SPEC-04 (Example 14) ── DONE (v0.0.31)
+SPEC-02 (Codex CLI, depends on 01) ──┘    DONE (v0.0.29)
 
-SPEC-03 (Test Logging) ──────────────────→ Independent, can parallel with 02
+SPEC-03 (Test Logging) ──────────────────→ DONE (v0.0.30)
 
-P5.1, P5.3 (Quality fixes) ────────────→ Independent, can be done anytime
+P5.1, P5.2, P5.3 (Quality fixes) ───────→ DONE (P5.2 in v0.0.28, P5.1+P5.3 in v0.0.31)
 ```
