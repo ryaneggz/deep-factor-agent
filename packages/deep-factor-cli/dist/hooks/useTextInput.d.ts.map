@@ -1,1 +1,0 @@
-{"version":3,"file":"useTextInput.d.ts","sourceRoot":"","sources":["../../src/hooks/useTextInput.ts"],"names":[],"mappings":"AAGA,UAAU,mBAAmB;IAC3B,QAAQ,EAAE,CAAC,KAAK,EAAE,MAAM,KAAK,IAAI,CAAC;CACnC;AAED,UAAU,kBAAkB;IAC1B,KAAK,EAAE,MAAM,CAAC;CACf;AAED;;;;;;GAMG;AACH,wBAAgB,YAAY,CAAC,EAAE,QAAQ,EAAE,EAAE,mBAAmB,GAAG,kBAAkB,CA4BlF"}

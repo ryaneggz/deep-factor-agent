@@ -1,1 +1,0 @@
-{"version":3,"file":"TuiApp.d.ts","sourceRoot":"","sources":["../../src/tui/TuiApp.tsx"],"names":[],"mappings":"AASA,UAAU,WAAW;IACnB,KAAK,EAAE,MAAM,CAAC;IACd,OAAO,EAAE,MAAM,CAAC;IAChB,UAAU,EAAE,OAAO,CAAC;CACrB;AAQD,wBAAgB,MAAM,CAAC,EACrB,KAAK,EAAE,YAAY,EACnB,OAAO,EACP,UAAU,EAAE,iBAAiB,GAC9B,EAAE,WAAW,2CAiCb"}
