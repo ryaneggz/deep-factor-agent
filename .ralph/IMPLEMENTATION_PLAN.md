@@ -45,34 +45,17 @@
 
 ## Priority 3 — SPEC-03: Test Logging Infrastructure
 
-**Dependency**: None (independent of SPEC-01/02)
-**Status**: NOT STARTED — 0/11 acceptance criteria met
+**Dependency**: None
+**Status**: COMPLETE — 11/11 acceptance criteria met
 
-### Tasks
+### Implementation Notes
 
-- [ ] Create `packages/deep-factor-agent/src/test-logger.ts`
-  - `TestResult` interface: `{ name, status: "passed"|"failed"|"skipped", duration, error? }`
-  - `TestSuiteLog` interface: `{ suite, timestamp, passed, failed, skipped, duration, tests }`
-  - `TestLoggerOptions` interface: `{ logDir? }`
-  - `writeTestLog(suiteLog, options?)` — creates `./logs/` dir, writes JSON with filename `agent-<timestamp>-<suite>.json`
-  - `buildTestSuiteLog(suite, tests, totalDuration)` — counts pass/fail/skip from test array
-
-- [ ] Create `packages/deep-factor-agent/vitest.setup.ts`
-  - Custom Vitest reporter implementing `onFinished(files?)`
-  - Iterates over test files, maps tasks to `TestResult[]`, calls `writeTestLog`
-
-- [ ] Modify `packages/deep-factor-agent/vitest.config.ts`
-  - Add `reporters: ["default", "./vitest.setup.ts"]` to test config
-  - Existing config has `include`, `passWithNoTests`, `coverage` — only add `reporters`
-
-- [ ] Modify `.gitignore`
-  - Add `logs/` (currently only `.ralph/logs/` exists)
-
-- [ ] Create `packages/deep-factor-agent/__tests__/test-logger.test.ts`
-  - Test: `buildTestSuiteLog` counts passed/failed/skipped
-  - Test: `writeTestLog` creates dir and writes JSON file
-  - Test: suite name sanitized in filename
-  - Test: JSON file is parseable with correct structure
+- `src/test-logger.ts` — `writeTestLog()`, `buildTestSuiteLog()`, type interfaces
+- `vitest.setup.ts` — Custom Vitest 4 reporter using `onTestRunEnd()` (not `onFinished`, which was removed in v4)
+- `vitest.config.ts` — `reporters: ["default", "./vitest.setup.ts"]`
+- `.gitignore` — Added `logs/`
+- `__tests__/test-logger.test.ts` — 8 unit tests
+- Vitest 4 reporter API: uses `onTestRunEnd(testModules)` with recursive `collectTests()` for nested describe blocks; results via `child.result()` method
 
 ---
 
