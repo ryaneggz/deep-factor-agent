@@ -87,7 +87,7 @@ Only update AGENTS.md if you have **genuinely reusable knowledge** that would he
 
 For any story that changes UI, you MUST verify it works in the browser:
 
-1. Load the `dev-browser` skill
+1. Load the `agent-browser` skill
 2. Navigate to the relevant page
 3. Verify the UI changes work as expected
 4. Take a screenshot if helpful for the progress log
