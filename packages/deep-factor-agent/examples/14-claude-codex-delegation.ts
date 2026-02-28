@@ -147,6 +147,18 @@ async function main() {
     }
   }
 
+  const errors = result.thread.events.filter(
+    (e: AgentEvent) => e.type === "error",
+  );
+  if (errors.length > 0) {
+    console.log(`\nErrors: ${errors.length}`);
+    for (const err of errors) {
+      if (err.type === "error") {
+        console.log(`  - [iter ${err.iteration}] ${err.error}`);
+      }
+    }
+  }
+
   // Token usage (will be zeros for CLI providers — expected)
   console.log(`\nToken usage:`);
   console.log(`  Input:  ${result.usage.inputTokens}`);

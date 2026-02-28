@@ -1,0 +1,100 @@
+{
+  "suite": "context-manager",
+  "timestamp": "2026-02-28T05:20:08.093Z",
+  "passed": 18,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "returns Math.ceil(5 / 3.5) = 2 for 'hello'",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns 0 for empty string",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns reasonable estimate for long text",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "sums token estimates across all events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns 0 for empty thread",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "uses custom tokenEstimator when provided",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "custom tokenEstimator affects needsSummarization threshold",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "falls back to estimateTokens when no custom estimator is provided",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns false when below threshold",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns true when exceeding threshold",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "replaces old iteration events with SummaryEvent entries",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "falls back to a descriptive summary when model throws",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "preserves recent iterations unchanged",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns accumulated token usage from summarization calls",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns zero usage when model has no usage_metadata",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "produces formatted string of iteration summaries",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns empty string when no summaries exist",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "includes multiple summaries",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "suite": "test-logger",
+  "timestamp": "2026-02-28T05:20:08.094Z",
+  "passed": 8,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "counts passed/failed/skipped tests correctly",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles empty test array",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "includes ISO timestamp",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "creates the log directory if it does not exist",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "writes a JSON file with correct structure",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "sanitizes suite name in filename",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "file name matches pattern: agent-<timestamp>-<suite>.json",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "JSON file is parseable with standard tools",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

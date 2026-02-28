@@ -1,0 +1,1 @@
+{"version":3,"file":"HumanInput.d.ts","sourceRoot":"","sources":["../../src/components/HumanInput.tsx"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,wBAAwB,EAAE,MAAM,mBAAmB,CAAC;AAElE,UAAU,eAAe;IACvB,OAAO,EAAE,wBAAwB,CAAC;IAClC,QAAQ,EAAE,CAAC,QAAQ,EAAE,MAAM,KAAK,IAAI,CAAC;CACtC;AAED,wBAAgB,UAAU,CAAC,EAAE,OAAO,EAAE,QAAQ,EAAE,EAAE,eAAe,2CAyChE"}

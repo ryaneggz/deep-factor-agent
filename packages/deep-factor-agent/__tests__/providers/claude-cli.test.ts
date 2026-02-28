@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { z } from "zod";
+import { tool } from "@langchain/core/tools";
 import { HumanMessage, SystemMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 
 // Mock node:child_process before importing the module under test
@@ -197,6 +199,33 @@ describe("createClaudeCliProvider", () => {
     expect(prompt).toContain("[Available Tools]");
     expect(prompt).toContain("calculator");
     expect(prompt).toContain("tool_calls");
+  });
+
+  it("serializes Zod schemas as JSON Schema (not Zod internals)", async () => {
+    simulateExecFile("Plain response");
+    const provider = createClaudeCliProvider();
+
+    const calcTool = tool(
+      async ({ expression }: { expression: string }) => expression,
+      {
+        name: "calculator",
+        description: "Evaluate math",
+        schema: z.object({
+          expression: z.string().describe("The math expression"),
+        }),
+      },
+    );
+
+    provider.bindTools!([calcTool]);
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    const prompt = args[1]; // -p <prompt>
+    // Should contain JSON Schema properties, not Zod internals
+    expect(prompt).toContain('"type": "object"');
+    expect(prompt).toContain('"type": "string"');
+    expect(prompt).not.toContain('"def"');
+    expect(prompt).not.toContain('"shape"');
   });
 
   it("passes timeout and maxBuffer options", async () => {

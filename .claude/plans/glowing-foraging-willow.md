@@ -6,7 +6,7 @@ Logs are bulky and not worth archiving. `.claude/plans/*.md` files are useful co
 
 ## File
 
-`.ralph/archive.sh`
+`.huntley/archive.sh`
 
 ## Changes
 
@@ -35,6 +35,6 @@ Logs are bulky and not worth archiving. `.claude/plans/*.md` files are useful co
 
 ## Verification
 
-1. `bash -n .ralph/archive.sh` — syntax check
-2. `.ralph/archive.sh --help` — prints usage
-3. `echo n | .ralph/archive.sh` — preview shows "Delete: logs/" instead of moving them, no mention of `.claude/plans`
+1. `bash -n .huntley/archive.sh` — syntax check
+2. `.huntley/archive.sh --help` — prints usage
+3. `echo n | .huntley/archive.sh` — preview shows "Delete: logs/" instead of moving them, no mention of `.claude/plans`

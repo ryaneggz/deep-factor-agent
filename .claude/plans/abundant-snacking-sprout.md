@@ -66,7 +66,7 @@ Change `model` to accept `(messages: BaseMessage[]) => Promise<AIMessage>`.
 
 ## Approach
 
-Generate **4 spec files** in `.ralph/specs/`:
+Generate **4 spec files** in `.huntley/specs/`:
 
 | Spec | Description | New Files |
 |------|-------------|-----------|
@@ -107,14 +107,14 @@ Generate **4 spec files** in `.ralph/specs/`:
 
 ## Steps
 
-1. Write `SPEC-01-claude-cli-provider.md` to `.ralph/specs/`
-2. Write `SPEC-02-codex-cli-provider.md` to `.ralph/specs/`
-3. Write `SPEC-03-test-logging.md` to `.ralph/specs/`
-4. Write `SPEC-04-example-delegation.md` to `.ralph/specs/`
+1. Write `SPEC-01-claude-cli-provider.md` to `.huntley/specs/`
+2. Write `SPEC-02-codex-cli-provider.md` to `.huntley/specs/`
+3. Write `SPEC-03-test-logging.md` to `.huntley/specs/`
+4. Write `SPEC-04-example-delegation.md` to `.huntley/specs/`
 
 ## Verification
 
-- Specs follow the established format from `.ralph/archive/` (CONTEXT → OVERVIEW → IMPLEMENTATION → FILE STRUCTURE → DESIGN DECISIONS → ACCEPTANCE CRITERIA)
+- Specs follow the established format from `.huntley/archive/` (CONTEXT → OVERVIEW → IMPLEMENTATION → FILE STRUCTURE → DESIGN DECISIONS → ACCEPTANCE CRITERIA)
 - All acceptance criteria are checkboxes that can be verified during implementation
 - Implementation code snippets are complete and follow existing patterns
 

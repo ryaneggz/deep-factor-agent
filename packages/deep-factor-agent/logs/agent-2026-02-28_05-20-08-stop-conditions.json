@@ -1,0 +1,155 @@
+{
+  "suite": "stop-conditions",
+  "timestamp": "2026-02-28T05:20:08.094Z",
+  "passed": 29,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "does not stop before reaching the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stops on reaching the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stops when exceeding the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "does not stop below the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stops when total tokens reach the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stops when exceeding the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "does not stop below the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stops when input tokens reach the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "does not stop below the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stops when output tokens reach the limit",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "computes cost for a known model",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles cache tokens when present",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns 0 for unknown models",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "warns once per unknown model (not on every call)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "computes cost for gpt-4o",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "does not stop below the budget",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stops when cost reaches the budget",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "never triggers for unknown model because calculateCost returns 0",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "uses explicit model override instead of context model",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns null when no condition triggers",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns the first triggered result (OR semantics)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns triggered result when only the second condition fires",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles empty conditions array",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "supports composability with OR semantics",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "contains all required models",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "claude-sonnet-4-6 has correct pricing",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "claude-opus-4-6 has correct pricing",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "computes cost correctly for claude-sonnet-4-6",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "computes cost correctly for claude-opus-4-6",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

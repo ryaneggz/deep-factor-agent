@@ -59,15 +59,15 @@
 - CLI types: `packages/deep-factor-cli/src/types.ts` (ChatMessage, AgentStatus)
 - Tests: `packages/deep-factor-cli/__tests__/` (ink-testing-library)
 
-### Ralph Layout
+### Huntley Layout
 
-- `.ralph/loop.sh` — build/plan loop driver
-- `.ralph/format-log.sh` — stream-json → markdown formatter
-- `.ralph/review-log.sh` — log viewer
-- `.ralph/archive.sh` — archive current phase
-- `.ralph/PROMPT_plan.md` — plan-mode prompt
-- `.ralph/PROMPT_build.md` — build-mode prompt
-- `.ralph/IMPLEMENTATION_PLAN.md` — current phase plan
-- `.ralph/specs/` — feature specifications
-- `.ralph/logs/` — session logs
-- `.ralph/archive/` — archived phases
+- `.huntley/loop.sh` — build/plan loop driver
+- `.huntley/format-log.sh` — stream-json → markdown formatter
+- `.huntley/review-log.sh` — log viewer
+- `.huntley/archive.sh` — archive current phase
+- `.huntley/PROMPT_plan.md` — plan-mode prompt
+- `.huntley/PROMPT_build.md` — build-mode prompt
+- `.huntley/IMPLEMENTATION_PLAN.md` — current phase plan
+- `.huntley/specs/` — feature specifications
+- `.huntley/logs/` — session logs
+- `.huntley/archive/` — archived phases

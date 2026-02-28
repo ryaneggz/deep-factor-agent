@@ -1,0 +1,55 @@
+{
+  "suite": "create-agent",
+  "timestamp": "2026-02-28T04:55:32.783Z",
+  "passed": 9,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "returns a DeepFactorAgent instance",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "works with only model specified (defaults applied)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "has loop() method",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "has stream() method",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "loop() returns AgentResult with mocked model",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stream() returns streaming result with mocked model",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "custom settings override defaults",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "applies default maxIterations(10) stop condition",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "all public types and functions are importable",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

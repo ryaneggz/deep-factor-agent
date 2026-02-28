@@ -1,0 +1,81 @@
+{
+  "suite": "codex-cli",
+  "timestamp": "2026-02-28T05:20:08.095Z",
+  "passed": 13,
+  "failed": 1,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "returns a ModelAdapter with invoke and bindTools",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "calls codex exec <prompt> --full-auto --sandbox read-only via execFile",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "uses XML encoding by default (prompt contains <thread>)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "uses text encoding when inputEncoding: 'text'",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "passes --model flag when model option is set",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "uses custom cliPath",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "throws on CLI error",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "parses tool calls from JSON code block",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns plain text with empty tool_calls when no JSON block",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles multiple tool calls in one response",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "injects tool definitions into prompt when tools bound",
+      "status": "failed",
+      "duration": 0,
+      "error": "Cannot read properties of undefined (reading 'def')"
+    },
+    {
+      "name": "serializes Zod schemas as JSON Schema (not Zod internals)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "passes timeout and maxBuffer options",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "uses correct CLI argument structure (exec, prompt, flags)",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

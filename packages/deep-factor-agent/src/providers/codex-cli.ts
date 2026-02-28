@@ -1,6 +1,7 @@
 import { AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
+import { toJSONSchema } from "zod";
 import type { ModelAdapter } from "./types.js";
 import {
   execFileAsync,
@@ -73,7 +74,9 @@ export function createCodexCliProvider(
             description: t.description,
             parameters:
               "schema" in t && t.schema
-                ? JSON.parse(JSON.stringify(t.schema))
+                ? "_zod" in (t.schema as object)
+                  ? toJSONSchema(t.schema as import("zod").ZodType)
+                  : t.schema
                 : {},
           }));
           prompt += `[Available Tools]\n${JSON.stringify(toolDefs, null, 2)}\n\n${TOOL_CALL_FORMAT}\n\n`;

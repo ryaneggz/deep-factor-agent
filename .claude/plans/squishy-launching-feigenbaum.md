@@ -28,10 +28,10 @@ ln -sf ~/.env/deep-factor-agent/.env /home/ryaneggz/sandbox/2026/feb/deep-factor
 
 ## Step 1: Archive the previous session
 
-Run the `.ralph/archive.sh` script to move the current implementation plan and specs into `archive/0006-*/`.
+Run the `.huntley/archive.sh` script to move the current implementation plan and specs into `archive/0006-*/`.
 
 ```bash
-cd /home/ryaneggz/sandbox/2026/feb/deep-factor-agent/.ralph && bash archive.sh --yes
+cd /home/ryaneggz/sandbox/2026/feb/deep-factor-agent/.huntley && bash archive.sh --yes
 ```
 
 This will:
@@ -42,7 +42,7 @@ This will:
 
 ---
 
-## Step 2: Create 6 test spec files in `.ralph/specs/`
+## Step 2: Create 6 test spec files in `.huntley/specs/`
 
 ### SPEC-01: `test-01-coverage-infra.md` — Coverage Infrastructure
 
