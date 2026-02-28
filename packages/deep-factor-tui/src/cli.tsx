@@ -19,11 +19,12 @@ const cli = meow(
     --model, -m      Model identifier (default: gpt-4.1-mini)
     --max-iter, -i   Maximum agent iterations (default: 10)
     --bash           Enable bash execution tool
+    --parallel, -p   Enable parallel tool execution
 
   Examples
     $ deep-factor-tui
     $ deep-factor-tui "Explain how React hooks work"
-    $ deep-factor-tui --model gpt-4.1 --bash "List files"
+    $ deep-factor-tui --model gpt-4.1 --bash --parallel "List files"
 `,
   {
     importMeta: import.meta,
@@ -42,6 +43,11 @@ const cli = meow(
         type: "boolean",
         default: false,
       },
+      parallel: {
+        type: "boolean",
+        shortFlag: "p",
+        default: false,
+      },
     },
   },
 );
@@ -54,6 +60,7 @@ const ink = withFullScreen(
     model={cli.flags.model}
     maxIter={cli.flags.maxIter}
     enableBash={cli.flags.bash}
+    parallelToolCalls={cli.flags.parallel}
   />,
 );
 

@@ -12,7 +12,7 @@ import type { AgentTools } from "./types.js";
 const HEADER_HEIGHT = 2;
 const FOOTER_HEIGHT = 3;
 
-export function TuiApp({ prompt, model, maxIter, enableBash }: TuiAppProps) {
+export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }: TuiAppProps) {
   const { height } = useScreenSize();
   const hasRun = useRef(false);
 
@@ -27,7 +27,7 @@ export function TuiApp({ prompt, model, maxIter, enableBash }: TuiAppProps) {
     sendPrompt,
     submitHumanInput,
     humanInputRequest,
-  } = useAgent({ model, maxIter, tools });
+  } = useAgent({ model, maxIter, tools, parallelToolCalls });
 
   const contentHeight = Math.max(1, height - HEADER_HEIGHT - FOOTER_HEIGHT);
 

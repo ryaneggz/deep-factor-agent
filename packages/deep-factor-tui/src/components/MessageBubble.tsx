@@ -41,10 +41,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         message.content.length > MAX_TOOL_RESULT_LENGTH
           ? message.content.slice(0, MAX_TOOL_RESULT_LENGTH) + "..."
           : message.content;
+      const timing = message.durationMs != null ? ` (${message.durationMs}ms)` : "";
+      const parallel = message.parallelGroup ? " [parallel]" : "";
       return (
         <Box>
           <Text color="cyan" dimColor>
-            Result: {content}
+            Result{timing}
+            {parallel}: {content}
           </Text>
         </Box>
       );

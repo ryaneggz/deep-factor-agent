@@ -14,12 +14,15 @@ export interface ChatMessage {
   content: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
+  durationMs?: number;
+  parallelGroup?: string;
 }
 
 export interface UseAgentOptions {
   model: string;
   maxIter: number;
   tools?: AgentTools;
+  parallelToolCalls?: boolean;
 }
 
 export interface UseAgentReturn {
@@ -38,4 +41,5 @@ export interface TuiAppProps {
   model: string;
   maxIter: number;
   enableBash: boolean;
+  parallelToolCalls?: boolean;
 }

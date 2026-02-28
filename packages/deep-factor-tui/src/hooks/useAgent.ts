@@ -44,6 +44,8 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
         messages.push({
           role: "tool_result",
           content: String(event.result),
+          durationMs: event.durationMs,
+          parallelGroup: event.parallelGroup,
         });
         break;
     }
@@ -109,6 +111,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         tools,
         stopWhen: [maxIterations(options.maxIter)],
         interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
+        parallelToolCalls: options.parallelToolCalls,
       });
 
       const existingThread = threadRef.current;
@@ -118,7 +121,14 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         agent.loop(prompt).then(handleResult).catch(handleError);
       }
     },
-    [options.model, options.maxIter, options.tools, handleResult, handleError],
+    [
+      options.model,
+      options.maxIter,
+      options.tools,
+      options.parallelToolCalls,
+      handleResult,
+      handleError,
+    ],
   );
 
   const submitHumanInput = useCallback(

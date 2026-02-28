@@ -953,4 +953,392 @@ describe("DeepFactorAgent", () => {
       // (or was called but stop condition result took precedence)
     });
   });
+
+  describe("parallelToolCalls", () => {
+    it("executes multiple tool calls concurrently when enabled", async () => {
+      const executionOrder: string[] = [];
+
+      const slowTool = tool(
+        async (args: { id: string }) => {
+          executionOrder.push(`start:${args.id}`);
+          await new Promise((r) => setTimeout(r, 50));
+          executionOrder.push(`end:${args.id}`);
+          return `result:${args.id}`;
+        },
+        {
+          name: "slow_tool",
+          description: "A slow tool",
+          schema: z.object({ id: z.string() }),
+        },
+      );
+
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [
+              { name: "slow_tool", args: { id: "A" }, id: "tc_a" },
+              { name: "slow_tool", args: { id: "B" }, id: "tc_b" },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [slowTool],
+        parallelToolCalls: true,
+      });
+
+      const result = await agent.loop("Run parallel");
+
+      // Both should have started before either finished (concurrent execution)
+      expect(executionOrder[0]).toBe("start:A");
+      expect(executionOrder[1]).toBe("start:B");
+
+      // Both tool results should be recorded
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(toolResultEvents.length).toBe(2);
+    });
+
+    it("records durationMs on tool result events", async () => {
+      const slowTool = tool(
+        async () => {
+          await new Promise((r) => setTimeout(r, 20));
+          return "done";
+        },
+        {
+          name: "timed_tool",
+          description: "A timed tool",
+          schema: z.object({}),
+        },
+      );
+
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [{ name: "timed_tool", args: {}, id: "tc_1" }],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [slowTool],
+        parallelToolCalls: true,
+      });
+
+      const result = await agent.loop("Time me");
+
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(toolResultEvents.length).toBe(1);
+      if (toolResultEvents[0].type === "tool_result") {
+        expect(toolResultEvents[0].durationMs).toBeGreaterThanOrEqual(0);
+        // Single tool call — no parallelGroup
+        expect(toolResultEvents[0].parallelGroup).toBeUndefined();
+      }
+    });
+
+    it("assigns parallelGroup when multiple tools run in parallel", async () => {
+      const fastTool = tool(async () => "ok", {
+        name: "fast_tool",
+        description: "Fast",
+        schema: z.object({}),
+      });
+
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [
+              { name: "fast_tool", args: {}, id: "tc_1" },
+              { name: "fast_tool", args: {}, id: "tc_2" },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [fastTool],
+        parallelToolCalls: true,
+      });
+
+      const result = await agent.loop("Parallel group");
+
+      const toolResultEvents = result.thread.events.filter(
+        (e) => e.type === "tool_result",
+      ) as import("../src/types.js").ToolResultEvent[];
+      expect(toolResultEvents.length).toBe(2);
+      expect(toolResultEvents[0].parallelGroup).toBeDefined();
+      expect(toolResultEvents[0].parallelGroup).toBe(toolResultEvents[1].parallelGroup);
+    });
+
+    it("does not parallelize HITL tool calls", async () => {
+      const safeTool = tool(async () => "ok", {
+        name: "safe_tool",
+        description: "Safe",
+        schema: z.object({}),
+      });
+
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            { name: "safe_tool", args: {}, id: "tc_safe" },
+            {
+              name: TOOL_NAME_REQUEST_HUMAN_INPUT,
+              args: { question: "Continue?" },
+              id: "tc_hitl",
+            },
+          ],
+        }),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [safeTool],
+        parallelToolCalls: true,
+      });
+
+      const result = await agent.loop("Mix parallel and HITL");
+      expect(isPendingResult(result)).toBe(true);
+
+      // safe_tool executed + synthetic HITL tool_result
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(toolResultEvents.length).toBe(2);
+      expect(String(toolResultEvents[0].result)).toBe("ok");
+      expect(String(toolResultEvents[1].result)).toContain("Waiting for human input");
+
+      // HITL event should be recorded
+      const hirEvents = result.thread.events.filter((e) => e.type === "human_input_requested");
+      expect(hirEvents.length).toBe(1);
+    });
+
+    it("does not parallelize interruptOn tool calls", async () => {
+      const safeTool = tool(async () => "safe_result", {
+        name: "safe_tool",
+        description: "Safe",
+        schema: z.object({}),
+      });
+      const dangerTool = tool(async () => "danger_result", {
+        name: "danger_tool",
+        description: "Dangerous",
+        schema: z.object({}),
+      });
+
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [
+              { name: "safe_tool", args: {}, id: "tc_safe" },
+              { name: "danger_tool", args: {}, id: "tc_danger" },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Waiting"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [safeTool, dangerTool],
+        parallelToolCalls: true,
+        interruptOn: ["danger_tool"],
+      });
+
+      const result = await agent.loop("Mix parallel and interrupt");
+      expect(isPendingResult(result)).toBe(true);
+
+      // safe_tool should have executed in parallel batch
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(toolResultEvents.length).toBe(2);
+      expect(String(toolResultEvents[0].result)).toBe("safe_result");
+      // danger_tool should have a synthetic interrupted result
+      expect(String(toolResultEvents[1].result)).toContain("not executed");
+    });
+
+    it("sequential path still records durationMs when parallelToolCalls is false", async () => {
+      const fastTool = tool(async () => "ok", {
+        name: "fast_tool",
+        description: "Fast",
+        schema: z.object({}),
+      });
+
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [{ name: "fast_tool", args: {}, id: "tc_1" }],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [fastTool],
+        parallelToolCalls: false,
+      });
+
+      const result = await agent.loop("Sequential timing");
+
+      const toolResultEvents = result.thread.events.filter(
+        (e) => e.type === "tool_result",
+      ) as import("../src/types.js").ToolResultEvent[];
+      expect(toolResultEvents.length).toBe(1);
+      expect(toolResultEvents[0].durationMs).toBeGreaterThanOrEqual(0);
+      expect(toolResultEvents[0].parallelGroup).toBeUndefined();
+    });
+
+    it("injects parallel batching hint into system prompt", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        instructions: "Be helpful.",
+        parallelToolCalls: true,
+      });
+
+      await agent.loop("Check system prompt");
+
+      const firstCall = mockModel.invoke.mock.calls[0];
+      const messages = firstCall[0] as Array<{ content: string }>;
+      const systemMessage = messages[0];
+      expect(systemMessage.content).toContain("batch them in a single response");
+    });
+  });
+
+  describe("HITL + interruptOn interaction", () => {
+    it("returns HITL PendingResult with model question when requestHumanInput is in interruptOn", async () => {
+      const mockModel = makeMockModel();
+      // Model calls requestHumanInput with a specific question
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("Let me ask", {
+          tool_calls: [
+            {
+              name: TOOL_NAME_REQUEST_HUMAN_INPUT,
+              args: {
+                question: "Which language?",
+                format: "multiple_choice",
+                choices: ["Python", "TypeScript"],
+              },
+              id: "tc_hitl",
+            },
+          ],
+        }),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [],
+        interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
+      });
+
+      const result = await agent.loop("Help me choose");
+      expect(isPendingResult(result)).toBe(true);
+      expect(result.stopReason).toBe("human_input_needed");
+      // Should get HITL detail, NOT the generic interruptOn detail
+      expect(result.stopDetail).toBe("Human input requested");
+
+      // Should have exactly ONE human_input_requested event (the HITL one, not interruptOn)
+      const hirEvents = result.thread.events.filter((e) => e.type === "human_input_requested");
+      expect(hirEvents.length).toBe(1);
+      if (hirEvents[0].type === "human_input_requested") {
+        expect(hirEvents[0].question).toBe("Which language?");
+      }
+
+      // Synthetic tool_result should exist for the HITL tool_call
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(toolResultEvents.length).toBe(1);
+      expect(String(toolResultEvents[0].result)).toContain("Waiting for human input");
+    });
+
+    it("HITL resume produces valid message sequence (tool_call has matching ToolMessage)", async () => {
+      const mockModel = makeMockModel();
+      // First call: model requests human input
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: TOOL_NAME_REQUEST_HUMAN_INPUT,
+              args: { question: "Pick a color" },
+              id: "tc_hitl_1",
+            },
+          ],
+        }),
+      );
+      // Second call (after resume): model responds normally
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Great, you picked blue!"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [],
+      });
+
+      const result = await agent.loop("Choose a color");
+      expect(isPendingResult(result)).toBe(true);
+
+      // Verify synthetic tool_result exists before resume
+      const toolResults = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(toolResults.length).toBe(1);
+      expect(toolResults[0].toolCallId).toBe("tc_hitl_1");
+
+      // Resume with human input — should not crash
+      const pendingResult = result as import("../src/types.js").PendingResult;
+      const resumed = await pendingResult.resume("blue");
+      expect(resumed.stopReason).toBe("completed");
+      expect(resumed.response).toBe("Great, you picked blue!");
+
+      // Verify the thread has human_input_received event
+      const hirEvents = resumed.thread.events.filter((e) => e.type === "human_input_received");
+      expect(hirEvents.length).toBe(1);
+    });
+
+    it("parallel HITL + interruptOn: returns model question, not generic message", async () => {
+      const safeTool = tool(async () => "safe_result", {
+        name: "safe_tool",
+        description: "Safe",
+        schema: z.object({}),
+      });
+
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            { name: "safe_tool", args: {}, id: "tc_safe" },
+            {
+              name: TOOL_NAME_REQUEST_HUMAN_INPUT,
+              args: { question: "Confirm deploy?", format: "yes_no" },
+              id: "tc_hitl",
+            },
+          ],
+        }),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        tools: [safeTool],
+        parallelToolCalls: true,
+        interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
+      });
+
+      const result = await agent.loop("Deploy and confirm");
+      expect(isPendingResult(result)).toBe(true);
+      expect(result.stopDetail).toBe("Human input requested");
+
+      // Model's actual question should be preserved
+      const hirEvents = result.thread.events.filter((e) => e.type === "human_input_requested");
+      expect(hirEvents.length).toBe(1);
+      if (hirEvents[0].type === "human_input_requested") {
+        expect(hirEvents[0].question).toBe("Confirm deploy?");
+      }
+
+      // safe_tool executed + synthetic HITL tool_result
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(toolResultEvents.length).toBe(2);
+      expect(String(toolResultEvents[0].result)).toBe("safe_result");
+      expect(String(toolResultEvents[1].result)).toContain("Waiting for human input");
+    });
+  });
 });

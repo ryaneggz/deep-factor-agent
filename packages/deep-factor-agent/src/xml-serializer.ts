@@ -60,9 +60,14 @@ export function serializeThreadToXml(events: AgentEvent[], options?: XmlSerializ
       }
       case "tool_result": {
         const toolName = toolNameMap.get(event.toolCallId) ?? "unknown";
-        lines.push(
-          `  <event type="tool_output" id="${id}" name="${escapeXml(toolName)}" status="success" iteration="${iteration}">${escapeXml(String(event.result))}</event>`,
-        );
+        let attrs = `type="tool_output" id="${id}" name="${escapeXml(toolName)}" status="success" iteration="${iteration}"`;
+        if (event.durationMs != null) {
+          attrs += ` duration_ms="${event.durationMs}"`;
+        }
+        if (event.parallelGroup) {
+          attrs += ` parallel_group="${escapeXml(event.parallelGroup)}"`;
+        }
+        lines.push(`  <event ${attrs}>${escapeXml(String(event.result))}</event>`);
         break;
       }
       case "error": {

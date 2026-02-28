@@ -319,6 +319,77 @@ describe("serializeThreadToXml", () => {
     expect(xml).toBe("<thread>\n</thread>\nStarting fresh");
   });
 
+  it("includes duration_ms attribute on tool_result when present", () => {
+    const events: AgentEvent[] = [
+      {
+        type: "tool_call",
+        toolName: "search",
+        toolCallId: "tc_1",
+        args: { query: "test" },
+        timestamp: 1000,
+        iteration: 1,
+      },
+      {
+        type: "tool_result",
+        toolCallId: "tc_1",
+        result: "found",
+        timestamp: 1001,
+        iteration: 1,
+        durationMs: 42,
+      },
+    ];
+    const xml = serializeThreadToXml(events);
+    expect(xml).toContain('duration_ms="42"');
+  });
+
+  it("includes parallel_group attribute on tool_result when present", () => {
+    const events: AgentEvent[] = [
+      {
+        type: "tool_call",
+        toolName: "search",
+        toolCallId: "tc_1",
+        args: {},
+        timestamp: 1000,
+        iteration: 1,
+      },
+      {
+        type: "tool_result",
+        toolCallId: "tc_1",
+        result: "ok",
+        timestamp: 1001,
+        iteration: 1,
+        durationMs: 10,
+        parallelGroup: "pg_1_0_1234",
+      },
+    ];
+    const xml = serializeThreadToXml(events);
+    expect(xml).toContain('duration_ms="10"');
+    expect(xml).toContain('parallel_group="pg_1_0_1234"');
+  });
+
+  it("omits duration_ms and parallel_group when not present", () => {
+    const events: AgentEvent[] = [
+      {
+        type: "tool_call",
+        toolName: "search",
+        toolCallId: "tc_1",
+        args: {},
+        timestamp: 1000,
+        iteration: 1,
+      },
+      {
+        type: "tool_result",
+        toolCallId: "tc_1",
+        result: "ok",
+        timestamp: 1001,
+        iteration: 1,
+      },
+    ];
+    const xml = serializeThreadToXml(events);
+    expect(xml).not.toContain("duration_ms");
+    expect(xml).not.toContain("parallel_group");
+  });
+
   it("produces valid XML structure", () => {
     const events: AgentEvent[] = [
       {

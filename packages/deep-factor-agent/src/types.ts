@@ -31,6 +31,10 @@ export interface ToolResultEvent extends BaseEvent {
   type: "tool_result";
   toolCallId: string;
   result: unknown;
+  /** Execution duration in milliseconds (recorded when timing is available). */
+  durationMs?: number;
+  /** Identifier grouping tool results that executed concurrently in the same parallel batch. */
+  parallelGroup?: string;
 }
 
 export interface ErrorEvent extends BaseEvent {
@@ -175,6 +179,8 @@ export interface DeepFactorAgentSettings<
   maxToolCallsPerIteration?: number;
   /** Context mode: "standard" converts events to individual LangChain messages; "xml" serializes the full thread into a single XML HumanMessage. Default: "standard". */
   contextMode?: "standard" | "xml";
+  /** When true, independent tool calls execute concurrently via Promise.all. HITL and interruptOn tools are excluded from parallel batches. Default: false. */
+  parallelToolCalls?: boolean;
   onIterationStart?: (iteration: number) => void;
   onIterationEnd?: (iteration: number, result: unknown) => void;
 }

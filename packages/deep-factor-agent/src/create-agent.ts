@@ -16,6 +16,7 @@ export function createDeepFactorAgent<
     middleware: settings.middleware ?? [todoMiddleware(), errorRecoveryMiddleware()],
     interruptOn: settings.interruptOn ?? [],
     contextMode: settings.contextMode ?? "standard",
+    parallelToolCalls: settings.parallelToolCalls ?? false,
     contextManagement: {
       maxContextTokens: 150000,
       keepRecentIterations: 3,

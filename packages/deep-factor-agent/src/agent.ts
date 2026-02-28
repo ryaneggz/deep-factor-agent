@@ -16,6 +16,7 @@ import { evaluateStopConditions } from "./stop-conditions.js";
 import { ContextManager } from "./context-manager.js";
 import { serializeThreadToXml } from "./xml-serializer.js";
 import { toolArrayToMap } from "./tool-adapter.js";
+import { performance } from "node:perf_hooks";
 import type {
   AgentThread,
   AgentResult,
@@ -142,6 +143,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
   private modelId: string;
   private maxToolCallsPerIteration: number;
   private contextMode: "standard" | "xml";
+  private parallelToolCalls: boolean;
 
   constructor(settings: DeepFactorAgentSettings<TTools>) {
     this.modelOrString = settings.model;
@@ -162,6 +164,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     this.onIterationEnd = settings.onIterationEnd;
     this.maxToolCallsPerIteration = settings.maxToolCallsPerIteration ?? 20;
     this.contextMode = settings.contextMode ?? "standard";
+    this.parallelToolCalls = settings.parallelToolCalls ?? false;
 
     // Normalize stopWhen
     if (!settings.stopWhen) {
@@ -197,8 +200,13 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
     // Build context injection from summaries
     const contextInjection = this.contextManager.buildContextInjection(thread);
-    if (this.instructions || contextInjection) {
-      const system = [contextInjection, this.instructions].filter(Boolean).join("\n\n");
+    const parallelHint = this.parallelToolCalls
+      ? "When multiple independent tool calls can satisfy the request, batch them in a single response so they execute concurrently."
+      : "";
+    if (this.instructions || contextInjection || parallelHint) {
+      const system = [contextInjection, this.instructions, parallelHint]
+        .filter(Boolean)
+        .join("\n\n");
       messages.push(new SystemMessage(system));
     }
 
@@ -266,8 +274,13 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
     // Build system prompt identically to standard mode
     const contextInjection = this.contextManager.buildContextInjection(thread);
-    if (this.instructions || contextInjection) {
-      const system = [contextInjection, this.instructions].filter(Boolean).join("\n\n");
+    const parallelHint = this.parallelToolCalls
+      ? "When multiple independent tool calls can satisfy the request, batch them in a single response so they execute concurrently."
+      : "";
+    if (this.instructions || contextInjection || parallelHint) {
+      const system = [contextInjection, this.instructions, parallelHint]
+        .filter(Boolean)
+        .join("\n\n");
       messages.push(new SystemMessage(system));
     }
 
@@ -402,115 +415,299 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
           // Record and execute tool calls
           const now = Date.now();
-          for (const tc of toolCalls) {
-            // Record tool call event
-            const toolCallEvent: ToolCallEvent = {
-              type: "tool_call",
-              toolName: tc.name,
-              toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
-              args: (tc.args ?? {}) as Record<string, unknown>,
-              timestamp: now,
-              iteration,
-            };
-            thread.events.push(toolCallEvent);
 
-            // Check for requestHumanInput
-            if (tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT) {
-              const args = (tc.args ?? {}) as Record<string, unknown>;
-              const hirEvent: HumanInputRequestedEvent = {
-                type: "human_input_requested",
-                question: (args.question as string) ?? "",
-                context: args.context as string | undefined,
-                urgency: args.urgency as "low" | "medium" | "high" | undefined,
-                format: args.format as "free_text" | "yes_no" | "multiple_choice" | undefined,
-                choices: args.choices as string[] | undefined,
+          if (this.parallelToolCalls && toolCalls.length > 0) {
+            // --- Parallel execution path ---
+            // Partition tool calls into parallel-safe and sequential (HITL / interruptOn)
+            const parallelBatch: typeof toolCalls = [];
+            const sequentialBatch: typeof toolCalls = [];
+            for (const tc of toolCalls) {
+              if (tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT || this.interruptOn.includes(tc.name)) {
+                sequentialBatch.push(tc);
+              } else {
+                parallelBatch.push(tc);
+              }
+            }
+
+            // Generate a parallelGroup ID for this batch
+            const groupId =
+              parallelBatch.length > 1 ? `pg_${iteration}_${stepCount}_${Date.now()}` : undefined;
+
+            // Record ToolCallEvents for parallel batch upfront
+            for (const tc of parallelBatch) {
+              const toolCallEvent: ToolCallEvent = {
+                type: "tool_call",
+                toolName: tc.name,
+                toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
+                args: (tc.args ?? {}) as Record<string, unknown>,
                 timestamp: now,
                 iteration,
               };
-              thread.events.push(hirEvent);
-              humanInputRequested = true;
-              // Don't execute the tool, just break
-              break;
+              thread.events.push(toolCallEvent);
             }
 
-            // Check interruptOn before executing
-            if (this.interruptOn.includes(tc.name)) {
-              // Push a synthetic tool_result so the message sequence stays valid
-              // (every AIMessage tool_call must have a matching ToolMessage)
-              const interruptedToolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
-              const interruptedResult = `[Tool "${tc.name}" not executed — interrupted for human approval]`;
+            // Execute parallel batch via Promise.all with per-tool timing
+            const parallelResults = await Promise.all(
+              parallelBatch.map(async (tc) => {
+                const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+                const foundTool = toolMap[tc.name];
+                const start = performance.now();
+                if (foundTool) {
+                  try {
+                    const toolResult = await foundTool.invoke(tc.args);
+                    const resultStr =
+                      typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
+                    const durationMs = Math.round(performance.now() - start);
+
+                    // Handle todoMiddleware special cases
+                    if (tc.name === TOOL_NAME_WRITE_TODOS) {
+                      try {
+                        const parsed = JSON.parse(resultStr);
+                        if (parsed.todos) {
+                          thread.metadata.todos = parsed.todos;
+                        }
+                      } catch (parseError) {
+                        console.warn(
+                          `[deep-factor-agent] Failed to parse write_todos result: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+                        );
+                      }
+                    }
+
+                    return { toolCallId, result: resultStr, durationMs, tc };
+                  } catch (err) {
+                    const durationMs = Math.round(performance.now() - start);
+                    const errorMsg = `Tool error: ${compactError(err)}`;
+                    return { toolCallId, result: errorMsg, durationMs, tc };
+                  }
+                } else {
+                  const durationMs = Math.round(performance.now() - start);
+                  const errorMsg = `Tool not found: "${tc.name}"`;
+                  return { toolCallId, result: errorMsg, durationMs, tc };
+                }
+              }),
+            );
+
+            // Record ToolResultEvents + push ToolMessages in original order
+            for (const pr of parallelResults) {
               const toolResultEvent: ToolResultEvent = {
                 type: "tool_result",
-                toolCallId: interruptedToolCallId,
-                result: interruptedResult,
-                timestamp: now,
+                toolCallId: pr.toolCallId,
+                result: pr.result,
+                timestamp: Date.now(),
                 iteration,
+                durationMs: pr.durationMs,
+                parallelGroup: groupId,
               };
               thread.events.push(toolResultEvent);
               messages.push(
                 new ToolMessage({
-                  tool_call_id: interruptedToolCallId,
-                  content: interruptedResult,
+                  tool_call_id: pr.toolCallId,
+                  content: pr.result,
                 }),
               );
-              continue;
             }
 
-            // Find and execute the tool (O(1) map lookup)
-            const foundTool = toolMap[tc.name];
-            if (foundTool) {
-              const toolResult = await foundTool.invoke(tc.args);
-              const resultStr =
-                typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
+            // Handle sequential tools (HITL / interruptOn) after parallel batch
+            for (const tc of sequentialBatch) {
+              const toolCallEvent: ToolCallEvent = {
+                type: "tool_call",
+                toolName: tc.name,
+                toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
+                args: (tc.args ?? {}) as Record<string, unknown>,
+                timestamp: Date.now(),
+                iteration,
+              };
+              thread.events.push(toolCallEvent);
 
-              // Handle todoMiddleware special cases
-              if (tc.name === TOOL_NAME_WRITE_TODOS) {
-                try {
-                  const parsed = JSON.parse(resultStr);
-                  if (parsed.todos) {
-                    thread.metadata.todos = parsed.todos;
-                  }
-                } catch (parseError) {
-                  console.warn(
-                    `[deep-factor-agent] Failed to parse write_todos result: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-                  );
-                }
+              if (tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT) {
+                const args = (tc.args ?? {}) as Record<string, unknown>;
+                const hirEvent: HumanInputRequestedEvent = {
+                  type: "human_input_requested",
+                  question: (args.question as string) ?? "",
+                  context: args.context as string | undefined,
+                  urgency: args.urgency as "low" | "medium" | "high" | undefined,
+                  format: args.format as "free_text" | "yes_no" | "multiple_choice" | undefined,
+                  choices: args.choices as string[] | undefined,
+                  timestamp: Date.now(),
+                  iteration,
+                };
+                thread.events.push(hirEvent);
+
+                // Add synthetic tool_result so every tool_call has a matching ToolMessage
+                const hitlToolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+                const hitlResult = `[Waiting for human input]`;
+                thread.events.push({
+                  type: "tool_result",
+                  toolCallId: hitlToolCallId,
+                  result: hitlResult,
+                  timestamp: Date.now(),
+                  iteration,
+                });
+                messages.push(
+                  new ToolMessage({
+                    tool_call_id: hitlToolCallId,
+                    content: hitlResult,
+                  }),
+                );
+
+                humanInputRequested = true;
+                break;
               }
 
-              // Record tool result event
-              const toolResultEvent: ToolResultEvent = {
-                type: "tool_result",
+              if (this.interruptOn.includes(tc.name)) {
+                const interruptedToolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+                const interruptedResult = `[Tool "${tc.name}" not executed — interrupted for human approval]`;
+                const toolResultEvent: ToolResultEvent = {
+                  type: "tool_result",
+                  toolCallId: interruptedToolCallId,
+                  result: interruptedResult,
+                  timestamp: Date.now(),
+                  iteration,
+                };
+                thread.events.push(toolResultEvent);
+                messages.push(
+                  new ToolMessage({
+                    tool_call_id: interruptedToolCallId,
+                    content: interruptedResult,
+                  }),
+                );
+                continue;
+              }
+            }
+          } else {
+            // --- Sequential execution path (original logic) ---
+            for (const tc of toolCalls) {
+              // Record tool call event
+              const toolCallEvent: ToolCallEvent = {
+                type: "tool_call",
+                toolName: tc.name,
                 toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
-                result: resultStr,
+                args: (tc.args ?? {}) as Record<string, unknown>,
                 timestamp: now,
                 iteration,
               };
-              thread.events.push(toolResultEvent);
+              thread.events.push(toolCallEvent);
 
-              messages.push(
-                new ToolMessage({
-                  tool_call_id: tc.id ?? `call_${stepCount}_${tc.name}`,
-                  content: resultStr,
-                }),
-              );
-            } else {
-              // Tool not found — record error to keep message sequence consistent
-              const errorMsg = `Tool not found: "${tc.name}"`;
-              const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
-              const toolResultEvent: ToolResultEvent = {
-                type: "tool_result",
-                toolCallId,
-                result: errorMsg,
-                timestamp: now,
-                iteration,
-              };
-              thread.events.push(toolResultEvent);
-              messages.push(
-                new ToolMessage({
-                  tool_call_id: toolCallId,
-                  content: errorMsg,
-                }),
-              );
+              // Check for requestHumanInput
+              if (tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT) {
+                const args = (tc.args ?? {}) as Record<string, unknown>;
+                const hirEvent: HumanInputRequestedEvent = {
+                  type: "human_input_requested",
+                  question: (args.question as string) ?? "",
+                  context: args.context as string | undefined,
+                  urgency: args.urgency as "low" | "medium" | "high" | undefined,
+                  format: args.format as "free_text" | "yes_no" | "multiple_choice" | undefined,
+                  choices: args.choices as string[] | undefined,
+                  timestamp: now,
+                  iteration,
+                };
+                thread.events.push(hirEvent);
+
+                // Add synthetic tool_result so every tool_call has a matching ToolMessage
+                const hitlToolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+                const hitlResult = `[Waiting for human input]`;
+                const hitlToolResultEvent: ToolResultEvent = {
+                  type: "tool_result",
+                  toolCallId: hitlToolCallId,
+                  result: hitlResult,
+                  timestamp: now,
+                  iteration,
+                };
+                thread.events.push(hitlToolResultEvent);
+                messages.push(
+                  new ToolMessage({
+                    tool_call_id: hitlToolCallId,
+                    content: hitlResult,
+                  }),
+                );
+
+                humanInputRequested = true;
+                // Don't execute the tool, just break
+                break;
+              }
+
+              // Check interruptOn before executing
+              if (this.interruptOn.includes(tc.name)) {
+                // Push a synthetic tool_result so the message sequence stays valid
+                // (every AIMessage tool_call must have a matching ToolMessage)
+                const interruptedToolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+                const interruptedResult = `[Tool "${tc.name}" not executed — interrupted for human approval]`;
+                const toolResultEvent: ToolResultEvent = {
+                  type: "tool_result",
+                  toolCallId: interruptedToolCallId,
+                  result: interruptedResult,
+                  timestamp: now,
+                  iteration,
+                };
+                thread.events.push(toolResultEvent);
+                messages.push(
+                  new ToolMessage({
+                    tool_call_id: interruptedToolCallId,
+                    content: interruptedResult,
+                  }),
+                );
+                continue;
+              }
+
+              // Find and execute the tool (O(1) map lookup)
+              const foundTool = toolMap[tc.name];
+              if (foundTool) {
+                const start = performance.now();
+                const toolResult = await foundTool.invoke(tc.args);
+                const durationMs = Math.round(performance.now() - start);
+                const resultStr =
+                  typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
+
+                // Handle todoMiddleware special cases
+                if (tc.name === TOOL_NAME_WRITE_TODOS) {
+                  try {
+                    const parsed = JSON.parse(resultStr);
+                    if (parsed.todos) {
+                      thread.metadata.todos = parsed.todos;
+                    }
+                  } catch (parseError) {
+                    console.warn(
+                      `[deep-factor-agent] Failed to parse write_todos result: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+                    );
+                  }
+                }
+
+                // Record tool result event
+                const toolResultEvent: ToolResultEvent = {
+                  type: "tool_result",
+                  toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
+                  result: resultStr,
+                  timestamp: now,
+                  iteration,
+                  durationMs,
+                };
+                thread.events.push(toolResultEvent);
+
+                messages.push(
+                  new ToolMessage({
+                    tool_call_id: tc.id ?? `call_${stepCount}_${tc.name}`,
+                    content: resultStr,
+                  }),
+                );
+              } else {
+                // Tool not found — record error to keep message sequence consistent
+                const errorMsg = `Tool not found: "${tc.name}"`;
+                const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+                const toolResultEvent: ToolResultEvent = {
+                  type: "tool_result",
+                  toolCallId,
+                  result: errorMsg,
+                  timestamp: now,
+                  iteration,
+                };
+                thread.events.push(toolResultEvent);
+                messages.push(
+                  new ToolMessage({
+                    tool_call_id: toolCallId,
+                    content: errorMsg,
+                  }),
+                );
+              }
             }
           }
 
@@ -566,6 +763,30 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
           };
         }
 
+        // Check human input request (must be checked BEFORE interruptOn so
+        // the model's actual question/choices take priority over the generic
+        // interruptOn message when requestHumanInput is in the interruptOn list)
+        if (humanInputRequested) {
+          const pendingResult: PendingResult = {
+            response: lastResponse,
+            thread,
+            usage: totalUsage,
+            iterations: iteration,
+            stopReason: "human_input_needed",
+            stopDetail: "Human input requested",
+            resume: async (humanResponse: string) => {
+              thread.events.push({
+                type: "human_input_received",
+                response: humanResponse,
+                timestamp: Date.now(),
+                iteration,
+              });
+              return this.runLoop(thread, prompt, iteration + 1);
+            },
+          };
+          return pendingResult;
+        }
+
         // Check interruptOn
         const interruptedTool = this.checkInterruptOn(thread, iteration);
         if (interruptedTool) {
@@ -583,28 +804,6 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
             iterations: iteration,
             stopReason: "human_input_needed",
             stopDetail: `Interrupted: tool "${interruptedTool}" requires approval`,
-            resume: async (humanResponse: string) => {
-              thread.events.push({
-                type: "human_input_received",
-                response: humanResponse,
-                timestamp: Date.now(),
-                iteration,
-              });
-              return this.runLoop(thread, prompt, iteration + 1);
-            },
-          };
-          return pendingResult;
-        }
-
-        // Check human input request
-        if (humanInputRequested) {
-          const pendingResult: PendingResult = {
-            response: lastResponse,
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            stopReason: "human_input_needed",
-            stopDetail: "Human input requested",
             resume: async (humanResponse: string) => {
               thread.events.push({
                 type: "human_input_received",
