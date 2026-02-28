@@ -26,7 +26,7 @@ export function StatusBar({ usage, iterations, status }: StatusBarProps) {
 
   return (
     <Box flexDirection="column">
-      <Text dimColor>{"─".repeat(50)}</Text>
+      <Text dimColor>{"─".repeat(process.stdout.columns || 50)}</Text>
       <Text>
         {"Tokens: "}
         {fmt(usage.inputTokens)} in / {fmt(usage.outputTokens)} out (

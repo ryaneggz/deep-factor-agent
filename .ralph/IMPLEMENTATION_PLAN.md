@@ -1,31 +1,32 @@
-# Implementation Plan — Phase 0015
+# Implementation Plan — Phase 0016
 
 **Generated:** 2026-02-27
 **Branch:** `ryaneggz/4-parallel-tool-calling`
-**Baseline:** 295 tests passing (178 agent, 117 CLI), type-check clean
+**Baseline:** 301 tests passing (182 agent, 119 CLI), type-check clean
 
 ## Status: COMPLETE
 
-## Primary Deliverables: P3.4 — Multi-turn CLI memory + P3.1 — assistantPrefill rename
+## Primary Deliverables: P4.2 — Async bash tool + P4.7 — Terminal-width StatusBar separator
 
 ---
 
-### P0 — Deliverable (Phase 0015) — DONE
+### P0 — Deliverable (Phase 0016) — DONE
 
-- [x] P3.4 — CLI `useAgent` creates new agent per prompt (no multi-turn memory) — `packages/deep-factor-cli/src/hooks/useAgent.ts`
-  - Root cause: Each `sendPrompt()` call created a fresh `DeepFactorAgent` and `AgentThread`. Cross-prompt context was lost because the thread (which is the single source of truth for conversation history) was discarded between calls.
-  - Fix: Added `continueLoop(thread, prompt)` public method to `DeepFactorAgent` (`packages/deep-factor-agent/src/agent.ts`) that reuses an existing thread, computes the next iteration from the thread's max iteration, and pushes the new user message before entering `runLoop()`. Updated `useAgent` hook to persist the thread in a `useRef` across calls. On the first `sendPrompt()`, `loop()` is used (creates fresh thread). On subsequent calls, `continueLoop(threadRef.current, prompt)` is used, so the model sees full conversation history. Usage is now accumulated across turns via `addUsage()`.
-  - Why: The CLI's interactive mode was functionally broken for multi-turn conversations — each prompt was treated as an independent session with no memory. `buildMessages()` already reconstructs the full LangChain message sequence from `thread.events`, so reusing the thread is all that's needed for multi-turn context.
-  - Tests: 4 new agent tests in `__tests__/agent.test.ts` — thread reuse, iteration continuation, full history visibility, per-turn usage independence. 2 new CLI hook tests in `__tests__/hooks/useAgent.test.tsx` — `loop()` vs `continueLoop()` dispatch and usage accumulation.
+- [x] P4.2 — `bash` tool uses synchronous `execSync` (blocks event loop) — `packages/deep-factor-cli/src/tools/bash.ts`
+  - Root cause: `execSync` from `node:child_process` blocks the entire Node.js event loop for up to 30 seconds while the subprocess runs. Ink's React render loop, timers, I/O callbacks, and other promises all freeze — the terminal UI appears stuck/unresponsive during bash command execution.
+  - Fix: Replaced `execSync` with async `exec` (callback-based `node:child_process.exec` wrapped in a manual Promise via `execAsync` helper). Same options preserved (`encoding: 'utf8'`, `timeout: 30_000`, `maxBuffer: 1MB`). Error propagation unchanged — exec errors (non-zero exit, timeout, maxBuffer exceeded) reject the promise with the same error objects.
+  - Why: The CLI's bash tool is the only tool that runs external processes. Blocking the event loop prevents Ink from rendering spinner updates, status bar changes, or handling user input (Ctrl+C). With async exec, the UI remains responsive while commands run.
+  - Tests: Updated all 14 existing tests to mock `node:child_process.exec` (callback-based) instead of `execSync`. Added 1 new test verifying async execution (deferred callback via `Promise.resolve().then()`). Total: 15 bash tests.
 
-- [x] P3.1 — `XmlSerializerOptions.responsePrefix` naming is misleading — `packages/deep-factor-agent/src/xml-serializer.ts`
-  - Fix: Renamed `responsePrefix` to `assistantPrefill` in the interface, function body (both code paths), and both test cases. Updated JSDoc to say "assistant prefill nudge" instead of "response prefix / nudge".
-  - Why: `responsePrefix` implied a prefix of the model's response, but the field is appended after the closing `</thread>` tag as a prefill nudge for the assistant turn. `assistantPrefill` accurately describes its purpose.
+- [x] P4.7 — StatusBar separator not terminal-width-aware — `packages/deep-factor-cli/src/components/StatusBar.tsx`
+  - Fix: Changed `"─".repeat(50)` to `"─".repeat(process.stdout.columns || 50)`. Falls back to 50 when `process.stdout.columns` is unavailable (piped output, non-TTY).
+  - Why: The hardcoded 50-char separator looked wrong on terminals wider or narrower than 50 columns.
+  - Tests: Added 2 new tests — one verifying the separator uses terminal width (80 cols), one verifying fallback to 50 when columns is undefined. Total: 5 StatusBar tests.
 
 ### P1 — Validation — DONE
 
 - [x] Type-check passes — `pnpm -r type-check`
-- [x] All 301 tests pass — `pnpm -r test` (182 agent, 119 CLI)
+- [x] All 304 tests pass — `pnpm -r test` (182 agent, 122 CLI)
 
 ---
 
@@ -39,12 +40,10 @@
 ### P4 — Deferred / Low Priority (Backlog)
 
 - [ ] P4.1 — Full streaming agent loop (implement `stream()` as full agentic loop)
-- [ ] P4.2 — `bash` tool uses synchronous `execSync` (blocks event loop) — `packages/deep-factor-cli/src/tools/bash.ts`
 - [ ] P4.3 — `zod` is peer-only but required at runtime — `packages/deep-factor-agent/package.json`
 - [ ] P4.4 — `@langchain/openai` is unconditional runtime dependency — `packages/deep-factor-agent/package.json`
 - [ ] P4.5 — Model pricing table may be stale (missing newer model IDs) — `packages/deep-factor-agent/src/stop-conditions.ts`
 - [ ] P4.6 — No CI coverage integration or thresholds
-- [ ] P4.7 — StatusBar separator not terminal-width-aware — `packages/deep-factor-cli/src/components/StatusBar.tsx`
 - [ ] P4.8 — CLI `HumanInput` has no Ctrl+C/escape cancel — `packages/deep-factor-cli/src/components/HumanInput.tsx`
 
 ---
@@ -66,3 +65,4 @@
 - [x] Phase 0013: Quality fixes P3.2, P3.3, P3.6, P3.7 + 1 new test (287 → 288 tests)
 - [x] Phase 0014: P3.5 — Extract shared useTextInput hook + fix stale-closure bug + 7 new tests (288 → 295 tests)
 - [x] Phase 0015: P3.4 — Multi-turn CLI memory + P3.1 — assistantPrefill rename + 6 new tests (295 → 301 tests)
+- [x] Phase 0016: P4.2 — Async bash tool + P4.7 — Terminal-width StatusBar separator + 3 new tests (301 → 304 tests)
