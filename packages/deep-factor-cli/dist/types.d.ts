@@ -12,7 +12,6 @@ export interface UseAgentOptions {
     model: string;
     maxIter: number;
     tools?: AgentTools;
-    verbose?: boolean;
 }
 export interface UseAgentReturn {
     messages: ChatMessage[];

@@ -2,17 +2,20 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useRef } from "react";
 import { Box, Text, useApp } from "ink";
 import { useAgent } from "./hooks/useAgent.js";
+import { useAgentContext } from "./testing/agent-context.js";
 import { Chat } from "./components/Chat.js";
 import { Spinner } from "./components/Spinner.js";
 import { HumanInput } from "./components/HumanInput.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { PromptInput } from "./components/PromptInput.js";
 import { bashTool } from "./tools/bash.js";
-export function App({ prompt, model, maxIter, verbose, enableBash, interactive, }) {
+export function App({ prompt, model, maxIter, verbose, enableBash, interactive }) {
     const { exit } = useApp();
     const hasRun = useRef(false);
     const tools = enableBash ? [bashTool] : [];
-    const { messages, status, usage, iterations, error, sendPrompt, submitHumanInput, humanInputRequest, } = useAgent({ model, maxIter, tools, verbose });
+    const agentFromContext = useAgentContext();
+    const agentFromHook = useAgent({ model, maxIter, tools });
+    const { messages, status, usage, iterations, error, sendPrompt, submitHumanInput, humanInputRequest, } = agentFromContext ?? agentFromHook;
     // Single-prompt mode: run on mount
     useEffect(() => {
         if (prompt && !hasRun.current) {

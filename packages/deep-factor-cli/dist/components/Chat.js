@@ -16,9 +16,7 @@ export function Chat({ messages, verbose }) {
                 case "tool_call":
                     return (_jsx(Box, { children: _jsx(ToolCall, { toolName: item.toolName ?? "unknown", args: item.toolArgs ?? {} }) }, item.key));
                 case "tool_result":
-                    return (_jsx(Box, { children: _jsx(Text, { color: "cyan", children: item.content.length > 200
-                                ? item.content.slice(0, 200) + "..."
-                                : item.content }) }, item.key));
+                    return (_jsx(Box, { children: _jsx(Text, { color: "cyan", children: item.content.length > 200 ? item.content.slice(0, 200) + "..." : item.content }) }, item.key));
                 default:
                     return null;
             }

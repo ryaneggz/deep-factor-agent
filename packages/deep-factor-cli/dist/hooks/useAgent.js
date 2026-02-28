@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { createDeepFactorAgent, requestHumanInput, TOOL_NAME_REQUEST_HUMAN_INPUT, maxIterations, isPendingResult, } from "deep-factor-agent";
+import { createDeepFactorAgent, requestHumanInput, TOOL_NAME_REQUEST_HUMAN_INPUT, maxIterations, isPendingResult, addUsage, } from "deep-factor-agent";
 export function eventsToChatMessages(events) {
     const messages = [];
     for (const event of events) {
@@ -39,10 +39,12 @@ export function useAgent(options) {
     const [error, setError] = useState(null);
     const [humanInputRequest, setHumanInputRequest] = useState(null);
     const pendingRef = useRef(null);
+    const threadRef = useRef(null);
     const handleResult = useCallback((result) => {
+        threadRef.current = result.thread;
         const newMessages = eventsToChatMessages(result.thread.events);
         setMessages(newMessages);
-        setUsage(result.usage);
+        setUsage((prev) => addUsage(prev, result.usage));
         setIterations(result.iterations);
         if (isPendingResult(result)) {
             pendingRef.current = result;
@@ -70,17 +72,20 @@ export function useAgent(options) {
         setError(null);
         setHumanInputRequest(null);
         pendingRef.current = null;
-        const tools = [
-            ...(options.tools ?? []),
-            requestHumanInput,
-        ];
+        const tools = [...(options.tools ?? []), requestHumanInput];
         const agent = createDeepFactorAgent({
             model: options.model,
             tools,
             stopWhen: [maxIterations(options.maxIter)],
             interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
         });
-        agent.loop(prompt).then(handleResult).catch(handleError);
+        const existingThread = threadRef.current;
+        if (existingThread) {
+            agent.continueLoop(existingThread, prompt).then(handleResult).catch(handleError);
+        }
+        else {
+            agent.loop(prompt).then(handleResult).catch(handleError);
+        }
     }, [options.model, options.maxIter, options.tools, handleResult, handleError]);
     const submitHumanInput = useCallback((response) => {
         const pending = pendingRef.current;
