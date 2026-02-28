@@ -13,6 +13,7 @@ progress.txt
 
 # Claude
 **/.env*
+**/dist/
 
 # Defensive patterns
 **/node_modules/
