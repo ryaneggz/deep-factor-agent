@@ -18,14 +18,19 @@
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:backpressure": "vitest run --testPathPattern=tui/backpressure",
     "type-check": "tsc --noEmit",
     "coverage": "vitest run --coverage",
-    "link": "npm i && npm run build && npm link"
+    "link": "npm i && npm run build && npm link",
+    "tui:dev": "tsx scripts/tui-dev.tsx"
   },
   "dependencies": {
     "deep-factor-agent": "workspace:*",
     "dotenv": "^16.6.1",
+    "fullscreen-ink": "^0.1.0",
     "ink": "^6.8.0",
+    "ink-select-input": "^6.0.0",
+    "ink-spinner": "^5.0.0",
     "meow": "^13.2.0",
     "react": "^19.0.0",
     "zod": "^4.0.0"
@@ -35,6 +40,7 @@
     "@types/react": "^19.0.0",
     "@vitest/coverage-v8": "^4.0.18",
     "ink-testing-library": "^4.0.0",
+    "tsx": "^4.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
