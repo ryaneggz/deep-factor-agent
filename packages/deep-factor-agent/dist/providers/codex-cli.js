@@ -53,10 +53,7 @@ export function createCodexCliProvider(opts) {
                     prompt += `[Available Tools]\n${JSON.stringify(toolDefs, null, 2)}\n\n${TOOL_CALL_FORMAT}\n\n`;
                 }
                 // Serialize messages using the configured encoding
-                prompt +=
-                    inputEncoding === "xml"
-                        ? messagesToXml(messages)
-                        : messagesToPrompt(messages);
+                prompt += inputEncoding === "xml" ? messagesToXml(messages) : messagesToPrompt(messages);
                 const args = ["exec", prompt, "--full-auto", "--sandbox", "read-only"];
                 if (model) {
                     args.push("--model", model);
@@ -69,9 +66,7 @@ export function createCodexCliProvider(opts) {
                 const toolCalls = parseToolCalls(text);
                 if (toolCalls.length > 0) {
                     // Extract any text outside the JSON block as content
-                    const contentOutsideJson = text
-                        .replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "")
-                        .trim();
+                    const contentOutsideJson = text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
                     return new AIMessage({
                         content: contentOutsideJson || "",
                         tool_calls: toolCalls,

@@ -7,7 +7,7 @@ export { ContextManager, estimateTokens } from "./context-manager.js";
 export { DeepFactorAgent, addUsage } from "./agent.js";
 export { createDeepFactorAgent } from "./create-agent.js";
 export { requestHumanInput, requestHumanInputSchema, TOOL_NAME_REQUEST_HUMAN_INPUT, } from "./human-in-the-loop.js";
-export { createLangChainTool, toolArrayToMap, findToolByName, } from "./tool-adapter.js";
+export { createLangChainTool, toolArrayToMap, findToolByName } from "./tool-adapter.js";
 export { serializeThreadToXml, escapeXml } from "./xml-serializer.js";
 export type { XmlSerializerOptions } from "./xml-serializer.js";
 export type { ModelAdapter } from "./providers/types.js";

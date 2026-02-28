@@ -73,7 +73,7 @@ huntley.archive:         ## Archive current phase (.ralph/archive.sh)
 
 # Run the Ralph autonomous agent loop using Claude Code
 snarktank.ralph:
-	./ralph.sh --tool claude $(MAX_ITERATIONS)
+	.ralph/ralph.sh --tool claude $(MAX_ITERATIONS)
 
 # Archive current prd.json and progress.txt into dated directory
 snarktank.archive:

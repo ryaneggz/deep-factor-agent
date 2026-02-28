@@ -14,11 +14,7 @@ export function writeTestLog(suiteLog, options) {
         .replace(/[^a-zA-Z0-9_-]/g, "-")
         .replace(/-+/g, "-")
         .toLowerCase();
-    const timestamp = new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")
-        .replace("T", "_")
-        .slice(0, 19);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
     const fileName = `agent-${timestamp}-${sanitizedSuite}.json`;
     const filePath = join(logDir, fileName);
     writeFileSync(filePath, JSON.stringify(suiteLog, null, 2) + "\n", "utf8");
