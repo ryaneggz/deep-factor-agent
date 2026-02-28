@@ -1,0 +1,41 @@
+{
+  "name": "deep-factor-tui",
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "deep-factor-tui": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc && node scripts/postbuild.js",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "deep-factor-agent": "workspace:*",
+    "dotenv": "^16.6.1",
+    "fullscreen-ink": "^0.1.0",
+    "ink": "^6.8.0",
+    "meow": "^13.2.0",
+    "react": "^19.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/react": "^19.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

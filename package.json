@@ -21,6 +21,10 @@
     ]
   },
   "pnpm": {
+    "overrides": {
+      "fullscreen-ink>ink": "^6.8.0",
+      "fullscreen-ink>react": "^19.0.0"
+    },
     "peerDependencyRules": {
       "allowedVersions": {
         "ink-testing-library>react": "19",
