@@ -17,3 +17,12 @@ progress.txt
 # Defensive patterns
 **/node_modules/
 **/.next/
+
+**/.env*
+**/node_modules/
+**/.next/
+packages/*/.env
+coverage/
+*.tsbuildinfo
+logs/
+archive/
