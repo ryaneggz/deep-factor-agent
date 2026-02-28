@@ -1,5 +1,6 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { StructuredToolInterface } from "@langchain/core/tools";
+import type { ModelAdapter } from "./providers/types.js";
 
 // --- Event Types ---
 
@@ -154,10 +155,7 @@ export interface AgentMiddleware {
   name: string;
   tools?: StructuredToolInterface[];
   beforeIteration?: (ctx: MiddlewareContext) => Promise<void>;
-  afterIteration?: (
-    ctx: MiddlewareContext,
-    result: unknown,
-  ) => Promise<void>;
+  afterIteration?: (ctx: MiddlewareContext, result: unknown) => Promise<void>;
 }
 
 // --- Agent Settings ---
@@ -165,7 +163,7 @@ export interface AgentMiddleware {
 export interface DeepFactorAgentSettings<
   TTools extends StructuredToolInterface[] = StructuredToolInterface[],
 > {
-  model: BaseChatModel | string;
+  model: BaseChatModel | ModelAdapter | string;
   tools?: TTools;
   instructions?: string;
   stopWhen?: StopCondition | StopCondition[];
@@ -202,8 +200,6 @@ export interface PendingResult {
   resume: (humanResponse: string) => Promise<AgentResult | PendingResult>;
 }
 
-export function isPendingResult(
-  r: AgentResult | PendingResult,
-): r is PendingResult {
+export function isPendingResult(r: AgentResult | PendingResult): r is PendingResult {
   return r.stopReason === "human_input_needed";
 }

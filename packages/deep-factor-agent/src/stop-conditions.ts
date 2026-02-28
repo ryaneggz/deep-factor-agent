@@ -87,16 +87,12 @@ export function calculateCost(usage: TokenUsage, model: string): number {
     return 0;
   }
 
-  let cost =
-    usage.inputTokens * pricing.input + usage.outputTokens * pricing.output;
+  let cost = usage.inputTokens * pricing.input + usage.outputTokens * pricing.output;
 
   if (usage.cacheReadTokens !== undefined && pricing.cacheRead !== undefined) {
     cost += usage.cacheReadTokens * pricing.cacheRead;
   }
-  if (
-    usage.cacheWriteTokens !== undefined &&
-    pricing.cacheWrite !== undefined
-  ) {
+  if (usage.cacheWriteTokens !== undefined && pricing.cacheWrite !== undefined) {
     cost += usage.cacheWriteTokens * pricing.cacheWrite;
   }
 

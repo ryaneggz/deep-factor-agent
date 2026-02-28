@@ -1,0 +1,40 @@
+{
+  "suite": "thread-retention",
+  "timestamp": "2026-02-28T04:55:32.783Z",
+  "passed": 6,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "buildMessages produces AIMessage with tool_calls and ToolMessage for tool events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "buildMessages produces HumanMessage with error text for error events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "XML HumanMessage contains all event types from prior iterations",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "model receives prior tool calls on iteration 2",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "model receives prior tool events as XML on iteration 2",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "both modes preserve the same tool interaction data",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

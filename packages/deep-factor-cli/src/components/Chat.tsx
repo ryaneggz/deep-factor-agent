@@ -13,9 +13,7 @@ export function Chat({ messages, verbose }: ChatProps) {
 
   const visibleMessages = verbose
     ? messages
-    : messages.filter(
-        (m) => m.role === "user" || m.role === "assistant",
-      );
+    : messages.filter((m) => m.role === "user" || m.role === "assistant");
 
   return (
     <Static items={visibleMessages.map((m, i) => ({ ...m, key: i }))}>
@@ -36,19 +34,14 @@ export function Chat({ messages, verbose }: ChatProps) {
           case "tool_call":
             return (
               <Box key={item.key}>
-                <ToolCall
-                  toolName={item.toolName ?? "unknown"}
-                  args={item.toolArgs ?? {}}
-                />
+                <ToolCall toolName={item.toolName ?? "unknown"} args={item.toolArgs ?? {}} />
               </Box>
             );
           case "tool_result":
             return (
               <Box key={item.key}>
                 <Text color="cyan">
-                  {item.content.length > 200
-                    ? item.content.slice(0, 200) + "..."
-                    : item.content}
+                  {item.content.length > 200 ? item.content.slice(0, 200) + "..." : item.content}
                 </Text>
               </Box>
             );

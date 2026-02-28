@@ -5,16 +5,19 @@ Runnable TypeScript examples demonstrating the deep-factor-agent library.
 ## Prerequisites
 
 1. Build the library first (from repo root):
+
    ```bash
    make build
    ```
 
 2. Install dev dependencies (if not already):
+
    ```bash
    make install
    ```
 
 3. Create a `.env` file in the package directory (copy from `.env.example`):
+
    ```bash
    cp packages/deep-factor-agent/.env.example packages/deep-factor-agent/.env
    ```
@@ -69,6 +72,10 @@ npx tsx examples/12-hitl-multiple-choice.ts
 
 # Parallel tool calling with HITL (interactive)
 npx tsx examples/13-parallel-tool-calls.ts
+
+# Claude/Codex CLI delegation (non-interactive, requires claude/codex CLI)
+npx tsx examples/14-claude-codex-delegation.ts
+npx tsx examples/14-claude-codex-delegation.ts --provider codex
 ```
 
 ## Configuration
@@ -81,24 +88,26 @@ ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 Supported models include any model supported by LangChain's `initChatModel`:
+
 - `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-5` (Anthropic)
 - `gpt-4.1`, `gpt-4.1-mini` (OpenAI)
 - `gemini-2.5-pro`, `gemini-2.5-flash` (Google)
 
 ## Example Overview
 
-| # | File | Feature |
-|---|------|---------|
-| 01 | `01-basic.ts` | Minimal agent: model + prompt, no tools |
-| 02 | `02-tools.ts` | Agent with LangChain tools (calculator, weather) |
-| 03 | `03-streaming.ts` | Real-time streaming via `agent.stream()` |
-| 04 | `04-stop-conditions.ts` | Stop conditions (maxIterations, maxCost, maxTokens) |
-| 05 | `05-middleware.ts` | Custom middleware (logging, timing, tool-providing) |
-| 06 | `06-human-in-the-loop.ts` | Pause/resume with simulated human input |
-| 07 | `07-verification.ts` | Verification with structural checks and self-correction |
-| 08 | `08-xml-context-mode.ts` | XML thread serialization vs standard context mode |
-| 09 | `09-thread-inspection.ts` | Thread retention, event inspection, XML export |
-| 10 | `10-xml-multi-turn-stream.ts` | Interactive multi-turn chat with streamed responses and XML thread |
-| 11 | `11-xml-tools-stream.ts` | Multi-turn streaming chat with bash tool, tool calls shown inline |
-| 12 | `12-hitl-multiple-choice.ts` | Interactive HITL with multiple-choice prompts, bash tool, streaming |
-| 13 | `13-parallel-tool-calls.ts` | Parallel tool execution with Promise.all, timing display, HITL sequential |
+| #   | File                            | Feature                                                                   |
+| --- | ------------------------------- | ------------------------------------------------------------------------- |
+| 01  | `01-basic.ts`                   | Minimal agent: model + prompt, no tools                                   |
+| 02  | `02-tools.ts`                   | Agent with LangChain tools (calculator, weather)                          |
+| 03  | `03-streaming.ts`               | Real-time streaming via `agent.stream()`                                  |
+| 04  | `04-stop-conditions.ts`         | Stop conditions (maxIterations, maxCost, maxTokens)                       |
+| 05  | `05-middleware.ts`              | Custom middleware (logging, timing, tool-providing)                       |
+| 06  | `06-human-in-the-loop.ts`       | Pause/resume with simulated human input                                   |
+| 07  | `07-verification.ts`            | Verification with structural checks and self-correction                   |
+| 08  | `08-xml-context-mode.ts`        | XML thread serialization vs standard context mode                         |
+| 09  | `09-thread-inspection.ts`       | Thread retention, event inspection, XML export                            |
+| 10  | `10-xml-multi-turn-stream.ts`   | Interactive multi-turn chat with streamed responses and XML thread        |
+| 11  | `11-xml-tools-stream.ts`        | Multi-turn streaming chat with bash tool, tool calls shown inline         |
+| 12  | `12-hitl-multiple-choice.ts`    | Interactive HITL with multiple-choice prompts, bash tool, streaming       |
+| 13  | `13-parallel-tool-calls.ts`     | Parallel tool execution with Promise.all, timing display, HITL sequential |
+| 14  | `14-claude-codex-delegation.ts` | CLI provider delegation via ModelAdapter (Claude CLI or Codex CLI)        |

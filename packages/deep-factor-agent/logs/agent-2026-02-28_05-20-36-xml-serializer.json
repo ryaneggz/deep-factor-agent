@@ -1,0 +1,145 @@
+{
+  "suite": "xml-serializer",
+  "timestamp": "2026-02-28T05:20:36.482Z",
+  "passed": 27,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "escapes ampersand",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes less-than",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes greater-than",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes double quotes",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes single quotes",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes all special characters in a single string",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "leaves plain text unchanged",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles empty string",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns empty thread for no events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes user message as human type",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes assistant message as ai type",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes system message as system type",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes tool_call as tool_input",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes tool_result as tool_output with name resolved from tool_call",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "falls back to unknown when tool_call not found for tool_result",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes error events with recoverable attribute",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes non-recoverable errors",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes human_input_requested events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes human_input_received events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes completion events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes summary events with summarizedIterations",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes content in event bodies",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes attribute values",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "assigns sequential ids",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "appends assistantPrefill after closing tag",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "appends assistantPrefill to empty thread",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "produces valid XML structure",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "suite": "messages-to-xml",
+  "timestamp": "2026-02-28T05:20:08.095Z",
+  "passed": 13,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "serializes system/human/ai/tool messages to XML",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "resolves tool names from AIMessage.tool_calls map",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "falls back to 'unknown' for unresolvable tool names",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "escapes XML special characters",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "passes through pre-serialized XML (content starts with <thread>)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "sets iteration='0' for all events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "serializes system/human/ai/tool messages to labeled text",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "separates messages with double newlines",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "extracts tool calls from a JSON code block",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns empty array when no JSON block present",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns empty array for malformed JSON",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "assigns default ids when missing",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles multiple tool calls",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

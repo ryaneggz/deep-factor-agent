@@ -2,13 +2,13 @@
 
 ## Context
 
-GitHub Issue #4 requests **Example 13 — Parallel Tool Calling**: when the model returns multiple `tool_calls` in a single response, execute them concurrently with `Promise.all` instead of the current sequential `for...of await` pattern. The `.ralph/specs/` directory is empty (only `.gitkeep`), and the branch `ryaneggz/4-parallel-tool-calling` needs a spec to drive implementation.
+GitHub Issue #4 requests **Example 13 — Parallel Tool Calling**: when the model returns multiple `tool_calls` in a single response, execute them concurrently with `Promise.all` instead of the current sequential `for...of await` pattern. The `.huntley/specs/` directory is empty (only `.gitkeep`), and the branch `ryaneggz/4-parallel-tool-calling` needs a spec to drive implementation.
 
 ## Action
 
 Create a single spec file following the established `SPEC-NN` format (matching the structure of `SPEC-01-hitl-multiple-choice-example.md` from archive phase 0009):
 
-### File: `.ralph/specs/SPEC-02-parallel-tool-calling.md`
+### File: `.huntley/specs/SPEC-02-parallel-tool-calling.md`
 
 Sections and content:
 
@@ -57,6 +57,6 @@ const sequentialTime = results.reduce((sum, r) => sum + r.duration, 0);
 ## Verification
 
 After generating the spec:
-- Confirm it matches the format of `.ralph/archive/0009-legion-laptop/specs/SPEC-01-hitl-multiple-choice-example.md`
+- Confirm it matches the format of `.huntley/archive/0009-legion-laptop/specs/SPEC-01-hitl-multiple-choice-example.md`
 - Confirm all 7 acceptance criteria from GitHub issue #4 are covered
 - Confirm derives-from references point to correct files and line ranges

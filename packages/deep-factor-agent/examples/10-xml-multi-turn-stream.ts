@@ -95,10 +95,7 @@ async function main() {
     const xml = serializeThreadToXml(thread.events);
 
     // 3. Build messages: system prompt + XML thread as context
-    const messages = [
-      new SystemMessage(instructions),
-      new HumanMessage(xml),
-    ];
+    const messages = [new SystemMessage(instructions), new HumanMessage(xml)];
 
     // 4. Stream the model response
     process.stdout.write("\nAssistant: ");
@@ -148,10 +145,7 @@ function printSummary(thread: AgentThread, turn: number) {
   console.log("\n--- Final Thread Summary ---");
   console.log("Total turns:", turn);
   console.log("Total events:", thread.events.length);
-  console.log(
-    "Event types:",
-    thread.events.map((e) => e.type).join(", "),
-  );
+  console.log("Event types:", thread.events.map((e) => e.type).join(", "));
 }
 
 main().catch(console.error);

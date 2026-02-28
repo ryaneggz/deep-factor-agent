@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  serializeThreadToXml,
-  escapeXml,
-} from "../src/xml-serializer.js";
+import { serializeThreadToXml, escapeXml } from "../src/xml-serializer.js";
 import type { AgentEvent } from "../src/types.js";
 
 describe("escapeXml", () => {

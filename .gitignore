@@ -1,7 +1,19 @@
-node_modules/
-dist/
-.env
-packages/*/.env
-coverage/
-*.tsbuildinfo
-.ralph/logs/
+# Ralph working files (generated during runs)
+prd.json
+.ralph/prd.json
+progress.txt
+.ralph/progress.txt
+.ralph/.last-branch
+
+# Archives
+.ralph/archives/
+
+# OS files
+.DS_Store
+
+# Claude
+**/.env*
+
+# Defensive patterns
+**/node_modules/
+**/.next/

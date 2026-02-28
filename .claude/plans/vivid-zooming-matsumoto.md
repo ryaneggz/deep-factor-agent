@@ -1,6 +1,6 @@
 # Manual Testing Queries for IMPLEMENTATION_PLAN.md
 
-**Context:** This document enumerates the exact commands, scripts, and interactive prompts needed to manually verify every item in `.ralph/IMPLEMENTATION_PLAN.md` — both completed (P1) and outstanding (P2–P4).
+**Context:** This document enumerates the exact commands, scripts, and interactive prompts needed to manually verify every item in `.huntley/IMPLEMENTATION_PLAN.md` — both completed (P1) and outstanding (P2–P4).
 
 ---
 

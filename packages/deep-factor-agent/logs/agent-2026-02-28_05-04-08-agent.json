@@ -1,0 +1,190 @@
+{
+  "suite": "agent",
+  "timestamp": "2026-02-28T05:04:08.282Z",
+  "passed": 36,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "sums all token fields",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles optional cache token fields",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "accepts string model IDs",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "creates agent with BaseChatModel instance",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns AgentResult with stopReason 'completed' for single iteration",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "records user message as first event in thread",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "aggregates token usage across iterations",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "multi-iteration with verification feedback",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles error recovery - one error then success",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "exits with max_errors after 3 consecutive errors",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stop condition triggered",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "records tool calls and results as events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "thread is included in result",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "invokes onIterationStart and onIterationEnd callbacks",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "no verifyCompletion means single iteration mode",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "reuses existing thread and appends new user message",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "starts iteration from thread's max iteration + 1",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "model receives full conversation history from prior turns",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns independent usage per turn",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns a streaming result",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "yields chunks that can be iterated",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "can reconstruct full message from chunks",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "propagates errors from the underlying stream",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "binds tools to model when tools are provided",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "defaults to 20 inner steps",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "respects custom maxToolCallsPerIteration",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "executes multiple tool calls from one model response",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "logs console.warn when write_todos result is not valid JSON",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns true for PendingResult",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns false for AgentResult",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "triggers summarization when thread exceeds maxContextTokens",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "injects summaries into system prompt via buildContextInjection",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "includes summarization token usage in totalUsage",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns PendingResult when a tool in interruptOn is called",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "executes non-interrupt tools but pauses on interrupt tool in mixed batch",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "stop condition fires before verification completes",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

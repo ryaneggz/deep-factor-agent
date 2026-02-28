@@ -144,17 +144,17 @@ pnpm coverage
 
 ### Test suite
 
-| File | Description | Tests |
-|------|-------------|-------|
-| `__tests__/app.test.tsx` | App integration (single-prompt, interactive, error, bash flag) | 18 |
-| `__tests__/hooks/useAgent.test.tsx` | `useAgent` hook + `eventsToChatMessages` pure function | 25 |
-| `__tests__/components/Chat.test.tsx` | Message rendering, verbose toggle, truncation | 8 |
-| `__tests__/components/StatusBar.test.tsx` | Token display, status colors, formatting | 3 |
-| `__tests__/components/Spinner.test.tsx` | Dot animation cycling, timer cleanup | 7 |
-| `__tests__/components/ToolCall.test.tsx` | Arg truncation, nested objects, null handling | 9 |
-| `__tests__/components/HumanInput.test.tsx` | Keypress accumulation, choices, submit, backspace | 16 |
-| `__tests__/components/PromptInput.test.tsx` | Input handling, submit, empty rejection | 10 |
-| `__tests__/tools/bash.test.ts` | execSync args, timeout, error paths | 14 |
+| File                                        | Description                                                    | Tests |
+| ------------------------------------------- | -------------------------------------------------------------- | ----- |
+| `__tests__/app.test.tsx`                    | App integration (single-prompt, interactive, error, bash flag) | 18    |
+| `__tests__/hooks/useAgent.test.tsx`         | `useAgent` hook + `eventsToChatMessages` pure function         | 25    |
+| `__tests__/components/Chat.test.tsx`        | Message rendering, verbose toggle, truncation                  | 8     |
+| `__tests__/components/StatusBar.test.tsx`   | Token display, status colors, formatting                       | 3     |
+| `__tests__/components/Spinner.test.tsx`     | Dot animation cycling, timer cleanup                           | 7     |
+| `__tests__/components/ToolCall.test.tsx`    | Arg truncation, nested objects, null handling                  | 9     |
+| `__tests__/components/HumanInput.test.tsx`  | Keypress accumulation, choices, submit, backspace              | 16    |
+| `__tests__/components/PromptInput.test.tsx` | Input handling, submit, empty rejection                        | 10    |
+| `__tests__/tools/bash.test.ts`              | execSync args, timeout, error paths                            | 14    |
 
 **Total: 110 tests** — all mocked, no API calls.
 
@@ -177,12 +177,12 @@ pnpm type-check
 
 ## Tech stack
 
-| Concern | Library |
-|---------|---------|
-| CLI args | [meow](https://github.com/sindresorhus/meow) v13 |
-| Terminal UI | [Ink](https://github.com/vadimdemedes/ink) v6 + React 19 |
-| Agent loop | [deep-factor-agent](../deep-factor-agent) (LangChain-based) |
-| Schema validation | [Zod](https://github.com/colinhacks/zod) v4 |
-| Test runner | [Vitest](https://vitest.dev/) v4 |
-| Coverage | [@vitest/coverage-v8](https://vitest.dev/guide/coverage) |
-| Module system | ESM only (`"type": "module"`) |
+| Concern           | Library                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| CLI args          | [meow](https://github.com/sindresorhus/meow) v13            |
+| Terminal UI       | [Ink](https://github.com/vadimdemedes/ink) v6 + React 19    |
+| Agent loop        | [deep-factor-agent](../deep-factor-agent) (LangChain-based) |
+| Schema validation | [Zod](https://github.com/colinhacks/zod) v4                 |
+| Test runner       | [Vitest](https://vitest.dev/) v4                            |
+| Coverage          | [@vitest/coverage-v8](https://vitest.dev/guide/coverage)    |
+| Module system     | ESM only (`"type": "module"`)                               |

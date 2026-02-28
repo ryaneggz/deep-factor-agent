@@ -29,9 +29,8 @@ export function StatusBar({ usage, iterations, status }: StatusBarProps) {
       <Text dimColor>{"─".repeat(process.stdout.columns || 50)}</Text>
       <Text>
         {"Tokens: "}
-        {fmt(usage.inputTokens)} in / {fmt(usage.outputTokens)} out (
-        {fmt(usage.totalTokens)} total) | Iterations: {iterations} | Status:{" "}
-        <Text color={color}>{status}</Text>
+        {fmt(usage.inputTokens)} in / {fmt(usage.outputTokens)} out ({fmt(usage.totalTokens)} total)
+        | Iterations: {iterations} | Status: <Text color={color}>{status}</Text>
       </Text>
     </Box>
   );

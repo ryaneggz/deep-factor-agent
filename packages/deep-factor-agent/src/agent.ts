@@ -32,6 +32,8 @@ import type {
   AgentMiddleware,
   MiddlewareContext,
 } from "./types.js";
+import type { ModelAdapter } from "./providers/types.js";
+import { isModelAdapter } from "./providers/types.js";
 
 let threadCounter = 0;
 
@@ -44,10 +46,8 @@ export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
     inputTokens: a.inputTokens + b.inputTokens,
     outputTokens: a.outputTokens + b.outputTokens,
     totalTokens: a.totalTokens + b.totalTokens,
-    cacheReadTokens:
-      (a.cacheReadTokens ?? 0) + (b.cacheReadTokens ?? 0) || undefined,
-    cacheWriteTokens:
-      (a.cacheWriteTokens ?? 0) + (b.cacheWriteTokens ?? 0) || undefined,
+    cacheReadTokens: (a.cacheReadTokens ?? 0) + (b.cacheReadTokens ?? 0) || undefined,
+    cacheWriteTokens: (a.cacheWriteTokens ?? 0) + (b.cacheWriteTokens ?? 0) || undefined,
   };
 }
 
@@ -99,10 +99,7 @@ function extractTextContent(content: string | unknown): string {
 }
 
 function compactError(error: unknown, maxLen = 500): string {
-  const msg =
-    error instanceof Error
-      ? `${error.name}: ${error.message}`
-      : String(error);
+  const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   return msg.length > maxLen ? msg.substring(0, maxLen) + "..." : msg;
 }
 
@@ -130,11 +127,9 @@ function createThread(): AgentThread {
   };
 }
 
-export class DeepFactorAgent<
-  TTools extends StructuredToolInterface[] = StructuredToolInterface[],
-> {
-  private modelOrString: BaseChatModel | string;
-  private resolvedModel: BaseChatModel | undefined;
+export class DeepFactorAgent<TTools extends StructuredToolInterface[] = StructuredToolInterface[]> {
+  private modelOrString: BaseChatModel | ModelAdapter | string;
+  private resolvedModel: BaseChatModel | ModelAdapter | null = null;
   private tools: TTools;
   private instructions: string;
   private stopConditions: StopCondition[];
@@ -153,6 +148,8 @@ export class DeepFactorAgent<
 
     if (typeof settings.model === "string") {
       this.modelId = settings.model;
+    } else if (isModelAdapter(settings.model)) {
+      this.modelId = "cli-adapter";
     } else {
       this.modelId = extractModelId(settings.model);
     }
@@ -183,12 +180,14 @@ export class DeepFactorAgent<
     this.contextManager = new ContextManager(settings.contextManagement);
   }
 
-  private async ensureModel(): Promise<BaseChatModel> {
+  private async ensureModel(): Promise<BaseChatModel | ModelAdapter> {
     if (this.resolvedModel) return this.resolvedModel;
     if (typeof this.modelOrString === "string") {
-      this.resolvedModel = await initChatModel(this.modelOrString);
-      return this.resolvedModel;
+      const resolved = await initChatModel(this.modelOrString);
+      this.resolvedModel = resolved;
+      return resolved;
     }
+    // Both BaseChatModel and ModelAdapter pass through directly
     this.resolvedModel = this.modelOrString;
     return this.resolvedModel;
   }
@@ -197,12 +196,9 @@ export class DeepFactorAgent<
     const messages: BaseMessage[] = [];
 
     // Build context injection from summaries
-    const contextInjection =
-      this.contextManager.buildContextInjection(thread);
+    const contextInjection = this.contextManager.buildContextInjection(thread);
     if (this.instructions || contextInjection) {
-      const system = [contextInjection, this.instructions]
-        .filter(Boolean)
-        .join("\n\n");
+      const system = [contextInjection, this.instructions].filter(Boolean).join("\n\n");
       messages.push(new SystemMessage(system));
     }
 
@@ -220,9 +216,7 @@ export class DeepFactorAgent<
           break;
         }
         case "human_input_received": {
-          messages.push(
-            new HumanMessage(`[Human Response]: ${event.response}`),
-          );
+          messages.push(new HumanMessage(`[Human Response]: ${event.response}`));
           break;
         }
         case "summary": {
@@ -254,14 +248,8 @@ export class DeepFactorAgent<
           break;
         }
         case "error": {
-          const recoverStr = event.recoverable
-            ? "recoverable"
-            : "non-recoverable";
-          messages.push(
-            new HumanMessage(
-              `[Error (${recoverStr})]: ${event.error}`,
-            ),
-          );
+          const recoverStr = event.recoverable ? "recoverable" : "non-recoverable";
+          messages.push(new HumanMessage(`[Error (${recoverStr})]: ${event.error}`));
           break;
         }
         case "completion":
@@ -277,12 +265,9 @@ export class DeepFactorAgent<
     const messages: BaseMessage[] = [];
 
     // Build system prompt identically to standard mode
-    const contextInjection =
-      this.contextManager.buildContextInjection(thread);
+    const contextInjection = this.contextManager.buildContextInjection(thread);
     if (this.instructions || contextInjection) {
-      const system = [contextInjection, this.instructions]
-        .filter(Boolean)
-        .join("\n\n");
+      const system = [contextInjection, this.instructions].filter(Boolean).join("\n\n");
       messages.push(new SystemMessage(system));
     }
 
@@ -293,19 +278,13 @@ export class DeepFactorAgent<
     return messages;
   }
 
-  private checkInterruptOn(
-    thread: AgentThread,
-    iteration: number,
-  ): string | null {
+  private checkInterruptOn(thread: AgentThread, iteration: number): string | null {
     if (this.interruptOn.length === 0) return null;
 
     for (let i = thread.events.length - 1; i >= 0; i--) {
       const event = thread.events[i];
       if (event.iteration !== iteration) break;
-      if (
-        event.type === "tool_call" &&
-        this.interruptOn.includes(event.toolName)
-      ) {
+      if (event.type === "tool_call" && this.interruptOn.includes(event.toolName)) {
         return event.toolName;
       }
     }
@@ -322,12 +301,8 @@ export class DeepFactorAgent<
    * Reuses the thread's full conversation history so the model retains
    * multi-turn context across calls.
    */
-  async continueLoop(
-    thread: AgentThread,
-    prompt: string,
-  ): Promise<AgentResult | PendingResult> {
-    const nextIteration =
-      thread.events.reduce((max, e) => Math.max(max, e.iteration), 0) + 1;
+  async continueLoop(thread: AgentThread, prompt: string): Promise<AgentResult | PendingResult> {
+    const nextIteration = thread.events.reduce((max, e) => Math.max(max, e.iteration), 0) + 1;
     thread.events.push({
       type: "message",
       role: "user",
@@ -367,10 +342,7 @@ export class DeepFactorAgent<
     let lastResponse = "";
 
     // Merge middleware tools with user tools
-    const allTools: StructuredToolInterface[] = [
-      ...this.tools,
-      ...this.composedMiddleware.tools,
-    ];
+    const allTools: StructuredToolInterface[] = [...this.tools, ...this.composedMiddleware.tools];
     const toolMap = toolArrayToMap(allTools);
 
     while (true) {
@@ -390,21 +362,20 @@ export class DeepFactorAgent<
       await this.composedMiddleware.beforeIteration(middlewareCtx);
 
       // Context management: check if summarization needed
-      if (this.contextManager.needsSummarization(thread)) {
-        const { usage: summarizationUsage } =
-          await this.contextManager.summarize(thread, model);
+      // Summarization requires BaseChatModel (not ModelAdapter) for LLM calls
+      if (this.contextManager.needsSummarization(thread) && !isModelAdapter(model)) {
+        const { usage: summarizationUsage } = await this.contextManager.summarize(thread, model);
         totalUsage = addUsage(totalUsage, summarizationUsage);
       }
 
       // Build messages from thread
-      const messages = this.contextMode === "xml"
-        ? this.buildXmlMessages(thread)
-        : this.buildMessages(thread);
+      const messages =
+        this.contextMode === "xml" ? this.buildXmlMessages(thread) : this.buildMessages(thread);
 
       try {
         // Bind tools and run inner tool-calling loop
         const modelWithTools =
-          allTools.length > 0 && model.bindTools
+          allTools.length > 0 && "bindTools" in model && model.bindTools
             ? model.bindTools(allTools)
             : model;
 
@@ -418,9 +389,7 @@ export class DeepFactorAgent<
         let lastAIResponse: AIMessage | null = null;
 
         while (stepCount < this.maxToolCallsPerIteration) {
-          const response = (await modelWithTools.invoke(
-            messages,
-          )) as AIMessage;
+          const response = (await modelWithTools.invoke(messages)) as AIMessage;
           messages.push(response);
           lastAIResponse = response;
 
@@ -452,16 +421,8 @@ export class DeepFactorAgent<
                 type: "human_input_requested",
                 question: (args.question as string) ?? "",
                 context: args.context as string | undefined,
-                urgency: args.urgency as
-                  | "low"
-                  | "medium"
-                  | "high"
-                  | undefined,
-                format: args.format as
-                  | "free_text"
-                  | "yes_no"
-                  | "multiple_choice"
-                  | undefined,
+                urgency: args.urgency as "low" | "medium" | "high" | undefined,
+                format: args.format as "free_text" | "yes_no" | "multiple_choice" | undefined,
                 choices: args.choices as string[] | undefined,
                 timestamp: now,
                 iteration,
@@ -476,8 +437,7 @@ export class DeepFactorAgent<
             if (this.interruptOn.includes(tc.name)) {
               // Push a synthetic tool_result so the message sequence stays valid
               // (every AIMessage tool_call must have a matching ToolMessage)
-              const interruptedToolCallId =
-                tc.id ?? `call_${stepCount}_${tc.name}`;
+              const interruptedToolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
               const interruptedResult = `[Tool "${tc.name}" not executed — interrupted for human approval]`;
               const toolResultEvent: ToolResultEvent = {
                 type: "tool_result",
@@ -501,9 +461,7 @@ export class DeepFactorAgent<
             if (foundTool) {
               const toolResult = await foundTool.invoke(tc.args);
               const resultStr =
-                typeof toolResult === "string"
-                  ? toolResult
-                  : JSON.stringify(toolResult);
+                typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
 
               // Handle todoMiddleware special cases
               if (tc.name === TOOL_NAME_WRITE_TODOS) {
@@ -533,6 +491,24 @@ export class DeepFactorAgent<
                 new ToolMessage({
                   tool_call_id: tc.id ?? `call_${stepCount}_${tc.name}`,
                   content: resultStr,
+                }),
+              );
+            } else {
+              // Tool not found — record error to keep message sequence consistent
+              const errorMsg = `Tool not found: "${tc.name}"`;
+              const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+              const toolResultEvent: ToolResultEvent = {
+                type: "tool_result",
+                toolCallId,
+                result: errorMsg,
+                timestamp: now,
+                iteration,
+              };
+              thread.events.push(toolResultEvent);
+              messages.push(
+                new ToolMessage({
+                  tool_call_id: toolCallId,
+                  content: errorMsg,
                 }),
               );
             }
@@ -566,10 +542,7 @@ export class DeepFactorAgent<
         consecutiveErrors = 0;
 
         // Middleware: afterIteration
-        await this.composedMiddleware.afterIteration(
-          middlewareCtx,
-          lastAIResponse,
-        );
+        await this.composedMiddleware.afterIteration(middlewareCtx, lastAIResponse);
 
         // Callback
         this.onIterationEnd?.(iteration, lastAIResponse);
@@ -716,10 +689,7 @@ export class DeepFactorAgent<
         thread.events.push(errorEvent);
 
         // Middleware: afterIteration (even on error)
-        await this.composedMiddleware.afterIteration(
-          middlewareCtx,
-          error,
-        );
+        await this.composedMiddleware.afterIteration(middlewareCtx, error);
 
         // Callback
         this.onIterationEnd?.(iteration, error);
@@ -744,6 +714,11 @@ export class DeepFactorAgent<
 
   async stream(prompt: string): Promise<AsyncIterable<AIMessageChunk>> {
     const model = await this.ensureModel();
+
+    if (isModelAdapter(model)) {
+      throw new Error("Streaming is not supported for ModelAdapter providers. Use loop() instead.");
+    }
+
     const thread = createThread();
 
     // Push initial user message
@@ -755,20 +730,13 @@ export class DeepFactorAgent<
       iteration: 0,
     });
 
-    const allTools: StructuredToolInterface[] = [
-      ...this.tools,
-      ...this.composedMiddleware.tools,
-    ];
+    const allTools: StructuredToolInterface[] = [...this.tools, ...this.composedMiddleware.tools];
 
     const messages =
-      this.contextMode === "xml"
-        ? this.buildXmlMessages(thread)
-        : this.buildMessages(thread);
+      this.contextMode === "xml" ? this.buildXmlMessages(thread) : this.buildMessages(thread);
 
     const modelWithTools =
-      allTools.length > 0 && model.bindTools
-        ? model.bindTools(allTools)
-        : model;
+      allTools.length > 0 && model.bindTools ? model.bindTools(allTools) : model;
 
     return modelWithTools.stream(messages);
   }

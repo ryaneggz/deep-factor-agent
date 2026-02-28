@@ -1,6 +1,6 @@
 import React from "react";
 import { render } from "ink-testing-library";
-import { describe, test, expect, vi, afterEach } from "vitest";
+import { describe, test, expect, afterEach } from "vitest";
 import { StatusBar } from "../../src/components/StatusBar.js";
 
 describe("StatusBar", () => {

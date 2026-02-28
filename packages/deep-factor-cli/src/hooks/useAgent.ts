@@ -61,41 +61,34 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   });
   const [iterations, setIterations] = useState(0);
   const [error, setError] = useState<Error | null>(null);
-  const [humanInputRequest, setHumanInputRequest] =
-    useState<HumanInputRequestedEvent | null>(null);
+  const [humanInputRequest, setHumanInputRequest] = useState<HumanInputRequestedEvent | null>(null);
 
   const pendingRef = useRef<PendingResult | null>(null);
   const threadRef = useRef<AgentThread | null>(null);
 
-  const handleResult = useCallback(
-    (result: AgentResult | PendingResult) => {
-      threadRef.current = result.thread;
-      const newMessages = eventsToChatMessages(result.thread.events);
-      setMessages(newMessages);
-      setUsage((prev) => addUsage(prev, result.usage));
-      setIterations(result.iterations);
+  const handleResult = useCallback((result: AgentResult | PendingResult) => {
+    threadRef.current = result.thread;
+    const newMessages = eventsToChatMessages(result.thread.events);
+    setMessages(newMessages);
+    setUsage((prev) => addUsage(prev, result.usage));
+    setIterations(result.iterations);
 
-      if (isPendingResult(result)) {
-        pendingRef.current = result;
-        const req =
-          result.thread.events
-            .filter(
-              (e): e is HumanInputRequestedEvent =>
-                e.type === "human_input_requested",
-            )
-            .pop() ?? null;
-        setHumanInputRequest(req);
-        setStatus("pending_input");
-      } else if (result.stopReason === "max_errors") {
-        const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
-        setError(new Error(detail));
-        setStatus("error");
-      } else {
-        setStatus("done");
-      }
-    },
-    [],
-  );
+    if (isPendingResult(result)) {
+      pendingRef.current = result;
+      const req =
+        result.thread.events
+          .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
+          .pop() ?? null;
+      setHumanInputRequest(req);
+      setStatus("pending_input");
+    } else if (result.stopReason === "max_errors") {
+      const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
+      setError(new Error(detail));
+      setStatus("error");
+    } else {
+      setStatus("done");
+    }
+  }, []);
 
   const handleError = useCallback((err: unknown) => {
     setError(err instanceof Error ? err : new Error(String(err)));
@@ -109,10 +102,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       setHumanInputRequest(null);
       pendingRef.current = null;
 
-      const tools: AgentTools = [
-        ...(options.tools ?? []),
-        requestHumanInput,
-      ];
+      const tools: AgentTools = [...(options.tools ?? []), requestHumanInput];
 
       const agent = createDeepFactorAgent({
         model: options.model,
@@ -123,10 +113,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
       const existingThread = threadRef.current;
       if (existingThread) {
-        agent
-          .continueLoop(existingThread, prompt)
-          .then(handleResult)
-          .catch(handleError);
+        agent.continueLoop(existingThread, prompt).then(handleResult).catch(handleError);
       } else {
         agent.loop(prompt).then(handleResult).catch(handleError);
       }

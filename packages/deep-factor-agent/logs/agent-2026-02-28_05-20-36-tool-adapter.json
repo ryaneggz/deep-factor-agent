@@ -1,0 +1,75 @@
+{
+  "suite": "tool-adapter",
+  "timestamp": "2026-02-28T05:20:36.482Z",
+  "passed": 13,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "returns a StructuredToolInterface with correct name and description",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "passes through string return values unchanged",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "auto-stringifies non-string return values via JSON.stringify",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "auto-stringifies array return values",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "auto-stringifies numeric return values",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "auto-stringifies null return values",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "converts an array of tools to a name-keyed record",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns an empty record for an empty array",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "last tool wins when duplicate names exist",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns the tool when the name matches",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns the correct tool among multiple",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns undefined when no tool matches",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns undefined for an empty array",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

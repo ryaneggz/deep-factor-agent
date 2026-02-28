@@ -1,11 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
-import type {
-  AgentMiddleware,
-  MiddlewareContext,
-  ErrorEvent,
-} from "./types.js";
+import type { AgentMiddleware, MiddlewareContext, ErrorEvent } from "./types.js";
 
 export const TOOL_NAME_WRITE_TODOS = "write_todos";
 
@@ -55,10 +51,7 @@ export function composeMiddleware(
     }
   };
 
-  const afterIteration = async (
-    ctx: MiddlewareContext,
-    result: unknown,
-  ): Promise<void> => {
+  const afterIteration = async (ctx: MiddlewareContext, result: unknown): Promise<void> => {
     for (const mw of middlewares) {
       if (mw.afterIteration) {
         await mw.afterIteration(ctx, result);
@@ -94,8 +87,7 @@ export function todoMiddleware(): AgentMiddleware {
         },
         {
           name: TOOL_NAME_WRITE_TODOS,
-          description:
-            "Create or update the todo list for planning and tracking progress",
+          description: "Create or update the todo list for planning and tracking progress",
           schema: todoSchema,
         },
       ),
@@ -116,10 +108,7 @@ export function todoMiddleware(): AgentMiddleware {
 export function errorRecoveryMiddleware(): AgentMiddleware {
   return {
     name: "errorRecovery",
-    afterIteration: async (
-      ctx: MiddlewareContext,
-      _result: unknown,
-    ): Promise<void> => {
+    afterIteration: async (ctx: MiddlewareContext): Promise<void> => {
       const { thread } = ctx;
       if (thread.events.length === 0) return;
 

@@ -1,0 +1,35 @@
+{
+  "suite": "xml-context",
+  "timestamp": "2026-02-28T05:20:36.482Z",
+  "passed": 5,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "uses standard mode by default",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "uses XML mode when contextMode is xml",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "XML mode produces SystemMessage + HumanMessage(xml) structure",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "defaults contextMode to standard",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "XML HumanMessage contains tool events from prior iteration",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

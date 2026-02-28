@@ -68,12 +68,16 @@ export {
 } from "./human-in-the-loop.js";
 
 // Tool adapter utilities
-export {
-  createLangChainTool,
-  toolArrayToMap,
-  findToolByName,
-} from "./tool-adapter.js";
+export { createLangChainTool, toolArrayToMap, findToolByName } from "./tool-adapter.js";
 
 // XML thread serializer
 export { serializeThreadToXml, escapeXml } from "./xml-serializer.js";
 export type { XmlSerializerOptions } from "./xml-serializer.js";
+
+// Providers
+export type { ModelAdapter } from "./providers/types.js";
+export { isModelAdapter } from "./providers/types.js";
+export { createClaudeCliProvider } from "./providers/claude-cli.js";
+export type { ClaudeCliProviderOptions } from "./providers/claude-cli.js";
+export { createCodexCliProvider } from "./providers/codex-cli.js";
+export type { CodexCliProviderOptions } from "./providers/codex-cli.js";

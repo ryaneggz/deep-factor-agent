@@ -2,14 +2,14 @@
 
 ## Context
 
-GitHub Issue [#2](https://github.com/ryaneggz/deep-factor-agent/issues/2) requests a new example (`examples/12-hitl-multiple-choice.ts`) that combines the interactive multi-turn streaming chat + bash tool from Example 11 with the `requestHumanInput` tool's `multiple_choice` format. The `.ralph/specs/` directory was empty — specs and an implementation plan have been drafted.
+GitHub Issue [#2](https://github.com/ryaneggz/deep-factor-agent/issues/2) requests a new example (`examples/12-hitl-multiple-choice.ts`) that combines the interactive multi-turn streaming chat + bash tool from Example 11 with the `requestHumanInput` tool's `multiple_choice` format. The `.huntley/specs/` directory was empty — specs and an implementation plan have been drafted.
 
 ## Files Created
 
 | File | Purpose |
 |------|---------|
-| `.ralph/specs/SPEC-01-hitl-multiple-choice-example.md` | Full spec for Example 12 — context, implementation details with code, design decisions, acceptance criteria |
-| `.ralph/IMPLEMENTATION_PLAN.md` | Build order and verification steps |
+| `.huntley/specs/SPEC-01-hitl-multiple-choice-example.md` | Full spec for Example 12 — context, implementation details with code, design decisions, acceptance criteria |
+| `.huntley/IMPLEMENTATION_PLAN.md` | Build order and verification steps |
 
 ## Spec Summary (SPEC-01)
 

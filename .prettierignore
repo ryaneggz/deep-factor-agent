@@ -1,0 +1,8 @@
+dist
+node_modules
+pnpm-lock.yaml
+coverage
+.huntley/logs
+.huntley/archive
+.ralph/archives
+.claude

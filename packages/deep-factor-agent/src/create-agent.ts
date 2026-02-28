@@ -13,10 +13,7 @@ export function createDeepFactorAgent<
     instructions: settings.instructions ?? "",
     stopWhen: settings.stopWhen ?? [maxIterations(10)],
     verifyCompletion: settings.verifyCompletion,
-    middleware: settings.middleware ?? [
-      todoMiddleware(),
-      errorRecoveryMiddleware(),
-    ],
+    middleware: settings.middleware ?? [todoMiddleware(), errorRecoveryMiddleware()],
     interruptOn: settings.interruptOn ?? [],
     contextMode: settings.contextMode ?? "standard",
     contextManagement: {

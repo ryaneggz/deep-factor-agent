@@ -6,7 +6,7 @@ The agent's `buildMessages()` method (agent.ts:193) skips `tool_call`, `tool_res
 
 The [Orchestra XML agent](https://github.com/ruska-ai/orchestra/blob/0.0.2-rc70/backend/src/flows/xml_agent.py) solves this by serializing the entire thread into a `<thread><event ...>...</event></thread>` XML document, sent as a single `HumanMessage` alongside the `SystemMessage`. This ensures ALL event types are represented in the context window.
 
-**Goal**: Generate 3 spec files in `.ralph/specs/` that define how to add XML-based context window construction to the deep-factor-agent package.
+**Goal**: Generate 3 spec files in `.huntley/specs/` that define how to add XML-based context window construction to the deep-factor-agent package.
 
 ---
 

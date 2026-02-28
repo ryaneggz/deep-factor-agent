@@ -1,11 +1,7 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
-import type {
-  AgentThread,
-  ContextManagementConfig,
-  SummaryEvent,
-  TokenUsage,
-} from "./types.js";
+import type { AgentThread, ContextManagementConfig, SummaryEvent, TokenUsage } from "./types.js";
+import type { ModelAdapter } from "./providers/types.js";
 
 /**
  * Default token estimator using `Math.ceil(text.length / 3.5)`.
@@ -48,7 +44,7 @@ export class ContextManager {
 
   async summarize(
     thread: AgentThread,
-    model: BaseChatModel,
+    model: BaseChatModel | ModelAdapter,
   ): Promise<{ thread: AgentThread; usage: TokenUsage }> {
     const zeroUsage: TokenUsage = {
       inputTokens: 0,
@@ -81,9 +77,7 @@ export class ContextManager {
       const events = iterationMap.get(iter)!;
       if (events.length === 1 && events[0].type === "summary") continue;
 
-      const eventsText = events
-        .map((e) => JSON.stringify(e))
-        .join("\n");
+      const eventsText = events.map((e) => JSON.stringify(e)).join("\n");
 
       try {
         const response = await model.invoke([
@@ -93,9 +87,12 @@ export class ContextManager {
         ]);
 
         // Track token usage from this summarization call
-        const meta = (response as any).usage_metadata as
-          | { input_tokens?: number; output_tokens?: number; total_tokens?: number }
-          | undefined;
+        const meta =
+          "usage_metadata" in response
+            ? (response.usage_metadata as
+                | { input_tokens?: number; output_tokens?: number; total_tokens?: number }
+                | undefined)
+            : undefined;
         if (meta) {
           totalUsage = {
             inputTokens: totalUsage.inputTokens + (meta.input_tokens ?? 0),
@@ -127,9 +124,7 @@ export class ContextManager {
       }
     }
 
-    const newEvents = thread.events.filter(
-      (e) => e.iteration > cutoff || e.type === "summary",
-    );
+    const newEvents = thread.events.filter((e) => e.iteration > cutoff || e.type === "summary");
 
     thread.events = [...summaryEvents, ...newEvents];
     thread.updatedAt = Date.now();
@@ -138,9 +133,7 @@ export class ContextManager {
   }
 
   buildContextInjection(thread: AgentThread): string {
-    const summaries = thread.events.filter(
-      (e): e is SummaryEvent => e.type === "summary",
-    );
+    const summaries = thread.events.filter((e): e is SummaryEvent => e.type === "summary");
 
     if (summaries.length === 0) return "";
 

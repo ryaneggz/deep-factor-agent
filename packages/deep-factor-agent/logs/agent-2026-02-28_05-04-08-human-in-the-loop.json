@@ -1,0 +1,75 @@
+{
+  "suite": "human-in-the-loop",
+  "timestamp": "2026-02-28T05:04:08.283Z",
+  "passed": 13,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "has correct description",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "has schema",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "invoke returns requested flag",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "pauses the loop and returns PendingResult",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "HumanInputRequestedEvent is appended to thread on pause",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "resume continues the loop and returns AgentResult",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "HumanInputReceivedEvent is appended on resume",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "pauses before executing a listed tool",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "resume with 'approved' continues the loop",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "resume with 'denied: reason' skips tool execution",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "produces valid message sequence on resume (every tool_call has matching ToolMessage)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "after resume, the loop continues from where it left off",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "supports multiple pause/resume within a single run",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

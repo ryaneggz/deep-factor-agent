@@ -1,4 +1,8 @@
-.PHONY: install build dev test test-watch type-check check install-cli build-cli dev-cli test-cli type-check-cli install-all build-all test-all check-all loop loop-plan review archive help
+.PHONY: help install build dev test test-watch type-check check install-cli build-cli dev-cli test-cli type-check-cli install-all build-all test-all check-all huntley.loop huntley.loop-plan huntley.review huntley.archive snarktank.ralph snarktank.archive
+
+
+ENV ?= dev
+MAX_ITERATIONS ?= 200
 
 help:            ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -55,14 +59,22 @@ check-all:       ## Type-check + test all packages
 	pnpm -r type-check && pnpm -r test
 
 # Ralph tooling
-loop:            ## Run build loop (.ralph/loop.sh [N])
-	.ralph/loop.sh $(N)
+huntley.loop:            ## Run build loop (.ralph/loop.sh [N])
+	.huntley/loop.sh $(N)
 
-loop-plan:       ## Run plan loop (.ralph/loop.sh plan [N])
-	.ralph/loop.sh plan $(N)
+huntley.loop-plan:       ## Run plan loop (.ralph/loop.sh plan [N])
+	.huntley/loop.sh plan $(N)
 
-review:          ## Review logs (.ralph/review-log.sh [path])
-	.ralph/review-log.sh $(ARGS)
+huntley.review:          ## Review logs (.ralph/review-log.sh [path])
+	.huntley/review-log.sh $(ARGS)
 
-archive:         ## Archive current phase (.ralph/archive.sh)
-	.ralph/archive.sh $(NAME) $(if $(YES),--yes)
+huntley.archive:         ## Archive current phase (.ralph/archive.sh)
+	.huntley/archive.sh $(NAME) $(if $(YES),--yes)
+
+# Run the Ralph autonomous agent loop using Claude Code
+snarktank.ralph:
+	./ralph.sh --tool claude $(MAX_ITERATIONS)
+
+# Archive current prd.json and progress.txt into dated directory
+snarktank.archive:
+	claude --dangerously-skip-permissions -p "Archive the latest prd.json, progress.json, and the current specs folder into \`./.ralph/archives/YYYY-MM-DD/prd.json\` and \`./.ralph/archives/YYYY-MM-DD/progress.json\` respectively. Create the directory if it doesn't exist."

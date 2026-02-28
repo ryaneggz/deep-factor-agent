@@ -1,0 +1,45 @@
+{
+  "suite": "integration",
+  "timestamp": "2026-02-28T04:55:32.783Z",
+  "passed": 7,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "createDeepFactorAgent -> loop() with tools, middleware, stop conditions",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "multi-iteration with verification feedback",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "human-in-the-loop: pause, resume, continue",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "middleware hooks fire in correct order",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "token usage aggregation across iterations",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "todoMiddleware write-then-read round-trip through agent loop",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "all tests use mock models - no real API calls",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

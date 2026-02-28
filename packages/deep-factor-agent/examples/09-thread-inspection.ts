@@ -10,20 +10,14 @@
  */
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
-import {
-  createDeepFactorAgent,
-  maxIterations,
-  serializeThreadToXml,
-} from "../dist/index.js";
+import { createDeepFactorAgent, maxIterations, serializeThreadToXml } from "../dist/index.js";
 import { MODEL_ID } from "./env.js";
 
 // Two tools so the agent makes multiple calls
 const searchDocs = tool(
   async ({ query }: { query: string }) => {
     return JSON.stringify({
-      results: [
-        { title: `Guide to ${query}`, url: `https://docs.example.com/${query}` },
-      ],
+      results: [{ title: `Guide to ${query}`, url: `https://docs.example.com/${query}` }],
     });
   },
   {
@@ -60,9 +54,7 @@ async function main() {
 
   console.log("--- Running agent with thread inspection ---\n");
 
-  const result = await agent.loop(
-    "Find documentation about TypeScript generics and summarize it.",
-  );
+  const result = await agent.loop("Find documentation about TypeScript generics and summarize it.");
 
   // --- Response ---
   console.log("Response:\n", result.response);
@@ -98,9 +90,7 @@ async function main() {
         );
         break;
       case "completion":
-        console.log(
-          `  [${i}] ${event.type} (${iter}): verified=${event.verified}`,
-        );
+        console.log(`  [${i}] ${event.type} (${iter}): verified=${event.verified}`);
         break;
       default:
         console.log(`  [${i}] ${event.type} (${iter})`);

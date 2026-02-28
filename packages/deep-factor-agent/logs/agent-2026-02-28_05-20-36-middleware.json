@@ -1,0 +1,105 @@
+{
+  "suite": "middleware",
+  "timestamp": "2026-02-28T05:20:36.481Z",
+  "passed": 19,
+  "failed": 0,
+  "skipped": 0,
+  "duration": 0,
+  "tests": [
+    {
+      "name": "merges tools from multiple middleware",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "later middleware wins on tool name conflicts with warning",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "calls custom onConflict callback instead of console.warn on tool name conflict",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "executes beforeIteration hooks in order",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "executes afterIteration hooks in order",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "handles middleware with no hooks gracefully",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns middleware with name 'todo'",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "provides write_todos and read_todos tools",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "write_todos tool returns success with todos",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "read_todos tool returns empty array initially",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "read_todos returns what write_todos persisted (round-trip)",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "write_todos overwrites previous todos on subsequent calls",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "separate todoMiddleware instances have independent state",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "returns middleware with name 'errorRecovery'",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "appends recovery hint when last event is an error",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "truncates long error messages at 500 chars",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "does nothing when last event is not an error",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "does nothing when thread has no events",
+      "status": "passed",
+      "duration": 0
+    },
+    {
+      "name": "custom middleware runs after built-in in composed order",
+      "status": "passed",
+      "duration": 0
+    }
+  ]
+}

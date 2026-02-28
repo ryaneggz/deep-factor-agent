@@ -24,12 +24,8 @@ function loggingMiddleware(): AgentMiddleware {
       console.log(`  [log] Starting iteration ${ctx.iteration}`);
     },
     afterIteration: async (ctx, result) => {
-      const eventCount = ctx.thread.events.filter(
-        (e) => e.iteration === ctx.iteration,
-      ).length;
-      console.log(
-        `  [log] Iteration ${ctx.iteration} complete — ${eventCount} events recorded`,
-      );
+      const eventCount = ctx.thread.events.filter((e) => e.iteration === ctx.iteration).length;
+      console.log(`  [log] Iteration ${ctx.iteration} complete — ${eventCount} events recorded`);
     },
   };
 }
@@ -77,8 +73,7 @@ function dateToolMiddleware(): AgentMiddleware {
 async function main() {
   const agent = createDeepFactorAgent({
     model: MODEL_ID,
-    instructions:
-      "You are a helpful assistant. You can check the current date if needed.",
+    instructions: "You are a helpful assistant. You can check the current date if needed.",
     stopWhen: maxIterations(2),
     // Compose custom middleware with built-in middleware
     middleware: [

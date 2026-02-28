@@ -20,10 +20,7 @@ export function escapeXml(text: string): string {
 /**
  * Converts an array of AgentEvent objects into a <thread> XML string.
  */
-export function serializeThreadToXml(
-  events: AgentEvent[],
-  options?: XmlSerializerOptions,
-): string {
+export function serializeThreadToXml(events: AgentEvent[], options?: XmlSerializerOptions): string {
   if (events.length === 0) {
     const xml = "<thread>\n</thread>";
     return options?.assistantPrefill ? `${xml}\n${options.assistantPrefill}` : xml;
@@ -33,10 +30,7 @@ export function serializeThreadToXml(
   const toolNameMap = new Map<string, string>();
   for (const event of events) {
     if (event.type === "tool_call") {
-      toolNameMap.set(
-        (event as ToolCallEvent).toolCallId,
-        (event as ToolCallEvent).toolName,
-      );
+      toolNameMap.set((event as ToolCallEvent).toolCallId, (event as ToolCallEvent).toolName);
     }
   }
 

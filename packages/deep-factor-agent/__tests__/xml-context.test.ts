@@ -9,6 +9,7 @@ function makeMockModel() {
     invoke: vi.fn(),
     bindTools: vi.fn(),
     stream: vi.fn(),
+    _generate: vi.fn(),
     modelName: "test-model",
   };
   model.bindTools.mockReturnValue(model);
@@ -54,9 +55,7 @@ describe("XML Context Mode", () => {
       // In standard mode, the model receives individual messages
       const invokeCall = mockModel.invoke.mock.calls[0][0];
       // Should have at least a HumanMessage for "Hello"
-      const humanMsg = invokeCall.find(
-        (m: any) => m.constructor.name === "HumanMessage",
-      );
+      const humanMsg = invokeCall.find((m: any) => m.constructor.name === "HumanMessage");
       expect(humanMsg).toBeDefined();
       // Standard mode does NOT wrap in <thread> XML
       expect(humanMsg.content).toBe("Hello");
@@ -77,9 +76,7 @@ describe("XML Context Mode", () => {
 
       // In XML mode, the model receives a SystemMessage + HumanMessage(xml)
       const invokeCall = mockModel.invoke.mock.calls[0][0];
-      const humanMsg = invokeCall.find(
-        (m: any) => m.constructor.name === "HumanMessage",
-      );
+      const humanMsg = invokeCall.find((m: any) => m.constructor.name === "HumanMessage");
       expect(humanMsg).toBeDefined();
       // XML mode wraps everything in <thread>
       expect(humanMsg.content).toContain("<thread>");
@@ -124,9 +121,7 @@ describe("XML Context Mode", () => {
 
       // Standard mode — no XML wrapping
       const invokeCall = mockModel.invoke.mock.calls[0][0];
-      const humanMsg = invokeCall.find(
-        (m: any) => m.constructor.name === "HumanMessage",
-      );
+      const humanMsg = invokeCall.find((m: any) => m.constructor.name === "HumanMessage");
       expect(humanMsg).toBeDefined();
       expect(humanMsg.content).toBe("Hello");
     });
@@ -158,9 +153,7 @@ describe("XML Context Mode", () => {
         tools: [searchTool],
         contextMode: "xml",
         verifyCompletion: async ({ iteration }) =>
-          iteration >= 2
-            ? { complete: true }
-            : { complete: false, reason: "Continue" },
+          iteration >= 2 ? { complete: true } : { complete: false, reason: "Continue" },
         stopWhen: [maxIterations(5)],
       });
 
@@ -170,9 +163,7 @@ describe("XML Context Mode", () => {
       // On iteration 2, the XML should contain the tool_call and tool_result from iteration 1
       // The 3rd invoke call is iteration 2's first call
       const iter2Call = mockModel.invoke.mock.calls[2][0];
-      const xmlMsg = iter2Call.find(
-        (m: any) => m.constructor.name === "HumanMessage",
-      );
+      const xmlMsg = iter2Call.find((m: any) => m.constructor.name === "HumanMessage");
       expect(xmlMsg).toBeDefined();
       expect(xmlMsg.content).toContain('type="tool_input"');
       expect(xmlMsg.content).toContain('type="tool_output"');
