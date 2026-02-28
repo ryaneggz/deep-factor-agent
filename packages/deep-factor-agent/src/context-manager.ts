@@ -4,6 +4,7 @@ import type {
   AgentThread,
   ContextManagementConfig,
   SummaryEvent,
+  TokenUsage,
 } from "./types.js";
 
 /**
@@ -48,7 +49,13 @@ export class ContextManager {
   async summarize(
     thread: AgentThread,
     model: BaseChatModel,
-  ): Promise<AgentThread> {
+  ): Promise<{ thread: AgentThread; usage: TokenUsage }> {
+    const zeroUsage: TokenUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+    };
+
     const iterationMap = new Map<number, typeof thread.events>();
     for (const event of thread.events) {
       const iter = event.iteration;
@@ -59,15 +66,16 @@ export class ContextManager {
     }
 
     const iterations = Array.from(iterationMap.keys()).sort((a, b) => a - b);
-    if (iterations.length === 0) return thread;
+    if (iterations.length === 0) return { thread, usage: zeroUsage };
 
     const maxIteration = iterations[iterations.length - 1];
     const cutoff = maxIteration - this.keepRecentIterations;
 
     const oldIterations = iterations.filter((i) => i <= cutoff);
-    if (oldIterations.length === 0) return thread;
+    if (oldIterations.length === 0) return { thread, usage: zeroUsage };
 
     const summaryEvents: SummaryEvent[] = [];
+    let totalUsage: TokenUsage = { ...zeroUsage };
 
     for (const iter of oldIterations) {
       const events = iterationMap.get(iter)!;
@@ -83,6 +91,18 @@ export class ContextManager {
             `Summarize the following agent iteration events in 2-3 sentences. Focus on what tools were called, what was accomplished, and any errors:\n\n${eventsText}`,
           ),
         ]);
+
+        // Track token usage from this summarization call
+        const meta = (response as any).usage_metadata as
+          | { input_tokens?: number; output_tokens?: number; total_tokens?: number }
+          | undefined;
+        if (meta) {
+          totalUsage = {
+            inputTokens: totalUsage.inputTokens + (meta.input_tokens ?? 0),
+            outputTokens: totalUsage.outputTokens + (meta.output_tokens ?? 0),
+            totalTokens: totalUsage.totalTokens + (meta.total_tokens ?? 0),
+          };
+        }
 
         const content =
           typeof response.content === "string"
@@ -114,7 +134,7 @@ export class ContextManager {
     thread.events = [...summaryEvents, ...newEvents];
     thread.updatedAt = Date.now();
 
-    return thread;
+    return { thread, usage: totalUsage };
   }
 
   buildContextInjection(thread: AgentThread): string {

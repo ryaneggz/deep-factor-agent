@@ -342,6 +342,93 @@ describe("DeepFactorAgent", () => {
     });
   });
 
+  describe("continueLoop()", () => {
+    it("reuses existing thread and appends new user message", async () => {
+      const mockModel = makeMockModel();
+      // First turn
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("First response"));
+      // Second turn (continueLoop)
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({ model: mockModel });
+
+      const result1 = await agent.loop("Hello");
+      expect(result1.thread.id).toBeDefined();
+
+      const result2 = await agent.continueLoop(result1.thread, "Follow up");
+      // Same thread ID — proves reuse
+      expect(result2.thread.id).toBe(result1.thread.id);
+      // Thread contains both user messages
+      const userMessages = result2.thread.events.filter(
+        (e) => e.type === "message" && e.role === "user",
+      );
+      expect(userMessages.length).toBe(2);
+      expect(userMessages[0].type === "message" && userMessages[0].content).toBe("Hello");
+      expect(userMessages[1].type === "message" && userMessages[1].content).toBe("Follow up");
+    });
+
+    it("starts iteration from thread's max iteration + 1", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("First"));
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Second"));
+
+      const agent = new DeepFactorAgent({ model: mockModel });
+
+      const result1 = await agent.loop("Turn one");
+      expect(result1.iterations).toBe(1);
+
+      const result2 = await agent.continueLoop(result1.thread, "Turn two");
+      // Iteration should be > 1 (the completion event from turn 1 is at iteration 1)
+      expect(result2.iterations).toBeGreaterThan(result1.iterations);
+    });
+
+    it("model receives full conversation history from prior turns", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("First response"));
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        instructions: "You are helpful.",
+      });
+
+      const result1 = await agent.loop("Hello");
+      await agent.continueLoop(result1.thread, "Follow up");
+
+      // Second invoke should receive messages from both turns
+      const secondCall = mockModel.invoke.mock.calls[1];
+      const messages = secondCall[0] as Array<{ content: string }>;
+      // Should have: SystemMessage, HumanMessage("Hello"), AIMessage("First response"),
+      // HumanMessage("Follow up") — at minimum 4 messages
+      expect(messages.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("returns independent usage per turn", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("First", {
+            usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 },
+          }),
+        )
+        .mockResolvedValueOnce(
+          makeAIMessage("Second", {
+            usage: { input_tokens: 200, output_tokens: 80, total_tokens: 280 },
+          }),
+        );
+
+      const agent = new DeepFactorAgent({ model: mockModel });
+
+      const result1 = await agent.loop("Turn one");
+      expect(result1.usage.inputTokens).toBe(100);
+
+      const result2 = await agent.continueLoop(result1.thread, "Turn two");
+      // Usage from continueLoop is only for the second turn
+      expect(result2.usage.inputTokens).toBe(200);
+      expect(result2.usage.outputTokens).toBe(80);
+    });
+  });
+
   describe("stream()", () => {
     it("returns a streaming result", async () => {
       const mockModel = makeMockModel();
@@ -748,6 +835,47 @@ describe("DeepFactorAgent", () => {
 
       expect(result.stopReason).toBe("completed");
     });
+
+    it("includes summarization token usage in totalUsage", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke
+        // Iteration 1: main LLM response (100 input, 50 output, 150 total)
+        .mockResolvedValueOnce(makeAIMessage("First response"))
+        // Summarization call for iteration 0 — with explicit usage
+        .mockResolvedValueOnce(
+          new AIMessage({
+            content: "Summary: User asked about summarization.",
+            usage_metadata: {
+              input_tokens: 200,
+              output_tokens: 80,
+              total_tokens: 280,
+            },
+          }),
+        )
+        // Iteration 2: main LLM response (100 input, 50 output, 150 total)
+        .mockResolvedValueOnce(makeAIMessage("Second response"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        contextManagement: {
+          maxContextTokens: 10,
+          keepRecentIterations: 1,
+        },
+        verifyCompletion: vi
+          .fn()
+          .mockResolvedValueOnce({ complete: false, reason: "Try again" })
+          .mockResolvedValueOnce({ complete: true }),
+      });
+
+      const result = await agent.loop("Test summarization usage tracking");
+
+      // Two main LLM calls: 2 × (100 + 50 + 150) = (200, 100, 300)
+      // One summarization call: (200, 80, 280)
+      // Total should include both: (400, 180, 580)
+      expect(result.usage.inputTokens).toBe(400);
+      expect(result.usage.outputTokens).toBe(180);
+      expect(result.usage.totalTokens).toBe(580);
+    });
   });
 
   describe("interruptOn", () => {
@@ -787,11 +915,14 @@ describe("DeepFactorAgent", () => {
       expect(result.stopReason).toBe("human_input_needed");
       expect(result.stopDetail).toContain("dangerous_action");
 
-      // The tool should NOT have been executed (no tool_result events)
+      // The tool should NOT have been executed — but a synthetic tool_result
+      // is recorded to keep the message sequence valid for LLM APIs
       const toolResultEvents = result.thread.events.filter(
         (e) => e.type === "tool_result",
       );
-      expect(toolResultEvents.length).toBe(0);
+      expect(toolResultEvents.length).toBe(1);
+      expect(String(toolResultEvents[0].result)).toContain("not executed");
+      expect(String(toolResultEvents[0].result)).toContain("interrupted");
     });
 
     it("executes non-interrupt tools but pauses on interrupt tool in mixed batch", async () => {
@@ -838,11 +969,16 @@ describe("DeepFactorAgent", () => {
       expect(isPendingResult(result)).toBe(true);
       expect(result.stopReason).toBe("human_input_needed");
 
-      // safe_search should have been executed (tool_result present)
+      // safe_search was executed (real tool_result) + deploy has a synthetic
+      // tool_result to keep the message sequence valid for LLM APIs
       const toolResultEvents = result.thread.events.filter(
         (e) => e.type === "tool_result",
       );
-      expect(toolResultEvents.length).toBe(1);
+      expect(toolResultEvents.length).toBe(2);
+      // safe_search result is real
+      expect(String(toolResultEvents[0].result)).toBe("result: test");
+      // deploy result is synthetic (interrupted)
+      expect(String(toolResultEvents[1].result)).toContain("not executed");
 
       // Both tool_call events should be recorded
       const toolCallEvents = result.thread.events.filter(

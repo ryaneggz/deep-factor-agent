@@ -7,8 +7,9 @@ export type {
   AppProps,
 } from "./types.js";
 
-// Hook
-export { useAgent } from "./hooks/useAgent.js";
+// Hooks
+export { useAgent, eventsToChatMessages } from "./hooks/useAgent.js";
+export { useTextInput } from "./hooks/useTextInput.js";
 
 // Components
 export { App } from "./app.js";

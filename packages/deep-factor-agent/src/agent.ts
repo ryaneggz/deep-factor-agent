@@ -15,7 +15,7 @@ import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "./human-in-the-loop.js";
 import { evaluateStopConditions } from "./stop-conditions.js";
 import { ContextManager } from "./context-manager.js";
 import { serializeThreadToXml } from "./xml-serializer.js";
-import { findToolByName } from "./tool-adapter.js";
+import { toolArrayToMap } from "./tool-adapter.js";
 import type {
   AgentThread,
   AgentResult,
@@ -317,6 +317,28 @@ export class DeepFactorAgent<
     return this.runLoop(thread, prompt, 1);
   }
 
+  /**
+   * Continue an existing thread with a new user prompt.
+   * Reuses the thread's full conversation history so the model retains
+   * multi-turn context across calls.
+   */
+  async continueLoop(
+    thread: AgentThread,
+    prompt: string,
+  ): Promise<AgentResult | PendingResult> {
+    const nextIteration =
+      thread.events.reduce((max, e) => Math.max(max, e.iteration), 0) + 1;
+    thread.events.push({
+      type: "message",
+      role: "user",
+      content: prompt,
+      timestamp: Date.now(),
+      iteration: nextIteration,
+    });
+    thread.updatedAt = Date.now();
+    return this.runLoop(thread, prompt, nextIteration);
+  }
+
   private async runLoop(
     thread: AgentThread,
     prompt: string,
@@ -349,6 +371,7 @@ export class DeepFactorAgent<
       ...this.tools,
       ...this.composedMiddleware.tools,
     ];
+    const toolMap = toolArrayToMap(allTools);
 
     while (true) {
       // Callback
@@ -368,7 +391,9 @@ export class DeepFactorAgent<
 
       // Context management: check if summarization needed
       if (this.contextManager.needsSummarization(thread)) {
-        await this.contextManager.summarize(thread, model);
+        const { usage: summarizationUsage } =
+          await this.contextManager.summarize(thread, model);
+        totalUsage = addUsage(totalUsage, summarizationUsage);
       }
 
       // Build messages from thread
@@ -449,12 +474,30 @@ export class DeepFactorAgent<
 
             // Check interruptOn before executing
             if (this.interruptOn.includes(tc.name)) {
-              // Don't execute - will be handled after the inner loop
+              // Push a synthetic tool_result so the message sequence stays valid
+              // (every AIMessage tool_call must have a matching ToolMessage)
+              const interruptedToolCallId =
+                tc.id ?? `call_${stepCount}_${tc.name}`;
+              const interruptedResult = `[Tool "${tc.name}" not executed — interrupted for human approval]`;
+              const toolResultEvent: ToolResultEvent = {
+                type: "tool_result",
+                toolCallId: interruptedToolCallId,
+                result: interruptedResult,
+                timestamp: now,
+                iteration,
+              };
+              thread.events.push(toolResultEvent);
+              messages.push(
+                new ToolMessage({
+                  tool_call_id: interruptedToolCallId,
+                  content: interruptedResult,
+                }),
+              );
               continue;
             }
 
-            // Find and execute the tool
-            const foundTool = findToolByName(allTools, tc.name);
+            // Find and execute the tool (O(1) map lookup)
+            const foundTool = toolMap[tc.name];
             if (foundTool) {
               const toolResult = await foundTool.invoke(tc.args);
               const resultStr =

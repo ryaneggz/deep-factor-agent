@@ -5,6 +5,7 @@ import {
   TOOL_NAME_REQUEST_HUMAN_INPUT,
   maxIterations,
   isPendingResult,
+  addUsage,
 } from "deep-factor-agent";
 import type {
   AgentResult,
@@ -12,6 +13,7 @@ import type {
   TokenUsage,
   HumanInputRequestedEvent,
   AgentEvent,
+  AgentThread,
 } from "deep-factor-agent";
 import type {
   ChatMessage,
@@ -63,12 +65,14 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     useState<HumanInputRequestedEvent | null>(null);
 
   const pendingRef = useRef<PendingResult | null>(null);
+  const threadRef = useRef<AgentThread | null>(null);
 
   const handleResult = useCallback(
     (result: AgentResult | PendingResult) => {
+      threadRef.current = result.thread;
       const newMessages = eventsToChatMessages(result.thread.events);
       setMessages(newMessages);
-      setUsage(result.usage);
+      setUsage((prev) => addUsage(prev, result.usage));
       setIterations(result.iterations);
 
       if (isPendingResult(result)) {
@@ -117,7 +121,15 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
       });
 
-      agent.loop(prompt).then(handleResult).catch(handleError);
+      const existingThread = threadRef.current;
+      if (existingThread) {
+        agent
+          .continueLoop(existingThread, prompt)
+          .then(handleResult)
+          .catch(handleError);
+      } else {
+        agent.loop(prompt).then(handleResult).catch(handleError);
+      }
     },
     [options.model, options.maxIter, options.tools, handleResult, handleError],
   );

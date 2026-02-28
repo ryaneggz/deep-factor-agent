@@ -301,6 +301,68 @@ describe("human-in-the-loop: interruptOn", () => {
     }
   });
 
+  it("produces valid message sequence on resume (every tool_call has matching ToolMessage)", async () => {
+    const mockModel = makeMockModel();
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [
+            {
+              name: "deleteUser",
+              args: { userId: "123" },
+              id: "tc_del_1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage(""))
+      .mockResolvedValueOnce(
+        makeAIMessage("Done"),
+      );
+
+    const agent = new DeepFactorAgent({
+      model: mockModel,
+      interruptOn: ["deleteUser"],
+    });
+
+    const pendingResult = (await agent.loop(
+      "Delete user 123",
+    )) as PendingResult;
+
+    // Verify the thread has a synthetic tool_result for the interrupted tool
+    const toolResults = pendingResult.thread.events.filter(
+      (e) => e.type === "tool_result",
+    );
+    expect(toolResults.length).toBe(1);
+    expect(String(toolResults[0].result)).toContain("not executed");
+
+    await pendingResult.resume("approved");
+
+    // The third invoke call is the resume — capture messages sent to the model
+    const resumeCallMessages = mockModel.invoke.mock.calls[2][0];
+
+    // Validate: for every AIMessage with tool_calls, there must be a
+    // subsequent ToolMessage with the matching tool_call_id before the
+    // next non-ToolMessage
+    const toolCallIds = new Set<string>();
+    const toolResultIds = new Set<string>();
+    for (const msg of resumeCallMessages) {
+      if (msg.constructor.name === "AIMessage" && msg.tool_calls?.length) {
+        for (const tc of msg.tool_calls) {
+          toolCallIds.add(tc.id);
+        }
+      }
+      if (msg.constructor.name === "ToolMessage") {
+        toolResultIds.add(msg.tool_call_id);
+      }
+    }
+
+    // Every tool_call ID must have a matching ToolMessage
+    for (const id of toolCallIds) {
+      expect(toolResultIds.has(id)).toBe(true);
+    }
+  });
+
   it("after resume, the loop continues from where it left off", async () => {
     const mockModel = makeMockModel();
     mockModel.invoke
