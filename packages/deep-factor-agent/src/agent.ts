@@ -32,6 +32,8 @@ import type {
   AgentMiddleware,
   MiddlewareContext,
 } from "./types.js";
+import type { ModelAdapter } from "./providers/types.js";
+import { isModelAdapter } from "./providers/types.js";
 
 let threadCounter = 0;
 
@@ -133,8 +135,8 @@ function createThread(): AgentThread {
 export class DeepFactorAgent<
   TTools extends StructuredToolInterface[] = StructuredToolInterface[],
 > {
-  private modelOrString: BaseChatModel | string;
-  private resolvedModel: BaseChatModel | undefined;
+  private modelOrString: BaseChatModel | ModelAdapter | string;
+  private resolvedModel: BaseChatModel | ModelAdapter | null = null;
   private tools: TTools;
   private instructions: string;
   private stopConditions: StopCondition[];
@@ -153,6 +155,8 @@ export class DeepFactorAgent<
 
     if (typeof settings.model === "string") {
       this.modelId = settings.model;
+    } else if (isModelAdapter(settings.model)) {
+      this.modelId = "cli-adapter";
     } else {
       this.modelId = extractModelId(settings.model);
     }
@@ -183,12 +187,14 @@ export class DeepFactorAgent<
     this.contextManager = new ContextManager(settings.contextManagement);
   }
 
-  private async ensureModel(): Promise<BaseChatModel> {
+  private async ensureModel(): Promise<BaseChatModel | ModelAdapter> {
     if (this.resolvedModel) return this.resolvedModel;
     if (typeof this.modelOrString === "string") {
-      this.resolvedModel = await initChatModel(this.modelOrString);
-      return this.resolvedModel;
+      const resolved = await initChatModel(this.modelOrString);
+      this.resolvedModel = resolved;
+      return resolved;
     }
+    // Both BaseChatModel and ModelAdapter pass through directly
     this.resolvedModel = this.modelOrString;
     return this.resolvedModel;
   }
@@ -390,7 +396,11 @@ export class DeepFactorAgent<
       await this.composedMiddleware.beforeIteration(middlewareCtx);
 
       // Context management: check if summarization needed
-      if (this.contextManager.needsSummarization(thread)) {
+      // Summarization requires BaseChatModel (not ModelAdapter) for LLM calls
+      if (
+        this.contextManager.needsSummarization(thread) &&
+        !isModelAdapter(model)
+      ) {
         const { usage: summarizationUsage } =
           await this.contextManager.summarize(thread, model);
         totalUsage = addUsage(totalUsage, summarizationUsage);
@@ -404,7 +414,7 @@ export class DeepFactorAgent<
       try {
         // Bind tools and run inner tool-calling loop
         const modelWithTools =
-          allTools.length > 0 && model.bindTools
+          allTools.length > 0 && "bindTools" in model && model.bindTools
             ? model.bindTools(allTools)
             : model;
 
@@ -744,6 +754,13 @@ export class DeepFactorAgent<
 
   async stream(prompt: string): Promise<AsyncIterable<AIMessageChunk>> {
     const model = await this.ensureModel();
+
+    if (isModelAdapter(model)) {
+      throw new Error(
+        "Streaming is not supported for ModelAdapter providers. Use loop() instead.",
+      );
+    }
+
     const thread = createThread();
 
     // Push initial user message

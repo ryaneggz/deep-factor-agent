@@ -6,6 +6,7 @@ import type {
   SummaryEvent,
   TokenUsage,
 } from "./types.js";
+import type { ModelAdapter } from "./providers/types.js";
 
 /**
  * Default token estimator using `Math.ceil(text.length / 3.5)`.
@@ -48,7 +49,7 @@ export class ContextManager {
 
   async summarize(
     thread: AgentThread,
-    model: BaseChatModel,
+    model: BaseChatModel | ModelAdapter,
   ): Promise<{ thread: AgentThread; usage: TokenUsage }> {
     const zeroUsage: TokenUsage = {
       inputTokens: 0,
@@ -93,9 +94,12 @@ export class ContextManager {
         ]);
 
         // Track token usage from this summarization call
-        const meta = (response as any).usage_metadata as
-          | { input_tokens?: number; output_tokens?: number; total_tokens?: number }
-          | undefined;
+        const meta =
+          "usage_metadata" in response
+            ? (response.usage_metadata as
+                | { input_tokens?: number; output_tokens?: number; total_tokens?: number }
+                | undefined)
+            : undefined;
         if (meta) {
           totalUsage = {
             inputTokens: totalUsage.inputTokens + (meta.input_tokens ?? 0),

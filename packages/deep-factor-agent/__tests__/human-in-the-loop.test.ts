@@ -9,6 +9,7 @@ function makeMockModel() {
     invoke: vi.fn(),
     bindTools: vi.fn(),
     stream: vi.fn(),
+    _generate: vi.fn(),
     modelName: "test-model",
   };
   model.bindTools.mockReturnValue(model);
