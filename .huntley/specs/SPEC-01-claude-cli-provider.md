@@ -10,24 +10,24 @@ This spec introduces a lightweight `ModelAdapter` interface and the first concre
 
 ### Derives From
 
-| Source | What it provides |
-|--------|-----------------|
-| Plan: `abundant-snacking-sprout.md` | Architecture decision (Option A — simple adapter functions), interface shape, key design decisions |
-| `src/agent.ts:404-423` | The 2 methods the agent loop uses: `model.bindTools()` and `model.invoke()` |
-| `src/types.ts:165-182` | `DeepFactorAgentSettings.model` — currently `BaseChatModel \| string` |
-| `packages/deep-factor-cli/src/tools/bash.ts` | `child_process` pattern with async wrapper |
+| Source                                       | What it provides                                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Plan: `abundant-snacking-sprout.md`          | Architecture decision (Option A — simple adapter functions), interface shape, key design decisions |
+| `src/agent.ts:404-423`                       | The 2 methods the agent loop uses: `model.bindTools()` and `model.invoke()`                        |
+| `src/types.ts:165-182`                       | `DeepFactorAgentSettings.model` — currently `BaseChatModel \| string`                              |
+| `packages/deep-factor-cli/src/tools/bash.ts` | `child_process` pattern with async wrapper                                                         |
 
 ### Relevant Files
 
-| File | Purpose |
-|------|---------|
-| `packages/deep-factor-agent/src/types.ts` | `DeepFactorAgentSettings` — `model` field needs union extension |
-| `packages/deep-factor-agent/src/agent.ts` | `ensureModel()` (line 186-194) needs 3rd branch; agent loop (line 404-423) uses `invoke` + `bindTools` |
-| `packages/deep-factor-agent/src/index.ts` | Re-exports — needs new provider exports |
-| `packages/deep-factor-agent/src/create-agent.ts` | Factory — may need type adjustment |
-| `packages/deep-factor-agent/src/xml-serializer.ts` | `escapeXml()` — reused by `messagesToXml()` (not duplicated) |
-| `packages/deep-factor-cli/src/tools/bash.ts` | Reference for `child_process` async pattern |
-| `packages/deep-factor-agent/__tests__/agent.test.ts` | Test patterns — `makeMockModel()`, `makeAIMessage()` |
+| File                                                 | Purpose                                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `packages/deep-factor-agent/src/types.ts`            | `DeepFactorAgentSettings` — `model` field needs union extension                                        |
+| `packages/deep-factor-agent/src/agent.ts`            | `ensureModel()` (line 186-194) needs 3rd branch; agent loop (line 404-423) uses `invoke` + `bindTools` |
+| `packages/deep-factor-agent/src/index.ts`            | Re-exports — needs new provider exports                                                                |
+| `packages/deep-factor-agent/src/create-agent.ts`     | Factory — may need type adjustment                                                                     |
+| `packages/deep-factor-agent/src/xml-serializer.ts`   | `escapeXml()` — reused by `messagesToXml()` (not duplicated)                                           |
+| `packages/deep-factor-cli/src/tools/bash.ts`         | Reference for `child_process` async pattern                                                            |
+| `packages/deep-factor-agent/__tests__/agent.test.ts` | Test patterns — `makeMockModel()`, `makeAIMessage()`                                                   |
 
 ---
 
@@ -65,9 +65,7 @@ export interface ModelAdapter {
  * Type guard to distinguish ModelAdapter from BaseChatModel.
  * BaseChatModel has _generate; ModelAdapter does not.
  */
-export function isModelAdapter(
-  model: unknown,
-): model is ModelAdapter {
+export function isModelAdapter(model: unknown): model is ModelAdapter {
   return (
     typeof model === "object" &&
     model !== null &&
@@ -82,7 +80,7 @@ export function isModelAdapter(
 
 Extracts duplicated functions from both CLI providers into a single shared module. Adds `messagesToXml()` for XML input encoding.
 
-```ts
+````ts
 import { execFile } from "node:child_process";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { AIMessage as AIMessageType } from "@langchain/core/messages";
@@ -115,10 +113,7 @@ export function execFileAsync(
 export function messagesToPrompt(messages: BaseMessage[]): string {
   return messages
     .map((msg) => {
-      const content =
-        typeof msg.content === "string"
-          ? msg.content
-          : JSON.stringify(msg.content);
+      const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
       const type = msg._getType();
       switch (type) {
         case "system":
@@ -179,33 +174,24 @@ export function messagesToXml(messages: BaseMessage[]): string {
   let id = 0;
 
   for (const msg of messages) {
-    const content =
-      typeof msg.content === "string"
-        ? msg.content
-        : JSON.stringify(msg.content);
+    const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
     const type = msg._getType();
 
     switch (type) {
       case "system":
-        lines.push(
-          `  <event type="system" id="${id}" iteration="0">${escapeXml(content)}</event>`,
-        );
+        lines.push(`  <event type="system" id="${id}" iteration="0">${escapeXml(content)}</event>`);
         id++;
         break;
 
       case "human":
-        lines.push(
-          `  <event type="human" id="${id}" iteration="0">${escapeXml(content)}</event>`,
-        );
+        lines.push(`  <event type="human" id="${id}" iteration="0">${escapeXml(content)}</event>`);
         id++;
         break;
 
       case "ai": {
         // Emit AI text content (may be empty when only tool calls)
         if (content) {
-          lines.push(
-            `  <event type="ai" id="${id}" iteration="0">${escapeXml(content)}</event>`,
-          );
+          lines.push(`  <event type="ai" id="${id}" iteration="0">${escapeXml(content)}</event>`);
           id++;
         }
         // Emit tool_input events for each tool call
@@ -270,11 +256,11 @@ export function parseToolCalls(
 
   return [];
 }
-```
+````
 
 ### `src/providers/claude-cli.ts` — Claude CLI Provider
 
-```ts
+````ts
 import { AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -327,9 +313,7 @@ If you do not need to call any tools, respond with plain text (no JSON block).`;
  * By default, messages are serialized as `<thread>` XML (matching the agent's
  * `contextMode: "xml"` pattern). Set `inputEncoding: "text"` for plain-text labels.
  */
-export function createClaudeCliProvider(
-  opts?: ClaudeCliProviderOptions,
-): ModelAdapter {
+export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelAdapter {
   const cliPath = opts?.cliPath ?? "claude";
   const model = opts?.model;
   const timeout = opts?.timeout ?? 120_000;
@@ -348,19 +332,13 @@ export function createClaudeCliProvider(
           const toolDefs = boundToolDefs.map((t) => ({
             name: t.name,
             description: t.description,
-            parameters:
-              "schema" in t && t.schema
-                ? JSON.parse(JSON.stringify(t.schema))
-                : {},
+            parameters: "schema" in t && t.schema ? JSON.parse(JSON.stringify(t.schema)) : {},
           }));
           prompt += `[Available Tools]\n${JSON.stringify(toolDefs, null, 2)}\n\n${TOOL_CALL_FORMAT}\n\n`;
         }
 
         // Serialize messages using the configured encoding
-        prompt +=
-          inputEncoding === "xml"
-            ? messagesToXml(messages)
-            : messagesToPrompt(messages);
+        prompt += inputEncoding === "xml" ? messagesToXml(messages) : messagesToPrompt(messages);
 
         const args = ["-p", prompt, "--no-input"];
         if (model) {
@@ -377,9 +355,7 @@ export function createClaudeCliProvider(
 
         if (toolCalls.length > 0) {
           // Extract any text outside the JSON block as content
-          const contentOutsideJson = text
-            .replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "")
-            .trim();
+          const contentOutsideJson = text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
           return new AIMessage({
             content: contentOutsideJson || "",
             tool_calls: toolCalls,
@@ -398,7 +374,7 @@ export function createClaudeCliProvider(
 
   return buildAdapter();
 }
-```
+````
 
 ### `src/types.ts` — Extend Model Union
 
@@ -457,15 +433,14 @@ export type { ClaudeCliProviderOptions } from "./providers/claude-cli.js";
 
 ### `__tests__/providers/messages-to-xml.test.ts` (NEW)
 
-```ts
+````ts
 import { describe, it, expect } from "vitest";
+import { HumanMessage, SystemMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 import {
-  HumanMessage,
-  SystemMessage,
-  AIMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
-import { messagesToXml, messagesToPrompt, parseToolCalls } from "../../src/providers/messages-to-xml.js";
+  messagesToXml,
+  messagesToPrompt,
+  parseToolCalls,
+} from "../../src/providers/messages-to-xml.js";
 
 describe("messagesToXml", () => {
   it("serializes system/human/ai/tool messages to XML", () => {
@@ -510,18 +485,14 @@ describe("messagesToXml", () => {
   });
 
   it("falls back to 'unknown' for unresolvable tool names", () => {
-    const messages = [
-      new ToolMessage({ tool_call_id: "orphan_id", content: "result" }),
-    ];
+    const messages = [new ToolMessage({ tool_call_id: "orphan_id", content: "result" })];
 
     const xml = messagesToXml(messages);
     expect(xml).toContain('name="unknown"');
   });
 
   it("escapes XML special characters", () => {
-    const messages = [
-      new HumanMessage('What is <b>"1 & 2"</b>?'),
-    ];
+    const messages = [new HumanMessage('What is <b>"1 & 2"</b>?')];
 
     const xml = messagesToXml(messages);
     expect(xml).toContain("&lt;b&gt;");
@@ -530,7 +501,8 @@ describe("messagesToXml", () => {
   });
 
   it("passes through pre-serialized XML (content starts with <thread>)", () => {
-    const preSerialized = "<thread>\n  <event type=\"human\" id=\"0\" iteration=\"1\">Hello</event>\n</thread>";
+    const preSerialized =
+      '<thread>\n  <event type="human" id="0" iteration="1">Hello</event>\n</thread>';
     const messages = [new HumanMessage(preSerialized)];
 
     const xml = messagesToXml(messages);
@@ -538,10 +510,7 @@ describe("messagesToXml", () => {
   });
 
   it("sets iteration='0' for all events", () => {
-    const messages = [
-      new SystemMessage("sys"),
-      new HumanMessage("hi"),
-    ];
+    const messages = [new SystemMessage("sys"), new HumanMessage("hi")];
 
     const xml = messagesToXml(messages);
     const iterationMatches = xml.match(/iteration="0"/g);
@@ -574,7 +543,8 @@ describe("messagesToPrompt", () => {
 
 describe("parseToolCalls", () => {
   it("extracts tool calls from a JSON code block", () => {
-    const text = 'Some text\n\n```json\n{"tool_calls": [{"name": "calc", "args": {"x": 1}, "id": "c1"}]}\n```\n\nMore text';
+    const text =
+      'Some text\n\n```json\n{"tool_calls": [{"name": "calc", "args": {"x": 1}, "id": "c1"}]}\n```\n\nMore text';
     const result = parseToolCalls(text);
     expect(result).toEqual([{ name: "calc", args: { x: 1 }, id: "c1" }]);
   });
@@ -594,12 +564,13 @@ describe("parseToolCalls", () => {
   });
 
   it("handles multiple tool calls", () => {
-    const text = '```json\n{"tool_calls": [{"name": "a", "args": {}, "id": "1"}, {"name": "b", "args": {"k": "v"}, "id": "2"}]}\n```';
+    const text =
+      '```json\n{"tool_calls": [{"name": "a", "args": {}, "id": "1"}, {"name": "b", "args": {"k": "v"}, "id": "2"}]}\n```';
     const result = parseToolCalls(text);
     expect(result).toHaveLength(2);
   });
 });
-```
+````
 
 ### `__tests__/providers/claude-cli.test.ts`
 
@@ -619,21 +590,17 @@ import { isModelAdapter } from "../../src/providers/types.js";
 const mockExecFile = vi.mocked(execFile);
 
 function simulateExecFile(stdout: string) {
-  mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, cb: any) => {
-      cb(null, stdout, "");
-      return {} as any;
-    },
-  );
+  mockExecFile.mockImplementation((_file: any, _args: any, _opts: any, cb: any) => {
+    cb(null, stdout, "");
+    return {} as any;
+  });
 }
 
 function simulateExecFileError(message: string) {
-  mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, cb: any) => {
-      cb(new Error(message), "", "");
-      return {} as any;
-    },
-  );
+  mockExecFile.mockImplementation((_file: any, _args: any, _opts: any, cb: any) => {
+    cb(new Error(message), "", "");
+    return {} as any;
+  });
 }
 
 beforeEach(() => {
@@ -683,10 +650,7 @@ describe("createClaudeCliProvider", () => {
     simulateExecFile("Response");
     const provider = createClaudeCliProvider({ inputEncoding: "text" });
 
-    await provider.invoke([
-      new SystemMessage("Be concise."),
-      new HumanMessage("What is 2+2?"),
-    ]);
+    await provider.invoke([new SystemMessage("Be concise."), new HumanMessage("What is 2+2?")]);
 
     const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
     const prompt = args[1];
@@ -722,9 +686,9 @@ describe("createClaudeCliProvider", () => {
     simulateExecFileError("CLI process exited with code 1");
     const provider = createClaudeCliProvider();
 
-    await expect(
-      provider.invoke([new HumanMessage("Hi")]),
-    ).rejects.toThrow("CLI process exited with code 1");
+    await expect(provider.invoke([new HumanMessage("Hi")])).rejects.toThrow(
+      "CLI process exited with code 1",
+    );
   });
 
   it("parses tool calls from JSON code block", async () => {
@@ -849,6 +813,7 @@ describe("isModelAdapter", () => {
 ## FILE STRUCTURE
 
 ### New
+
 - `packages/deep-factor-agent/src/providers/types.ts`
 - `packages/deep-factor-agent/src/providers/messages-to-xml.ts` — Shared utility: `messagesToXml()`, `messagesToPrompt()`, `parseToolCalls()`, `execFileAsync()`
 - `packages/deep-factor-agent/src/providers/claude-cli.ts`
@@ -856,6 +821,7 @@ describe("isModelAdapter", () => {
 - `packages/deep-factor-agent/__tests__/providers/messages-to-xml.test.ts`
 
 ### Modified
+
 - `packages/deep-factor-agent/src/types.ts` — Add `ModelAdapter` to `model` union
 - `packages/deep-factor-agent/src/agent.ts` — Update `ensureModel()` return type and stored model type
 - `packages/deep-factor-agent/src/index.ts` — Export `ModelAdapter`, `isModelAdapter`, `createClaudeCliProvider`

@@ -36,9 +36,7 @@ async function main() {
   // Check if the agent is paused waiting for human input
   if (isPendingResult(result)) {
     // Find the question the agent asked
-    const hirEvents = result.thread.events.filter(
-      (e) => e.type === "human_input_requested",
-    );
+    const hirEvents = result.thread.events.filter((e) => e.type === "human_input_requested");
     const lastQuestion = hirEvents[hirEvents.length - 1];
     if (lastQuestion && lastQuestion.type === "human_input_requested") {
       console.log(`\nAgent asked: "${lastQuestion.question}"`);

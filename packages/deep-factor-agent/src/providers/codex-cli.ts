@@ -51,9 +51,7 @@ If you do not need to call any tools, respond with plain text (no JSON block).`;
  * By default, messages are serialized as `<thread>` XML (matching the agent's
  * `contextMode: "xml"` pattern). Set `inputEncoding: "text"` for plain-text labels.
  */
-export function createCodexCliProvider(
-  opts?: CodexCliProviderOptions,
-): ModelAdapter {
+export function createCodexCliProvider(opts?: CodexCliProviderOptions): ModelAdapter {
   const cliPath = opts?.cliPath ?? "codex";
   const model = opts?.model;
   const timeout = opts?.timeout ?? 120_000;
@@ -83,10 +81,7 @@ export function createCodexCliProvider(
         }
 
         // Serialize messages using the configured encoding
-        prompt +=
-          inputEncoding === "xml"
-            ? messagesToXml(messages)
-            : messagesToPrompt(messages);
+        prompt += inputEncoding === "xml" ? messagesToXml(messages) : messagesToPrompt(messages);
 
         const args = ["exec", prompt, "--full-auto", "--sandbox", "read-only"];
         if (model) {
@@ -103,9 +98,7 @@ export function createCodexCliProvider(
 
         if (toolCalls.length > 0) {
           // Extract any text outside the JSON block as content
-          const contentOutsideJson = text
-            .replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "")
-            .trim();
+          const contentOutsideJson = text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
           return new AIMessage({
             content: contentOutsideJson || "",
             tool_calls: toolCalls,

@@ -1,11 +1,6 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
-import type {
-  AgentThread,
-  ContextManagementConfig,
-  SummaryEvent,
-  TokenUsage,
-} from "./types.js";
+import type { AgentThread, ContextManagementConfig, SummaryEvent, TokenUsage } from "./types.js";
 import type { ModelAdapter } from "./providers/types.js";
 
 /**
@@ -82,9 +77,7 @@ export class ContextManager {
       const events = iterationMap.get(iter)!;
       if (events.length === 1 && events[0].type === "summary") continue;
 
-      const eventsText = events
-        .map((e) => JSON.stringify(e))
-        .join("\n");
+      const eventsText = events.map((e) => JSON.stringify(e)).join("\n");
 
       try {
         const response = await model.invoke([
@@ -131,9 +124,7 @@ export class ContextManager {
       }
     }
 
-    const newEvents = thread.events.filter(
-      (e) => e.iteration > cutoff || e.type === "summary",
-    );
+    const newEvents = thread.events.filter((e) => e.iteration > cutoff || e.type === "summary");
 
     thread.events = [...summaryEvents, ...newEvents];
     thread.updatedAt = Date.now();
@@ -142,9 +133,7 @@ export class ContextManager {
   }
 
   buildContextInjection(thread: AgentThread): string {
-    const summaries = thread.events.filter(
-      (e): e is SummaryEvent => e.type === "summary",
-    );
+    const summaries = thread.events.filter((e): e is SummaryEvent => e.type === "summary");
 
     if (summaries.length === 0) return "";
 

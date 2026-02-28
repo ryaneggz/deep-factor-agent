@@ -31,14 +31,10 @@ import type { AgentEvent } from "../dist/index.js";
 const args = process.argv.slice(2);
 const providerIndex = args.indexOf("--provider");
 const providerName =
-  providerIndex >= 0 && args[providerIndex + 1]
-    ? args[providerIndex + 1]
-    : "claude";
+  providerIndex >= 0 && args[providerIndex + 1] ? args[providerIndex + 1] : "claude";
 
 if (providerName !== "claude" && providerName !== "codex") {
-  console.error(
-    `Error: Invalid provider "${providerName}". Must be "claude" or "codex".`,
-  );
+  console.error(`Error: Invalid provider "${providerName}". Must be "claude" or "codex".`);
   process.exit(1);
 }
 
@@ -110,8 +106,7 @@ async function main() {
     middleware: [],
   });
 
-  const prompt =
-    "What is 42 * 17 + 3? Also, what is the current date and time?";
+  const prompt = "What is 42 * 17 + 3? Also, what is the current date and time?";
   console.log(`Prompt: ${prompt}\n`);
 
   const result = await agent.loop(prompt);
@@ -126,12 +121,8 @@ async function main() {
   }
 
   // Display events
-  const toolCalls = result.thread.events.filter(
-    (e: AgentEvent) => e.type === "tool_call",
-  );
-  const toolResults = result.thread.events.filter(
-    (e: AgentEvent) => e.type === "tool_result",
-  );
+  const toolCalls = result.thread.events.filter((e: AgentEvent) => e.type === "tool_call");
+  const toolResults = result.thread.events.filter((e: AgentEvent) => e.type === "tool_result");
 
   console.log(`\nTool calls: ${toolCalls.length}`);
   for (const tc of toolCalls) {
@@ -147,9 +138,7 @@ async function main() {
     }
   }
 
-  const errors = result.thread.events.filter(
-    (e: AgentEvent) => e.type === "error",
-  );
+  const errors = result.thread.events.filter((e: AgentEvent) => e.type === "error");
   if (errors.length > 0) {
     console.log(`\nErrors: ${errors.length}`);
     for (const err of errors) {
@@ -165,9 +154,7 @@ async function main() {
   console.log(`  Output: ${result.usage.outputTokens}`);
   console.log(`  Total:  ${result.usage.totalTokens}`);
   if (result.usage.inputTokens === 0) {
-    console.log(
-      "  (Zeros expected — CLI providers don't expose usage_metadata)",
-    );
+    console.log("  (Zeros expected — CLI providers don't expose usage_metadata)");
   }
 }
 

@@ -2,13 +2,12 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { describe, test, expect, vi, beforeEach } from "vitest";
 
-const { mockExit, mockUseAgent, mockSendPrompt, mockSubmitHumanInput } =
-  vi.hoisted(() => ({
-    mockExit: vi.fn(),
-    mockUseAgent: vi.fn(),
-    mockSendPrompt: vi.fn(),
-    mockSubmitHumanInput: vi.fn(),
-  }));
+const { mockExit, mockUseAgent, mockSendPrompt, mockSubmitHumanInput } = vi.hoisted(() => ({
+  mockExit: vi.fn(),
+  mockUseAgent: vi.fn(),
+  mockSendPrompt: vi.fn(),
+  mockSubmitHumanInput: vi.fn(),
+}));
 
 vi.mock("ink", async () => {
   const actual = await vi.importActual("ink");
@@ -100,13 +99,7 @@ describe("App", () => {
 
   test("PromptInput visible when idle + interactive", () => {
     const { lastFrame } = render(
-      <App
-        model="m"
-        maxIter={10}
-        verbose={false}
-        enableBash={false}
-        interactive={true}
-      />,
+      <App model="m" maxIter={10} verbose={false} enableBash={false} interactive={true} />,
     );
     expect(lastFrame()).toContain(">");
   });
@@ -133,13 +126,7 @@ describe("App", () => {
       messages: [{ role: "assistant", content: "done" }],
     });
     const { lastFrame } = render(
-      <App
-        model="m"
-        maxIter={10}
-        verbose={false}
-        enableBash={false}
-        interactive={true}
-      />,
+      <App model="m" maxIter={10} verbose={false} enableBash={false} interactive={true} />,
     );
     expect(lastFrame()).toContain(">");
   });
@@ -149,15 +136,7 @@ describe("App", () => {
       ...idle(),
       status: "done",
     });
-    render(
-      <App
-        model="m"
-        maxIter={10}
-        verbose={false}
-        enableBash={false}
-        interactive={true}
-      />,
-    );
+    render(<App model="m" maxIter={10} verbose={false} enableBash={false} interactive={true} />);
     await delay(100);
     expect(mockExit).not.toHaveBeenCalled();
   });
@@ -296,15 +275,7 @@ describe("App", () => {
       status: "error",
       error: new Error("failed"),
     });
-    render(
-      <App
-        model="m"
-        maxIter={10}
-        verbose={false}
-        enableBash={false}
-        interactive={true}
-      />,
-    );
+    render(<App model="m" maxIter={10} verbose={false} enableBash={false} interactive={true} />);
     await delay(100);
     expect(mockExit).not.toHaveBeenCalled();
   });
@@ -364,13 +335,7 @@ describe("App", () => {
 
   test("Spinner hidden when status=idle", () => {
     const { lastFrame } = render(
-      <App
-        model="m"
-        maxIter={10}
-        verbose={false}
-        enableBash={false}
-        interactive={false}
-      />,
+      <App model="m" maxIter={10} verbose={false} enableBash={false} interactive={false} />,
     );
     expect(lastFrame()).not.toContain("Thinking");
   });

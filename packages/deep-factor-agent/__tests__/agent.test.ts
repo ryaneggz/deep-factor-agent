@@ -178,9 +178,7 @@ describe("DeepFactorAgent", () => {
 
       const feedbackEvents = result.thread.events.filter(
         (e) =>
-          e.type === "message" &&
-          e.role === "user" &&
-          e.content.includes("Verification failed"),
+          e.type === "message" && e.role === "user" && e.content.includes("Verification failed"),
       );
       expect(feedbackEvents.length).toBe(1);
     });
@@ -198,9 +196,7 @@ describe("DeepFactorAgent", () => {
       const result = await agent.loop("Test error recovery");
       expect(result.stopReason).toBe("completed");
 
-      const errorEvents = result.thread.events.filter(
-        (e) => e.type === "error",
-      );
+      const errorEvents = result.thread.events.filter((e) => e.type === "error");
       expect(errorEvents.length).toBe(1);
       if (errorEvents[0].type === "error") {
         expect(errorEvents[0].recoverable).toBe(true);
@@ -222,9 +218,7 @@ describe("DeepFactorAgent", () => {
       expect(result.stopReason).toBe("max_errors");
       expect(result.stopDetail).toContain("3");
 
-      const errorEvents = result.thread.events.filter(
-        (e) => e.type === "error",
-      );
+      const errorEvents = result.thread.events.filter((e) => e.type === "error");
       expect(errorEvents.length).toBe(3);
     });
 
@@ -248,8 +242,7 @@ describe("DeepFactorAgent", () => {
 
     it("records tool calls and results as events", async () => {
       const searchTool = tool(
-        async (args: { query: string }) =>
-          JSON.stringify({ results: ["found"] }),
+        async (_args: { query: string }) => JSON.stringify({ results: ["found"] }),
         {
           name: "search",
           description: "Search for something",
@@ -261,9 +254,7 @@ describe("DeepFactorAgent", () => {
       mockModel.invoke
         .mockResolvedValueOnce(
           makeAIMessage("", {
-            tool_calls: [
-              { name: "search", args: { query: "test" }, id: "tc_1" },
-            ],
+            tool_calls: [{ name: "search", args: { query: "test" }, id: "tc_1" }],
           }),
         )
         .mockResolvedValueOnce(makeAIMessage("Found results"));
@@ -275,12 +266,8 @@ describe("DeepFactorAgent", () => {
 
       const result = await agent.loop("Search for something");
 
-      const toolCallEvents = result.thread.events.filter(
-        (e) => e.type === "tool_call",
-      );
-      const toolResultEvents = result.thread.events.filter(
-        (e) => e.type === "tool_result",
-      );
+      const toolCallEvents = result.thread.events.filter((e) => e.type === "tool_call");
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
 
       expect(toolCallEvents.length).toBe(1);
       expect(toolResultEvents.length).toBe(1);
@@ -336,9 +323,7 @@ describe("DeepFactorAgent", () => {
       expect(result.iterations).toBe(1);
       expect(result.stopReason).toBe("completed");
 
-      const completionEvents = result.thread.events.filter(
-        (e) => e.type === "completion",
-      );
+      const completionEvents = result.thread.events.filter((e) => e.type === "completion");
       expect(completionEvents.length).toBe(1);
     });
   });
@@ -526,14 +511,11 @@ describe("DeepFactorAgent", () => {
         })(),
       );
 
-      const searchTool = tool(
-        async () => "result",
-        {
-          name: "search",
-          description: "Search",
-          schema: z.object({ query: z.string() }),
-        },
-      );
+      const searchTool = tool(async () => "result", {
+        name: "search",
+        description: "Search",
+        schema: z.object({ query: z.string() }),
+      });
 
       const agent = new DeepFactorAgent({
         model: mockModel,
@@ -541,9 +523,7 @@ describe("DeepFactorAgent", () => {
       });
 
       await agent.stream("Test with tools");
-      expect(mockModel.bindTools).toHaveBeenCalledWith(
-        expect.arrayContaining([searchTool]),
-      );
+      expect(mockModel.bindTools).toHaveBeenCalledWith(expect.arrayContaining([searchTool]));
     });
   });
 
@@ -576,9 +556,7 @@ describe("DeepFactorAgent", () => {
       const result = await agent.loop("Exhaust tool calls");
       // The inner loop ran 20 times (stepCount 0..19), then the outer loop
       // completed without verification → single iteration
-      const toolCallEvents = result.thread.events.filter(
-        (e) => e.type === "tool_call",
-      );
+      const toolCallEvents = result.thread.events.filter((e) => e.type === "tool_call");
       // Should be exactly 20 tool calls (the 21st invoke never triggers a tool_call event)
       expect(toolCallEvents.length).toBe(20);
     });
@@ -606,9 +584,7 @@ describe("DeepFactorAgent", () => {
       });
 
       const result = await agent.loop("Limited tool calls");
-      const toolCallEvents = result.thread.events.filter(
-        (e) => e.type === "tool_call",
-      );
+      const toolCallEvents = result.thread.events.filter((e) => e.type === "tool_call");
       // With cap of 3, only 3 inner steps run (step 0, 1, 2)
       expect(toolCallEvents.length).toBe(3);
     });
@@ -616,22 +592,16 @@ describe("DeepFactorAgent", () => {
 
   describe("multiple tool calls in single response", () => {
     it("executes multiple tool calls from one model response", async () => {
-      const calcTool = tool(
-        async (args: { expression: string }) => `Result: ${args.expression}`,
-        {
-          name: "calculator",
-          description: "Calculate",
-          schema: z.object({ expression: z.string() }),
-        },
-      );
-      const weatherTool = tool(
-        async (args: { city: string }) => `72°F in ${args.city}`,
-        {
-          name: "weather",
-          description: "Weather",
-          schema: z.object({ city: z.string() }),
-        },
-      );
+      const calcTool = tool(async (args: { expression: string }) => `Result: ${args.expression}`, {
+        name: "calculator",
+        description: "Calculate",
+        schema: z.object({ expression: z.string() }),
+      });
+      const weatherTool = tool(async (args: { city: string }) => `72°F in ${args.city}`, {
+        name: "weather",
+        description: "Weather",
+        schema: z.object({ city: z.string() }),
+      });
 
       const mockModel = makeMockModel();
       mockModel.invoke
@@ -652,12 +622,8 @@ describe("DeepFactorAgent", () => {
 
       const result = await agent.loop("Calculate and check weather");
 
-      const toolCallEvents = result.thread.events.filter(
-        (e) => e.type === "tool_call",
-      );
-      const toolResultEvents = result.thread.events.filter(
-        (e) => e.type === "tool_result",
-      );
+      const toolCallEvents = result.thread.events.filter((e) => e.type === "tool_call");
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
 
       expect(toolCallEvents.length).toBe(2);
       expect(toolResultEvents.length).toBe(2);
@@ -758,9 +724,7 @@ describe("DeepFactorAgent", () => {
         // Iteration 1: main LLM response
         .mockResolvedValueOnce(makeAIMessage("First response"))
         // Summarization call for iteration 0 (triggered at start of iteration 2)
-        .mockResolvedValueOnce(
-          new AIMessage("Summary: User asked about summarization."),
-        )
+        .mockResolvedValueOnce(new AIMessage("Summary: User asked about summarization."))
         // Iteration 2: main LLM response
         .mockResolvedValueOnce(makeAIMessage("Second response"));
 
@@ -779,9 +743,7 @@ describe("DeepFactorAgent", () => {
       const result = await agent.loop("Test context summarization trigger");
 
       // Verify summary events exist in thread — proves summarization triggered
-      const summaryEvents = result.thread.events.filter(
-        (e) => e.type === "summary",
-      );
+      const summaryEvents = result.thread.events.filter((e) => e.type === "summary");
       expect(summaryEvents.length).toBeGreaterThan(0);
 
       // The summary should reference the summarized iteration (iteration 0)
@@ -801,9 +763,7 @@ describe("DeepFactorAgent", () => {
         // Iteration 1: main LLM response
         .mockResolvedValueOnce(makeAIMessage("First response"))
         // Summarization of iteration 0
-        .mockResolvedValueOnce(
-          new AIMessage("Summary of initial conversation."),
-        )
+        .mockResolvedValueOnce(new AIMessage("Summary of initial conversation."))
         // Iteration 2: main LLM response
         .mockResolvedValueOnce(makeAIMessage("Second response"));
 
@@ -881,29 +841,22 @@ describe("DeepFactorAgent", () => {
 
   describe("interruptOn", () => {
     it("returns PendingResult when a tool in interruptOn is called", async () => {
-      const dangerTool = tool(
-        async () => "executed",
-        {
-          name: "dangerous_action",
-          description: "A dangerous action",
-          schema: z.object({ target: z.string() }),
-        },
-      );
+      const dangerTool = tool(async () => "executed", {
+        name: "dangerous_action",
+        description: "A dangerous action",
+        schema: z.object({ target: z.string() }),
+      });
 
       const mockModel = makeMockModel();
       // First response: model wants to call the interrupt tool
       mockModel.invoke.mockResolvedValueOnce(
         makeAIMessage("Let me run this", {
-          tool_calls: [
-            { name: "dangerous_action", args: { target: "prod" }, id: "tc_d1" },
-          ],
+          tool_calls: [{ name: "dangerous_action", args: { target: "prod" }, id: "tc_d1" }],
         }),
       );
       // Second response: inner loop re-invokes after skipping execution;
       // no tool calls → inner loop exits, then checkInterruptOn fires
-      mockModel.invoke.mockResolvedValueOnce(
-        makeAIMessage("Awaiting approval"),
-      );
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Awaiting approval"));
 
       const agent = new DeepFactorAgent({
         model: mockModel,
@@ -918,31 +871,23 @@ describe("DeepFactorAgent", () => {
 
       // The tool should NOT have been executed — but a synthetic tool_result
       // is recorded to keep the message sequence valid for LLM APIs
-      const toolResultEvents = result.thread.events.filter(
-        (e) => e.type === "tool_result",
-      );
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
       expect(toolResultEvents.length).toBe(1);
       expect(String(toolResultEvents[0].result)).toContain("not executed");
       expect(String(toolResultEvents[0].result)).toContain("interrupted");
     });
 
     it("executes non-interrupt tools but pauses on interrupt tool in mixed batch", async () => {
-      const safeTool = tool(
-        async (args: { query: string }) => `result: ${args.query}`,
-        {
-          name: "safe_search",
-          description: "Safe search",
-          schema: z.object({ query: z.string() }),
-        },
-      );
-      const dangerTool = tool(
-        async () => "executed",
-        {
-          name: "deploy",
-          description: "Deploy to production",
-          schema: z.object({ env: z.string() }),
-        },
-      );
+      const safeTool = tool(async (args: { query: string }) => `result: ${args.query}`, {
+        name: "safe_search",
+        description: "Safe search",
+        schema: z.object({ query: z.string() }),
+      });
+      const dangerTool = tool(async () => "executed", {
+        name: "deploy",
+        description: "Deploy to production",
+        schema: z.object({ env: z.string() }),
+      });
 
       const mockModel = makeMockModel();
       // First response: mixed tool calls (safe + interrupt)
@@ -956,9 +901,7 @@ describe("DeepFactorAgent", () => {
       );
       // Second response: inner loop continues after processing tool results;
       // no tool calls → exits, then checkInterruptOn fires
-      mockModel.invoke.mockResolvedValueOnce(
-        makeAIMessage("Waiting for approval"),
-      );
+      mockModel.invoke.mockResolvedValueOnce(makeAIMessage("Waiting for approval"));
 
       const agent = new DeepFactorAgent({
         model: mockModel,
@@ -972,9 +915,7 @@ describe("DeepFactorAgent", () => {
 
       // safe_search was executed (real tool_result) + deploy has a synthetic
       // tool_result to keep the message sequence valid for LLM APIs
-      const toolResultEvents = result.thread.events.filter(
-        (e) => e.type === "tool_result",
-      );
+      const toolResultEvents = result.thread.events.filter((e) => e.type === "tool_result");
       expect(toolResultEvents.length).toBe(2);
       // safe_search result is real
       expect(String(toolResultEvents[0].result)).toBe("result: test");
@@ -982,9 +923,7 @@ describe("DeepFactorAgent", () => {
       expect(String(toolResultEvents[1].result)).toContain("not executed");
 
       // Both tool_call events should be recorded
-      const toolCallEvents = result.thread.events.filter(
-        (e) => e.type === "tool_call",
-      );
+      const toolCallEvents = result.thread.events.filter((e) => e.type === "tool_call");
       expect(toolCallEvents.length).toBe(2);
     });
   });

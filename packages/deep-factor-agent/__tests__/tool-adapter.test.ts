@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import {
-  createLangChainTool,
-  toolArrayToMap,
-  findToolByName,
-} from "../src/tool-adapter.js";
+import { createLangChainTool, toolArrayToMap, findToolByName } from "../src/tool-adapter.js";
 
 describe("createLangChainTool", () => {
   it("returns a StructuredToolInterface with correct name and description", () => {

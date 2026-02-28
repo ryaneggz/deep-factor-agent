@@ -3,7 +3,6 @@ import { AIMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { createDeepFactorAgent } from "../src/create-agent.js";
-import { DeepFactorAgent } from "../src/agent.js";
 import { maxIterations, maxTokens } from "../src/stop-conditions.js";
 import { requestHumanInput } from "../src/human-in-the-loop.js";
 import type { PendingResult, AgentMiddleware } from "../src/types.js";
@@ -55,8 +54,7 @@ beforeEach(() => {
 describe("Integration: full workflow", () => {
   it("createDeepFactorAgent -> loop() with tools, middleware, stop conditions", async () => {
     const searchDocsTool = tool(
-      async (args: { query: string }) =>
-        JSON.stringify({ docs: ["found result"] }),
+      async (_args: { query: string }) => JSON.stringify({ docs: ["found result"] }),
       {
         name: "searchDocs",
         description: "Search documentation",
@@ -105,12 +103,8 @@ describe("Integration: full workflow", () => {
     expect(result.response).toBe("Task completed");
     expect(result.usage.inputTokens).toBe(200);
 
-    const toolCalls = result.thread.events.filter(
-      (e) => e.type === "tool_call",
-    );
-    const toolResults = result.thread.events.filter(
-      (e) => e.type === "tool_result",
-    );
+    const toolCalls = result.thread.events.filter((e) => e.type === "tool_call");
+    const toolResults = result.thread.events.filter((e) => e.type === "tool_result");
     expect(toolCalls.length).toBe(1);
     expect(toolResults.length).toBe(1);
   });
@@ -139,10 +133,7 @@ describe("Integration: full workflow", () => {
     expect(result.response).toBe("Draft 2 - improved");
 
     const feedbackMessages = result.thread.events.filter(
-      (e) =>
-        e.type === "message" &&
-        e.role === "user" &&
-        e.content.includes("Verification failed"),
+      (e) => e.type === "message" && e.role === "user" && e.content.includes("Verification failed"),
     );
     expect(feedbackMessages.length).toBe(1);
   });
@@ -166,9 +157,7 @@ describe("Integration: full workflow", () => {
           },
         }),
       )
-      .mockResolvedValueOnce(
-        makeAIMessage("Set up PostgreSQL as requested"),
-      );
+      .mockResolvedValueOnce(makeAIMessage("Set up PostgreSQL as requested"));
 
     const agent = createDeepFactorAgent({
       model: mockModel,
@@ -176,21 +165,15 @@ describe("Integration: full workflow", () => {
       middleware: [],
     });
 
-    const pending = (await agent.loop(
-      "Set up database",
-    )) as PendingResult;
+    const pending = (await agent.loop("Set up database")) as PendingResult;
     expect(pending.stopReason).toBe("human_input_needed");
 
     const final = await pending.resume("PostgreSQL");
     expect(final.stopReason).toBe("completed");
     expect(final.response).toBe("Set up PostgreSQL as requested");
 
-    const requested = final.thread.events.filter(
-      (e) => e.type === "human_input_requested",
-    );
-    const received = final.thread.events.filter(
-      (e) => e.type === "human_input_received",
-    );
+    const requested = final.thread.events.filter((e) => e.type === "human_input_requested");
+    const received = final.thread.events.filter((e) => e.type === "human_input_received");
     expect(requested.length).toBe(1);
     expect(received.length).toBe(1);
   });
@@ -311,9 +294,7 @@ describe("Integration: full workflow", () => {
         }),
       )
       // After read_todos result, model returns final response
-      .mockResolvedValueOnce(
-        makeAIMessage("Todos written and verified"),
-      );
+      .mockResolvedValueOnce(makeAIMessage("Todos written and verified"));
 
     // Use createDeepFactorAgent which adds todoMiddleware by default
     const agent = createDeepFactorAgent({
@@ -327,9 +308,7 @@ describe("Integration: full workflow", () => {
     expect(result.thread.metadata.todos).toEqual(todosPayload);
 
     // Verify read_todos returned the written data (check tool_result events)
-    const toolResults = result.thread.events.filter(
-      (e) => e.type === "tool_result",
-    );
+    const toolResults = result.thread.events.filter((e) => e.type === "tool_result");
     expect(toolResults.length).toBe(2);
 
     // The second tool_result is from read_todos — it should contain the written todos

@@ -10,14 +10,7 @@ import { bashTool } from "./tools/bash.js";
 import type { AppProps } from "./types.js";
 import type { AgentTools } from "./types.js";
 
-export function App({
-  prompt,
-  model,
-  maxIter,
-  verbose,
-  enableBash,
-  interactive,
-}: AppProps) {
+export function App({ prompt, model, maxIter, verbose, enableBash, interactive }: AppProps) {
   const { exit } = useApp();
   const hasRun = useRef(false);
 

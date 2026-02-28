@@ -30,10 +30,7 @@ export interface TestLoggerOptions {
  * `agent-<timestamp>-<suite>.json` where the suite name is sanitized
  * for filesystem safety (special chars replaced with dashes).
  */
-export function writeTestLog(
-  suiteLog: TestSuiteLog,
-  options?: TestLoggerOptions,
-): string {
+export function writeTestLog(suiteLog: TestSuiteLog, options?: TestLoggerOptions): string {
   const logDir = options?.logDir ?? "./logs";
   mkdirSync(logDir, { recursive: true });
 
@@ -42,11 +39,7 @@ export function writeTestLog(
     .replace(/-+/g, "-")
     .toLowerCase();
 
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[:.]/g, "-")
-    .replace("T", "_")
-    .slice(0, 19);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
 
   const fileName = `agent-${timestamp}-${sanitizedSuite}.json`;
   const filePath = join(logDir, fileName);

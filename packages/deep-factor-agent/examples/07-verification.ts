@@ -5,10 +5,7 @@
  * contains valid JSON with a specific structure. The agent
  * self-corrects when verification fails.
  */
-import {
-  createDeepFactorAgent,
-  maxIterations,
-} from "../dist/index.js";
+import { createDeepFactorAgent, maxIterations } from "../dist/index.js";
 import type { VerifyContext, VerifyResult } from "../dist/index.js";
 import { MODEL_ID } from "./env.js";
 
@@ -17,8 +14,8 @@ async function verifyJsonResponse(ctx: VerifyContext): Promise<VerifyResult> {
   console.log(`  [verify] Checking iteration ${ctx.iteration}...`);
 
   // Try to extract JSON from the response
-  const jsonMatch = ctx.result.match(/```json\s*([\s\S]*?)```/) ??
-    ctx.result.match(/(\{[\s\S]*\})/);
+  const jsonMatch =
+    ctx.result.match(/```json\s*([\s\S]*?)```/) ?? ctx.result.match(/(\{[\s\S]*\})/);
 
   if (!jsonMatch) {
     console.log("  [verify] FAIL — No JSON found in response");
@@ -35,17 +32,14 @@ async function verifyJsonResponse(ctx: VerifyContext): Promise<VerifyResult> {
 
     // Validate required fields
     const requiredFields = ["name", "ingredients", "steps", "servings"];
-    const missingFields = requiredFields.filter(
-      (f) => !(f in data),
-    );
+    const missingFields = requiredFields.filter((f) => !(f in data));
 
     if (missingFields.length > 0) {
-      console.log(
-        `  [verify] FAIL — Missing fields: ${missingFields.join(", ")}`,
-      );
+      console.log(`  [verify] FAIL — Missing fields: ${missingFields.join(", ")}`);
       return {
         complete: false,
-        reason: `JSON is missing required fields: ${missingFields.join(", ")}. ` +
+        reason:
+          `JSON is missing required fields: ${missingFields.join(", ")}. ` +
           `Required fields are: ${requiredFields.join(", ")}.`,
       };
     }
@@ -54,8 +48,7 @@ async function verifyJsonResponse(ctx: VerifyContext): Promise<VerifyResult> {
       console.log("  [verify] FAIL — ingredients must be a non-empty array");
       return {
         complete: false,
-        reason:
-          "The 'ingredients' field must be a non-empty array of strings.",
+        reason: "The 'ingredients' field must be a non-empty array of strings.",
       };
     }
 
@@ -73,7 +66,8 @@ async function verifyJsonResponse(ctx: VerifyContext): Promise<VerifyResult> {
     console.log("  [verify] FAIL — Invalid JSON");
     return {
       complete: false,
-      reason: `Response contains invalid JSON: ${(e as Error).message}. ` +
+      reason:
+        `Response contains invalid JSON: ${(e as Error).message}. ` +
         "Please provide valid JSON in a ```json code block.",
     };
   }
@@ -96,9 +90,7 @@ async function main() {
 
   console.log("--- Running agent with verification ---\n");
 
-  const result = await agent.loop(
-    "Give me a recipe for chocolate chip cookies.",
-  );
+  const result = await agent.loop("Give me a recipe for chocolate chip cookies.");
 
   console.log("\nFinal response:\n", result.response);
   console.log("\n--- Result Summary ---");
@@ -110,17 +102,15 @@ async function main() {
   if (result.stopReason === "completed") {
     console.log("Verification: PASSED");
   } else if (result.stopReason === "stop_condition") {
-    console.log(
-      "Verification: Did not pass within iteration limit",
-    );
+    console.log("Verification: Did not pass within iteration limit");
     console.log("Stop detail:", result.stopDetail);
   }
 
   // Show iteration history
-  const messageEvents = result.thread.events.filter(
-    (e) => e.type === "message",
+  const messageEvents = result.thread.events.filter((e) => e.type === "message");
+  console.log(
+    `\nThread contains ${messageEvents.length} message events across ${result.iterations} iteration(s)`,
   );
-  console.log(`\nThread contains ${messageEvents.length} message events across ${result.iterations} iteration(s)`);
 }
 
 main().catch(console.error);

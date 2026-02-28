@@ -6,10 +6,7 @@ interface ToolCallProps {
   args: Record<string, unknown>;
 }
 
-function truncateValues(
-  obj: Record<string, unknown>,
-  maxLen: number,
-): Record<string, unknown> {
+function truncateValues(obj: Record<string, unknown>, maxLen: number): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const str = typeof value === "string" ? value : (JSON.stringify(value) ?? String(value));

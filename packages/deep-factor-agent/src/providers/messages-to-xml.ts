@@ -30,10 +30,7 @@ export function execFileAsync(
 export function messagesToPrompt(messages: BaseMessage[]): string {
   return messages
     .map((msg) => {
-      const content =
-        typeof msg.content === "string"
-          ? msg.content
-          : JSON.stringify(msg.content);
+      const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
       const type = msg._getType();
       switch (type) {
         case "system":
@@ -94,33 +91,24 @@ export function messagesToXml(messages: BaseMessage[]): string {
   let id = 0;
 
   for (const msg of messages) {
-    const content =
-      typeof msg.content === "string"
-        ? msg.content
-        : JSON.stringify(msg.content);
+    const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
     const type = msg._getType();
 
     switch (type) {
       case "system":
-        lines.push(
-          `  <event type="system" id="${id}" iteration="0">${escapeXml(content)}</event>`,
-        );
+        lines.push(`  <event type="system" id="${id}" iteration="0">${escapeXml(content)}</event>`);
         id++;
         break;
 
       case "human":
-        lines.push(
-          `  <event type="human" id="${id}" iteration="0">${escapeXml(content)}</event>`,
-        );
+        lines.push(`  <event type="human" id="${id}" iteration="0">${escapeXml(content)}</event>`);
         id++;
         break;
 
       case "ai": {
         // Emit AI text content (may be empty when only tool calls)
         if (content) {
-          lines.push(
-            `  <event type="ai" id="${id}" iteration="0">${escapeXml(content)}</event>`,
-          );
+          lines.push(`  <event type="ai" id="${id}" iteration="0">${escapeXml(content)}</event>`);
           id++;
         }
         // Emit tool_input events for each tool call
@@ -137,7 +125,7 @@ export function messagesToXml(messages: BaseMessage[]): string {
       }
 
       case "tool": {
-        const toolCallId = (msg as any).tool_call_id ?? "";
+        const toolCallId = (msg as unknown as { tool_call_id?: string }).tool_call_id ?? "";
         const toolName = toolNameMap.get(toolCallId) ?? "unknown";
         lines.push(
           `  <event type="tool_output" id="${id}" name="${escapeXml(toolName)}" call_id="${escapeXml(toolCallId)}" status="success" iteration="0">${escapeXml(content)}</event>`,

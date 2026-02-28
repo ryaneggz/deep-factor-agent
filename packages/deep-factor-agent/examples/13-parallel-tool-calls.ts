@@ -25,12 +25,7 @@ import { performance } from "node:perf_hooks";
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
 import { initChatModel } from "langchain/chat_models/universal";
-import {
-  HumanMessage,
-  AIMessage,
-  SystemMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { AgentEvent, AgentThread } from "../dist/index.js";
 import {
@@ -118,10 +113,7 @@ interface HitlResult {
   choices?: string[];
 }
 
-async function collectHumanInput(
-  toolResultJson: string,
-  rl: ReadlineInterface,
-): Promise<string> {
+async function collectHumanInput(toolResultJson: string, rl: ReadlineInterface): Promise<string> {
   const parsed: HitlResult = JSON.parse(toolResultJson);
 
   // Display question
@@ -198,9 +190,7 @@ async function executeToolsParallel(
 
   // --- Execute parallel (non-HITL) calls concurrently ---
   if (parallelCalls.length > 0) {
-    console.log(
-      `\n  [parallel] Executing ${parallelCalls.length} tool call(s) concurrently...`,
-    );
+    console.log(`\n  [parallel] Executing ${parallelCalls.length} tool call(s) concurrently...`);
 
     const batchStart = performance.now();
 
@@ -221,8 +211,7 @@ async function executeToolsParallel(
         console.log(`  [tool] ${tc.name}: ${tc.args.command ?? JSON.stringify(tc.args)}`);
 
         const result = await bashTool.invoke(tc.args);
-        const resultStr =
-          typeof result === "string" ? result : JSON.stringify(result);
+        const resultStr = typeof result === "string" ? result : JSON.stringify(result);
         const durationMs = performance.now() - callStart;
 
         return { toolCallId: tc.id, toolName: tc.name, result: resultStr, durationMs };
@@ -234,10 +223,7 @@ async function executeToolsParallel(
 
     // Record tool_result events and push ToolMessages (in order)
     for (const r of results) {
-      const preview =
-        r.result.length > 200
-          ? r.result.substring(0, 200) + "..."
-          : r.result;
+      const preview = r.result.length > 200 ? r.result.substring(0, 200) + "..." : r.result;
       console.log(
         `  [result] ${r.toolName} (${r.durationMs.toFixed(0)}ms): ${preview.replace(/\n/g, "\n           ")}`,
       );
@@ -250,9 +236,7 @@ async function executeToolsParallel(
         iteration: turn,
       });
 
-      messages.push(
-        new ToolMessage({ tool_call_id: r.toolCallId, content: r.result }),
-      );
+      messages.push(new ToolMessage({ tool_call_id: r.toolCallId, content: r.result }));
     }
 
     console.log(
@@ -275,8 +259,7 @@ async function executeToolsParallel(
     });
 
     const toolResult = await requestHumanInput.invoke(tc.args);
-    const resultStr =
-      typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
+    const resultStr = typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
     const hitlData = JSON.parse(resultStr);
 
     // Record human_input_requested
@@ -417,9 +400,7 @@ async function main() {
 
   console.log("--- Parallel Tool Calling with HITL (XML context) ---");
   console.log('Type a message and press Enter. Type "quit" to exit.');
-  console.log(
-    "Independent tool calls execute in parallel for better performance.\n",
-  );
+  console.log("Independent tool calls execute in parallel for better performance.\n");
 
   let turn = 0;
   process.stdout.write("You: ");
@@ -443,10 +424,7 @@ async function main() {
 
     // Build messages: system + XML thread
     const xml = serializeThreadToXml(thread.events);
-    const messages: BaseMessage[] = [
-      new SystemMessage(instructions),
-      new HumanMessage(xml),
-    ];
+    const messages: BaseMessage[] = [new SystemMessage(instructions), new HumanMessage(xml)];
 
     // Run the tool loop (streams text, executes tools and HITL inline)
     const response = await runToolLoop(model, messages, thread, turn, rl);

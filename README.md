@@ -48,9 +48,9 @@ const agent = createDeepFactorAgent({
 
 const result = await agent.loop("What is the capital of France?");
 
-console.log(result.response);   // "The capital of France is Paris."
+console.log(result.response); // "The capital of France is Paris."
 console.log(result.iterations); // number of loop iterations used
-console.log(result.usage);      // { inputTokens, outputTokens, totalTokens }
+console.log(result.usage); // { inputTokens, outputTokens, totalTokens }
 ```
 
 You can also pass a `BaseChatModel` instance directly:
@@ -88,14 +88,11 @@ import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-const getWeather = tool(
-  async ({ city }) => `72°F and sunny in ${city}`,
-  {
-    name: "getWeather",
-    description: "Get weather for a city",
-    schema: z.object({ city: z.string() }),
-  },
-);
+const getWeather = tool(async ({ city }) => `72°F and sunny in ${city}`, {
+  name: "getWeather",
+  description: "Get weather for a city",
+  schema: z.object({ city: z.string() }),
+});
 
 const agent = createDeepFactorAgent({
   model: "openai:gpt-4.1-mini",
@@ -126,11 +123,11 @@ import {
 const agent = createDeepFactorAgent({
   model: "openai:gpt-4.1-mini",
   stopWhen: [
-    maxIterations(20),          // stop after 20 loop iterations
-    maxTokens(100_000),         // stop at 100k total tokens
-    maxInputTokens(80_000),     // stop at 80k input tokens
-    maxOutputTokens(20_000),    // stop at 20k output tokens
-    maxCost(0.50),              // stop at $0.50 spend
+    maxIterations(20), // stop after 20 loop iterations
+    maxTokens(100_000), // stop at 100k total tokens
+    maxInputTokens(80_000), // stop at 80k input tokens
+    maxOutputTokens(20_000), // stop at 20k output tokens
+    maxCost(0.5), // stop at $0.50 spend
   ],
 });
 ```
@@ -231,8 +228,8 @@ const agent = createDeepFactorAgent({
   model: "openai:gpt-4.1-mini",
   stopWhen: [maxIterations(50)],
   contextManagement: {
-    maxContextTokens: 100_000,  // summarize when context exceeds this
-    keepRecentIterations: 5,    // always keep the last 5 iterations intact
+    maxContextTokens: 100_000, // summarize when context exceeds this
+    keepRecentIterations: 5, // always keep the last 5 iterations intact
   },
 });
 ```
@@ -243,113 +240,113 @@ When the context window fills up, older iterations are automatically summarized 
 
 When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 
-| Setting | Default |
-|---|---|
-| `tools` | `[]` (no tools) |
-| `instructions` | `""` (empty) |
-| `stopWhen` | `[maxIterations(10)]` |
-| `verifyCompletion` | `undefined` (no verification) |
-| `middleware` | `[todoMiddleware(), errorRecoveryMiddleware()]` |
-| `interruptOn` | `[]` (no interruptions) |
-| `maxToolCallsPerIteration` | `20` |
-| `contextManagement.maxContextTokens` | `150000` |
-| `contextManagement.keepRecentIterations` | `3` |
+| Setting                                  | Default                                         |
+| ---------------------------------------- | ----------------------------------------------- |
+| `tools`                                  | `[]` (no tools)                                 |
+| `instructions`                           | `""` (empty)                                    |
+| `stopWhen`                               | `[maxIterations(10)]`                           |
+| `verifyCompletion`                       | `undefined` (no verification)                   |
+| `middleware`                             | `[todoMiddleware(), errorRecoveryMiddleware()]` |
+| `interruptOn`                            | `[]` (no interruptions)                         |
+| `maxToolCallsPerIteration`               | `20`                                            |
+| `contextManagement.maxContextTokens`     | `150000`                                        |
+| `contextManagement.keepRecentIterations` | `3`                                             |
 
 ## API Reference
 
 ### Factory
 
-| Export | Description |
-|---|---|
+| Export                            | Description                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------- |
 | `createDeepFactorAgent(settings)` | Creates a `DeepFactorAgent` with sensible defaults. The primary entry point. |
 
 ### Agent Class
 
-| Export | Description |
-|---|---|
-| `DeepFactorAgent` | Core agent class. Use `createDeepFactorAgent` unless you need full control. |
-| `.loop(prompt)` | Run the agentic loop. Returns `AgentResult` or `PendingResult`. |
+| Export            | Description                                                                       |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `DeepFactorAgent` | Core agent class. Use `createDeepFactorAgent` unless you need full control.       |
+| `.loop(prompt)`   | Run the agentic loop. Returns `AgentResult` or `PendingResult`.                   |
 | `.stream(prompt)` | Stream the first LLM turn (non-looping). Returns `AsyncIterable<AIMessageChunk>`. |
-| `addUsage(a, b)` | Merge two `TokenUsage` objects by summing their fields. |
+| `addUsage(a, b)`  | Merge two `TokenUsage` objects by summing their fields.                           |
 
 ### Stop Conditions
 
-| Export | Description |
-|---|---|
-| `maxIterations(n)` | Stop after `n` loop iterations. |
-| `maxTokens(n)` | Stop when total tokens reach `n`. |
-| `maxInputTokens(n)` | Stop when input tokens reach `n`. |
-| `maxOutputTokens(n)` | Stop when output tokens reach `n`. |
-| `maxCost(dollars, model?)` | Stop when estimated cost reaches `dollars`. |
-| `calculateCost(usage, model)` | Calculate cost for a given `TokenUsage` and model name. |
-| `MODEL_PRICING` | Built-in pricing table for common models (Anthropic, OpenAI, Google). |
-| `evaluateStopConditions(conditions, ctx)` | Evaluate an array of stop conditions against a context. |
+| Export                                    | Description                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------- |
+| `maxIterations(n)`                        | Stop after `n` loop iterations.                                       |
+| `maxTokens(n)`                            | Stop when total tokens reach `n`.                                     |
+| `maxInputTokens(n)`                       | Stop when input tokens reach `n`.                                     |
+| `maxOutputTokens(n)`                      | Stop when output tokens reach `n`.                                    |
+| `maxCost(dollars, model?)`                | Stop when estimated cost reaches `dollars`.                           |
+| `calculateCost(usage, model)`             | Calculate cost for a given `TokenUsage` and model name.               |
+| `MODEL_PRICING`                           | Built-in pricing table for common models (Anthropic, OpenAI, Google). |
+| `evaluateStopConditions(conditions, ctx)` | Evaluate an array of stop conditions against a context.               |
 
 ### Middleware
 
-| Export | Description |
-|---|---|
+| Export                           | Description                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `composeMiddleware(middlewares)` | Compose an array of `AgentMiddleware` into a single middleware with merged tools and chained hooks. |
-| `todoMiddleware()` | Built-in middleware that gives the agent `write_todos` and `read_todos` tools. |
-| `errorRecoveryMiddleware()` | Built-in middleware that injects recovery guidance after errors. |
-| `TOOL_NAME_WRITE_TODOS` | Constant (`"write_todos"`) for the todo middleware tool name. |
+| `todoMiddleware()`               | Built-in middleware that gives the agent `write_todos` and `read_todos` tools.                      |
+| `errorRecoveryMiddleware()`      | Built-in middleware that injects recovery guidance after errors.                                    |
+| `TOOL_NAME_WRITE_TODOS`          | Constant (`"write_todos"`) for the todo middleware tool name.                                       |
 
 ### Context Management
 
-| Export | Description |
-|---|---|
-| `ContextManager` | Manages context window size by summarizing old iterations when the token limit is exceeded. |
-| `estimateTokens(text)` | Approximate token count for a string (~1 token per 3.5 characters). |
+| Export                 | Description                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| `ContextManager`       | Manages context window size by summarizing old iterations when the token limit is exceeded. |
+| `estimateTokens(text)` | Approximate token count for a string (~1 token per 3.5 characters).                         |
 
 ### Human-in-the-Loop
 
-| Export | Description |
-|---|---|
-| `requestHumanInput` | A LangChain tool that pauses the agent loop to collect human input. Use with `interruptOn: ["requestHumanInput"]`. |
-| `requestHumanInputSchema` | Zod schema for the `requestHumanInput` tool parameters. |
-| `TOOL_NAME_REQUEST_HUMAN_INPUT` | Constant (`"requestHumanInput"`) for the human input tool name. |
-| `isPendingResult(r)` | Type guard to check if a result is a `PendingResult` (agent is waiting for human input). |
+| Export                          | Description                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `requestHumanInput`             | A LangChain tool that pauses the agent loop to collect human input. Use with `interruptOn: ["requestHumanInput"]`. |
+| `requestHumanInputSchema`       | Zod schema for the `requestHumanInput` tool parameters.                                                            |
+| `TOOL_NAME_REQUEST_HUMAN_INPUT` | Constant (`"requestHumanInput"`) for the human input tool name.                                                    |
+| `isPendingResult(r)`            | Type guard to check if a result is a `PendingResult` (agent is waiting for human input).                           |
 
 ### Tool Adapter Utilities
 
-| Export | Description |
-|---|---|
-| `createLangChainTool(name, config)` | Create a LangChain `StructuredToolInterface` from a simple `{ description, schema, execute }` config. |
-| `toolArrayToMap(tools)` | Convert a `StructuredToolInterface[]` to a `Record<string, StructuredToolInterface>` for name-based lookup. |
-| `findToolByName(tools, name)` | Find a tool in an array by its `.name` property. |
+| Export                              | Description                                                                                                 |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `createLangChainTool(name, config)` | Create a LangChain `StructuredToolInterface` from a simple `{ description, schema, execute }` config.       |
+| `toolArrayToMap(tools)`             | Convert a `StructuredToolInterface[]` to a `Record<string, StructuredToolInterface>` for name-based lookup. |
+| `findToolByName(tools, name)`       | Find a tool in an array by its `.name` property.                                                            |
 
 ### Types
 
 All types are exported for use in your code:
 
-| Type | Description |
-|---|---|
-| `DeepFactorAgentSettings<TTools>` | Configuration for `createDeepFactorAgent`. `model` accepts `BaseChatModel \| string`. |
-| `AgentResult` | Return type of `loop()` — contains `response`, `thread`, `usage`, `iterations`, `stopReason`. |
-| `PendingResult` | Returned when `stopReason` is `"human_input_needed"` — adds `resume(input)`. |
-| `AgentThread` | The conversation thread with `id`, `events`, `metadata`. |
-| `TokenUsage` | Token counts: `inputTokens`, `outputTokens`, `totalTokens`, optional cache fields. |
-| `StopCondition` | A function `(ctx: StopConditionContext) => StopConditionResult`. |
-| `StopConditionContext` | Context passed to stop conditions: `iteration`, `usage`, `model`, `thread`. |
-| `StopConditionResult` | Result from a stop condition: `{ stop: boolean, reason?: string }`. |
-| `VerifyCompletion` | Async function to verify the agent completed its task. |
-| `VerifyContext` | Context passed to `verifyCompletion`: `result` (string), `iteration`, `thread`, `originalPrompt`. |
-| `VerifyResult` | Result from verification: `{ complete: boolean, reason?: string }`. |
-| `AgentMiddleware` | Middleware definition with `name`, optional `tools` (`StructuredToolInterface[]`), and lifecycle hooks. |
-| `MiddlewareContext` | Context passed to middleware hooks: `thread`, `iteration`, `settings`. |
-| `ContextManagementConfig` | Config for context management: `maxContextTokens`, `keepRecentIterations`. |
-| `ComposedMiddleware` | Result of `composeMiddleware()`: merged `tools`, chained `beforeIteration`/`afterIteration` hooks. |
-| `AgentEvent` | Discriminated union of all event types in the thread. |
-| `AgentEventType` | String literal union of all event type names (`"tool_call"`, `"tool_result"`, etc.). |
-| `BaseEvent` | Common fields shared by all events: `type`, `timestamp`, `iteration`. |
-| `ToolCallEvent` | Recorded when a tool is invoked. Adds `toolName`, `toolCallId`, `args`. |
-| `ToolResultEvent` | Recorded after a tool returns. Adds `toolCallId`, `result`. |
-| `ErrorEvent` | Recorded on errors. Adds `error` (string), `recoverable`, optional `toolCallId`. |
-| `HumanInputRequestedEvent` | Recorded when the agent pauses for human input. Adds `question`, optional `context`, `urgency`, `format`, `choices`. |
-| `HumanInputReceivedEvent` | Recorded when a human responds. Adds `response`. |
-| `MessageEvent` | Recorded for user/assistant/system messages. Adds `role`, `content`. |
-| `CompletionEvent` | Recorded when the agent completes. Adds `result`, `verified`. |
-| `SummaryEvent` | Recorded after context summarization. Adds `summarizedIterations`, `summary`. |
+| Type                              | Description                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `DeepFactorAgentSettings<TTools>` | Configuration for `createDeepFactorAgent`. `model` accepts `BaseChatModel \| string`.                                |
+| `AgentResult`                     | Return type of `loop()` — contains `response`, `thread`, `usage`, `iterations`, `stopReason`.                        |
+| `PendingResult`                   | Returned when `stopReason` is `"human_input_needed"` — adds `resume(input)`.                                         |
+| `AgentThread`                     | The conversation thread with `id`, `events`, `metadata`.                                                             |
+| `TokenUsage`                      | Token counts: `inputTokens`, `outputTokens`, `totalTokens`, optional cache fields.                                   |
+| `StopCondition`                   | A function `(ctx: StopConditionContext) => StopConditionResult`.                                                     |
+| `StopConditionContext`            | Context passed to stop conditions: `iteration`, `usage`, `model`, `thread`.                                          |
+| `StopConditionResult`             | Result from a stop condition: `{ stop: boolean, reason?: string }`.                                                  |
+| `VerifyCompletion`                | Async function to verify the agent completed its task.                                                               |
+| `VerifyContext`                   | Context passed to `verifyCompletion`: `result` (string), `iteration`, `thread`, `originalPrompt`.                    |
+| `VerifyResult`                    | Result from verification: `{ complete: boolean, reason?: string }`.                                                  |
+| `AgentMiddleware`                 | Middleware definition with `name`, optional `tools` (`StructuredToolInterface[]`), and lifecycle hooks.              |
+| `MiddlewareContext`               | Context passed to middleware hooks: `thread`, `iteration`, `settings`.                                               |
+| `ContextManagementConfig`         | Config for context management: `maxContextTokens`, `keepRecentIterations`.                                           |
+| `ComposedMiddleware`              | Result of `composeMiddleware()`: merged `tools`, chained `beforeIteration`/`afterIteration` hooks.                   |
+| `AgentEvent`                      | Discriminated union of all event types in the thread.                                                                |
+| `AgentEventType`                  | String literal union of all event type names (`"tool_call"`, `"tool_result"`, etc.).                                 |
+| `BaseEvent`                       | Common fields shared by all events: `type`, `timestamp`, `iteration`.                                                |
+| `ToolCallEvent`                   | Recorded when a tool is invoked. Adds `toolName`, `toolCallId`, `args`.                                              |
+| `ToolResultEvent`                 | Recorded after a tool returns. Adds `toolCallId`, `result`.                                                          |
+| `ErrorEvent`                      | Recorded on errors. Adds `error` (string), `recoverable`, optional `toolCallId`.                                     |
+| `HumanInputRequestedEvent`        | Recorded when the agent pauses for human input. Adds `question`, optional `context`, `urgency`, `format`, `choices`. |
+| `HumanInputReceivedEvent`         | Recorded when a human responds. Adds `response`.                                                                     |
+| `MessageEvent`                    | Recorded for user/assistant/system messages. Adds `role`, `content`.                                                 |
+| `CompletionEvent`                 | Recorded when the agent completes. Adds `result`, `verified`.                                                        |
+| `SummaryEvent`                    | Recorded after context summarization. Adds `summarizedIterations`, `summary`.                                        |
 
 ## Architecture: 12-Factor Agent Alignment
 

@@ -61,9 +61,7 @@ async function main() {
 
   console.log("--- Running agent with tools ---\n");
 
-  const result = await agent.loop(
-    "What is 47 * 89? Also, what's the weather like in Tokyo?",
-  );
+  const result = await agent.loop("What is 47 * 89? Also, what's the weather like in Tokyo?");
 
   console.log("Response:\n", result.response);
   console.log("\n--- Result Summary ---");

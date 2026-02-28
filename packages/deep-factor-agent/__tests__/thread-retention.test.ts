@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DeepFactorAgent } from "../src/agent.js";
 import { maxIterations } from "../src/stop-conditions.js";
-import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
+import { AIMessage } from "@langchain/core/messages";
 
 function makeMockModel() {
   const model: any = {
@@ -64,9 +64,7 @@ describe("Thread Retention", () => {
         tools: [searchTool],
         contextMode: "standard",
         verifyCompletion: async ({ iteration }) =>
-          iteration >= 2
-            ? { complete: true }
-            : { complete: false, reason: "Continue" },
+          iteration >= 2 ? { complete: true } : { complete: false, reason: "Continue" },
         stopWhen: [maxIterations(5)],
       });
 
@@ -79,19 +77,14 @@ describe("Thread Retention", () => {
 
       // Find the AIMessage that has tool_calls
       const toolCallMsg = iter2Call.find(
-        (m: any) =>
-          m.constructor.name === "AIMessage" &&
-          m.tool_calls &&
-          m.tool_calls.length > 0,
+        (m: any) => m.constructor.name === "AIMessage" && m.tool_calls && m.tool_calls.length > 0,
       );
       expect(toolCallMsg).toBeDefined();
       expect(toolCallMsg.tool_calls[0].name).toBe("search");
       expect(toolCallMsg.tool_calls[0].id).toBe("tc_1");
 
       // Find the ToolMessage
-      const toolResultMsg = iter2Call.find(
-        (m: any) => m.constructor.name === "ToolMessage",
-      );
+      const toolResultMsg = iter2Call.find((m: any) => m.constructor.name === "ToolMessage");
       expect(toolResultMsg).toBeDefined();
       expect(toolResultMsg.tool_call_id).toBe("tc_1");
       expect(toolResultMsg.content).toContain("search result data");
@@ -157,9 +150,7 @@ describe("Thread Retention", () => {
         tools: [calcTool],
         contextMode: "xml",
         verifyCompletion: async ({ iteration }) =>
-          iteration >= 2
-            ? { complete: true }
-            : { complete: false, reason: "Continue" },
+          iteration >= 2 ? { complete: true } : { complete: false, reason: "Continue" },
         stopWhen: [maxIterations(5)],
       });
 
@@ -168,9 +159,7 @@ describe("Thread Retention", () => {
 
       // On iteration 2, XML should contain all prior events
       const iter2Call = mockModel.invoke.mock.calls[2][0];
-      const xmlMsg = iter2Call.find(
-        (m: any) => m.constructor.name === "HumanMessage",
-      );
+      const xmlMsg = iter2Call.find((m: any) => m.constructor.name === "HumanMessage");
       expect(xmlMsg).toBeDefined();
 
       const xml = xmlMsg.content;
@@ -191,18 +180,14 @@ describe("Thread Retention", () => {
       mockModel.invoke
         .mockResolvedValueOnce(
           makeAIMessage("", {
-            tool_calls: [
-              { name: "read_file", args: { path: "/a.txt" }, id: "tc_1" },
-            ],
+            tool_calls: [{ name: "read_file", args: { path: "/a.txt" }, id: "tc_1" }],
           }),
         )
         .mockResolvedValueOnce(makeAIMessage("File read"))
         // Iteration 2: another tool call + response
         .mockResolvedValueOnce(
           makeAIMessage("", {
-            tool_calls: [
-              { name: "write_file", args: { path: "/b.txt", data: "hi" }, id: "tc_2" },
-            ],
+            tool_calls: [{ name: "write_file", args: { path: "/b.txt", data: "hi" }, id: "tc_2" }],
           }),
         )
         .mockResolvedValueOnce(makeAIMessage("File written"))
@@ -225,9 +210,7 @@ describe("Thread Retention", () => {
         tools: [readTool, writeTool],
         contextMode: "standard",
         verifyCompletion: async ({ iteration }) =>
-          iteration >= 3
-            ? { complete: true }
-            : { complete: false, reason: "Keep going" },
+          iteration >= 3 ? { complete: true } : { complete: false, reason: "Keep going" },
         stopWhen: [maxIterations(10)],
       });
 
@@ -239,17 +222,12 @@ describe("Thread Retention", () => {
 
       // Count AIMessages with tool_calls
       const toolCallMsgs = iter3Call.filter(
-        (m: any) =>
-          m.constructor.name === "AIMessage" &&
-          m.tool_calls &&
-          m.tool_calls.length > 0,
+        (m: any) => m.constructor.name === "AIMessage" && m.tool_calls && m.tool_calls.length > 0,
       );
       expect(toolCallMsgs.length).toBeGreaterThanOrEqual(2);
 
       // Count ToolMessages
-      const toolResultMsgs = iter3Call.filter(
-        (m: any) => m.constructor.name === "ToolMessage",
-      );
+      const toolResultMsgs = iter3Call.filter((m: any) => m.constructor.name === "ToolMessage");
       expect(toolResultMsgs.length).toBeGreaterThanOrEqual(2);
     });
   });
@@ -262,9 +240,7 @@ describe("Thread Retention", () => {
       mockModel.invoke
         .mockResolvedValueOnce(
           makeAIMessage("", {
-            tool_calls: [
-              { name: "search", args: { q: "test" }, id: "tc_1" },
-            ],
+            tool_calls: [{ name: "search", args: { q: "test" }, id: "tc_1" }],
           }),
         )
         .mockResolvedValueOnce(makeAIMessage("Found"))
@@ -282,9 +258,7 @@ describe("Thread Retention", () => {
         tools: [searchTool],
         contextMode: "xml",
         verifyCompletion: async ({ iteration }) =>
-          iteration >= 2
-            ? { complete: true }
-            : { complete: false, reason: "Keep going" },
+          iteration >= 2 ? { complete: true } : { complete: false, reason: "Keep going" },
         stopWhen: [maxIterations(5)],
       });
 
@@ -293,9 +267,7 @@ describe("Thread Retention", () => {
 
       // On iteration 2, XML should contain events from iteration 1
       const iter2Call = mockModel.invoke.mock.calls[2][0];
-      const xmlMsg = iter2Call.find(
-        (m: any) => m.constructor.name === "HumanMessage",
-      );
+      const xmlMsg = iter2Call.find((m: any) => m.constructor.name === "HumanMessage");
       const xml = xmlMsg.content;
 
       // Should contain tool events from iteration 1
@@ -331,9 +303,7 @@ describe("Thread Retention", () => {
           tools: [calcTool],
           contextMode: mode,
           verifyCompletion: async ({ iteration }) =>
-            iteration >= 2
-              ? { complete: true }
-              : { complete: false, reason: "Continue" },
+            iteration >= 2 ? { complete: true } : { complete: false, reason: "Continue" },
           stopWhen: [maxIterations(5)],
         });
 
@@ -351,20 +321,12 @@ describe("Thread Retention", () => {
       expect(stdResult.thread.events.length).toBe(xmlResult.thread.events.length);
 
       // Both should have tool_call and tool_result events
-      const stdToolCalls = stdResult.thread.events.filter(
-        (e) => e.type === "tool_call",
-      );
-      const xmlToolCalls = xmlResult.thread.events.filter(
-        (e) => e.type === "tool_call",
-      );
+      const stdToolCalls = stdResult.thread.events.filter((e) => e.type === "tool_call");
+      const xmlToolCalls = xmlResult.thread.events.filter((e) => e.type === "tool_call");
       expect(stdToolCalls.length).toBe(xmlToolCalls.length);
 
-      const stdToolResults = stdResult.thread.events.filter(
-        (e) => e.type === "tool_result",
-      );
-      const xmlToolResults = xmlResult.thread.events.filter(
-        (e) => e.type === "tool_result",
-      );
+      const stdToolResults = stdResult.thread.events.filter((e) => e.type === "tool_result");
+      const xmlToolResults = xmlResult.thread.events.filter((e) => e.type === "tool_result");
       expect(stdToolResults.length).toBe(xmlToolResults.length);
 
       // Both should complete with same response

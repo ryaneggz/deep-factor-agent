@@ -16,9 +16,7 @@ async function main() {
 
   console.log("--- Running basic agent ---\n");
 
-  const result = await agent.loop(
-    "What are the three laws of robotics? List them briefly.",
-  );
+  const result = await agent.loop("What are the three laws of robotics? List them briefly.");
 
   console.log("Response:\n", result.response);
   console.log("\n--- Result Summary ---");

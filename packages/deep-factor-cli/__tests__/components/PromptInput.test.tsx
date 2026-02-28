@@ -12,9 +12,7 @@ describe("PromptInput", () => {
   });
 
   test("appends character on keypress", async () => {
-    const { lastFrame, stdin } = render(
-      <PromptInput onSubmit={() => {}} />,
-    );
+    const { lastFrame, stdin } = render(<PromptInput onSubmit={() => {}} />);
     stdin.write("a");
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("a");
@@ -22,9 +20,7 @@ describe("PromptInput", () => {
   });
 
   test("appends multiple characters", async () => {
-    const { lastFrame, stdin } = render(
-      <PromptInput onSubmit={() => {}} />,
-    );
+    const { lastFrame, stdin } = render(<PromptInput onSubmit={() => {}} />);
     stdin.write("h");
     await delay();
     stdin.write("e");
@@ -40,9 +36,7 @@ describe("PromptInput", () => {
   });
 
   test("backspace removes last character", async () => {
-    const { lastFrame, stdin } = render(
-      <PromptInput onSubmit={() => {}} />,
-    );
+    const { lastFrame, stdin } = render(<PromptInput onSubmit={() => {}} />);
     stdin.write("a");
     await delay();
     stdin.write("b");
@@ -56,9 +50,7 @@ describe("PromptInput", () => {
   });
 
   test("delete removes last character", async () => {
-    const { lastFrame, stdin } = render(
-      <PromptInput onSubmit={() => {}} />,
-    );
+    const { lastFrame, stdin } = render(<PromptInput onSubmit={() => {}} />);
     stdin.write("x");
     await delay();
     stdin.write("y");
@@ -72,17 +64,13 @@ describe("PromptInput", () => {
   });
 
   test("backspace on empty input is a no-op", () => {
-    const { lastFrame, stdin } = render(
-      <PromptInput onSubmit={() => {}} />,
-    );
+    const { lastFrame, stdin } = render(<PromptInput onSubmit={() => {}} />);
     stdin.write("\x7f");
     expect(lastFrame()).toContain(">");
   });
 
   test("ignores ctrl key combinations", async () => {
-    const { lastFrame, stdin } = render(
-      <PromptInput onSubmit={() => {}} />,
-    );
+    const { lastFrame, stdin } = render(<PromptInput onSubmit={() => {}} />);
     stdin.write("a");
     await delay();
     stdin.write("\x01"); // ctrl+a
@@ -92,9 +80,7 @@ describe("PromptInput", () => {
   });
 
   test("ignores meta key combinations", async () => {
-    const { lastFrame, stdin } = render(
-      <PromptInput onSubmit={() => {}} />,
-    );
+    const { lastFrame, stdin } = render(<PromptInput onSubmit={() => {}} />);
     stdin.write("a");
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("a");

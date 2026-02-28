@@ -6,7 +6,14 @@ vi.mock("node:child_process", () => ({
 
 vi.mock("deep-factor-agent", () => ({
   createLangChainTool: vi.fn(
-    (name: string, opts: { description: string; schema: unknown; execute: (args: Record<string, unknown>) => Promise<string> }) => ({
+    (
+      name: string,
+      opts: {
+        description: string;
+        schema: unknown;
+        execute: (args: Record<string, unknown>) => Promise<string>;
+      },
+    ) => ({
       name,
       description: opts.description,
       schema: opts.schema,
@@ -27,7 +34,11 @@ beforeEach(() => {
 /** Helper: make mockExec call its callback with stdout */
 function mockSuccess(stdout: string) {
   mockExec.mockImplementation(
-    (_cmd: string, _opts: unknown, cb: (err: Error | null, stdout: string, stderr: string) => void) => {
+    (
+      _cmd: string,
+      _opts: unknown,
+      cb: (err: Error | null, stdout: string, stderr: string) => void,
+    ) => {
       cb(null, stdout, "");
     },
   );
@@ -36,7 +47,11 @@ function mockSuccess(stdout: string) {
 /** Helper: make mockExec call its callback with an error */
 function mockError(error: Error) {
   mockExec.mockImplementation(
-    (_cmd: string, _opts: unknown, cb: (err: Error | null, stdout: string, stderr: string) => void) => {
+    (
+      _cmd: string,
+      _opts: unknown,
+      cb: (err: Error | null, stdout: string, stderr: string) => void,
+    ) => {
       cb(error, "", "");
     },
   );
@@ -62,11 +77,7 @@ describe("bashTool", () => {
     it("calls exec with the command", async () => {
       mockSuccess("output");
       await bashTool.invoke({ command: "ls -la" });
-      expect(mockExec).toHaveBeenCalledWith(
-        "ls -la",
-        expect.any(Object),
-        expect.any(Function),
-      );
+      expect(mockExec).toHaveBeenCalledWith("ls -la", expect.any(Object), expect.any(Function));
     });
 
     it("passes encoding utf8", async () => {
@@ -110,7 +121,11 @@ describe("bashTool", () => {
       // while the child process runs
       let callbackCalled = false;
       mockExec.mockImplementation(
-        (_cmd: string, _opts: unknown, cb: (err: Error | null, stdout: string, stderr: string) => void) => {
+        (
+          _cmd: string,
+          _opts: unknown,
+          cb: (err: Error | null, stdout: string, stderr: string) => void,
+        ) => {
           // Simulate async: defer the callback
           Promise.resolve().then(() => {
             callbackCalled = true;
@@ -134,42 +149,30 @@ describe("bashTool", () => {
 
     it("preserves error message", async () => {
       mockError(new Error("Permission denied"));
-      await expect(
-        bashTool.invoke({ command: "restricted" }),
-      ).rejects.toThrow("Permission denied");
+      await expect(bashTool.invoke({ command: "restricted" })).rejects.toThrow("Permission denied");
     });
 
     it("throws on timeout", async () => {
       const err = new Error("TIMEOUT");
       (err as Record<string, unknown>).killed = true;
       mockError(err);
-      await expect(
-        bashTool.invoke({ command: "sleep 100" }),
-      ).rejects.toThrow();
+      await expect(bashTool.invoke({ command: "sleep 100" })).rejects.toThrow();
     });
 
     it("throws on maxBuffer exceeded", async () => {
       mockError(new Error("maxBuffer length exceeded"));
-      await expect(bashTool.invoke({ command: "huge" })).rejects.toThrow(
-        "maxBuffer",
-      );
+      await expect(bashTool.invoke({ command: "huge" })).rejects.toThrow("maxBuffer");
     });
 
     it("throws on command not found", async () => {
       mockError(new Error("Command not found: nonexistent"));
-      await expect(
-        bashTool.invoke({ command: "nonexistent" }),
-      ).rejects.toThrow();
+      await expect(bashTool.invoke({ command: "nonexistent" })).rejects.toThrow();
     });
 
     it("invokes exec even with empty command", async () => {
       mockSuccess("");
       await bashTool.invoke({ command: "" });
-      expect(mockExec).toHaveBeenCalledWith(
-        "",
-        expect.any(Object),
-        expect.any(Function),
-      );
+      expect(mockExec).toHaveBeenCalledWith("", expect.any(Object), expect.any(Function));
     });
   });
 });

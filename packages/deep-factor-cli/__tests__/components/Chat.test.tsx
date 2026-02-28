@@ -6,20 +6,14 @@ import { Chat } from "../../src/components/Chat.js";
 describe("Chat", () => {
   test("renders user message", () => {
     const { lastFrame } = render(
-      <Chat
-        messages={[{ role: "user", content: "hello" }]}
-        verbose={false}
-      />,
+      <Chat messages={[{ role: "user", content: "hello" }]} verbose={false} />,
     );
     expect(lastFrame()).toContain("hello");
   });
 
   test("renders assistant message", () => {
     const { lastFrame } = render(
-      <Chat
-        messages={[{ role: "assistant", content: "world" }]}
-        verbose={false}
-      />,
+      <Chat messages={[{ role: "assistant", content: "world" }]} verbose={false} />,
     );
     expect(lastFrame()).toContain("world");
   });
@@ -62,9 +56,7 @@ describe("Chat", () => {
   });
 
   test("renders nothing for empty messages", () => {
-    const { lastFrame } = render(
-      <Chat messages={[]} verbose={false} />,
-    );
+    const { lastFrame } = render(<Chat messages={[]} verbose={false} />);
     expect(lastFrame()).toBe("");
   });
 
@@ -91,9 +83,7 @@ describe("Chat", () => {
   test("renders tool_result content when verbose=true", () => {
     const { lastFrame } = render(
       <Chat
-        messages={[
-          { role: "tool_result", content: "result data from tool" },
-        ]}
+        messages={[{ role: "tool_result", content: "result data from tool" }]}
         verbose={true}
       />,
     );
@@ -104,10 +94,7 @@ describe("Chat", () => {
     // Use distinct prefix and suffix to verify truncation boundary
     const longContent = "X".repeat(200) + "Y".repeat(50);
     const { lastFrame } = render(
-      <Chat
-        messages={[{ role: "tool_result", content: longContent }]}
-        verbose={true}
-      />,
+      <Chat messages={[{ role: "tool_result", content: longContent }]} verbose={true} />,
     );
     const frame = lastFrame() ?? "";
     // Truncation adds "..." and removes content past 200 chars

@@ -1,11 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import {
-  composeMiddleware,
-  todoMiddleware,
-  errorRecoveryMiddleware,
-} from "../src/middleware.js";
+import { composeMiddleware, todoMiddleware, errorRecoveryMiddleware } from "../src/middleware.js";
 import type {
   AgentMiddleware,
   MiddlewareContext,
@@ -24,9 +20,7 @@ function makeThread(): AgentThread {
   };
 }
 
-function makeCtx(
-  overrides: Partial<MiddlewareContext> = {},
-): MiddlewareContext {
+function makeCtx(overrides: Partial<MiddlewareContext> = {}): MiddlewareContext {
   return {
     thread: makeThread(),
     iteration: 1,
@@ -91,9 +85,7 @@ describe("composeMiddleware", () => {
     const composed = composeMiddleware([mw1, mw2]);
     const sharedTool = composed.tools.find((t) => t.name === "shared_tool");
     expect(sharedTool!.description).toBe("V2");
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("shared_tool"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("shared_tool"));
 
     warnSpy.mockRestore();
   });
@@ -279,11 +271,11 @@ describe("todoMiddleware", () => {
     });
 
     // Instance 1 should have the todo
-    const result1 = JSON.parse(await readTool1.invoke({}) as string);
+    const result1 = JSON.parse((await readTool1.invoke({})) as string);
     expect(result1.todos).toHaveLength(1);
 
     // Instance 2 should still be empty
-    const result2 = JSON.parse(await readTool2.invoke({}) as string);
+    const result2 = JSON.parse((await readTool2.invoke({})) as string);
     expect(result2.todos).toHaveLength(0);
   });
 });
@@ -315,9 +307,7 @@ describe("errorRecoveryMiddleware", () => {
     expect(lastEvent.type).toBe("message");
     if (lastEvent.type === "message") {
       expect(lastEvent.content).toContain("Something went wrong");
-      expect(lastEvent.content).toContain(
-        "Consider an alternative approach",
-      );
+      expect(lastEvent.content).toContain("Consider an alternative approach");
     }
   });
 

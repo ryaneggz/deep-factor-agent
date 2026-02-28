@@ -10,23 +10,23 @@ This is the integration test that proves the `ModelAdapter` flow works end-to-en
 
 ### Derives From
 
-| Source | What it provides |
-|--------|-----------------|
-| Plan: `abundant-snacking-sprout.md` | Example 14 description, smoke test steps 5-7 |
-| SPEC-01 | `createClaudeCliProvider()`, `ModelAdapter` interface |
-| SPEC-02 | `createCodexCliProvider()` |
+| Source                               | What it provides                                               |
+| ------------------------------------ | -------------------------------------------------------------- |
+| Plan: `abundant-snacking-sprout.md`  | Example 14 description, smoke test steps 5-7                   |
+| SPEC-01                              | `createClaudeCliProvider()`, `ModelAdapter` interface          |
+| SPEC-02                              | `createCodexCliProvider()`                                     |
 | `examples/13-parallel-tool-calls.ts` | Nearest example — interactive loop with tools, streaming, HITL |
 
 ### Relevant Files
 
-| File | Purpose |
-|------|---------|
-| `packages/deep-factor-agent/src/providers/claude-cli.ts` | Claude CLI provider (SPEC-01) |
-| `packages/deep-factor-agent/src/providers/codex-cli.ts` | Codex CLI provider (SPEC-02) |
-| `packages/deep-factor-agent/src/create-agent.ts` | `createDeepFactorAgent()` factory |
-| `packages/deep-factor-agent/src/index.ts` | Package exports |
-| `packages/deep-factor-agent/examples/env.ts` | `MODEL_ID` and API key validation |
-| `packages/deep-factor-agent/examples/README.md` | Examples table — needs new row |
+| File                                                     | Purpose                           |
+| -------------------------------------------------------- | --------------------------------- |
+| `packages/deep-factor-agent/src/providers/claude-cli.ts` | Claude CLI provider (SPEC-01)     |
+| `packages/deep-factor-agent/src/providers/codex-cli.ts`  | Codex CLI provider (SPEC-02)      |
+| `packages/deep-factor-agent/src/create-agent.ts`         | `createDeepFactorAgent()` factory |
+| `packages/deep-factor-agent/src/index.ts`                | Package exports                   |
+| `packages/deep-factor-agent/examples/env.ts`             | `MODEL_ID` and API key validation |
+| `packages/deep-factor-agent/examples/README.md`          | Examples table — needs new row    |
 
 ---
 
@@ -107,8 +107,7 @@ const calculatorTool = tool(
   },
   {
     name: "calculator",
-    description:
-      "Evaluate a mathematical expression. Supports +, -, *, /, **, Math functions.",
+    description: "Evaluate a mathematical expression. Supports +, -, *, /, **, Math functions.",
     schema: z.object({
       expression: z
         .string()
@@ -145,8 +144,7 @@ const agent = createDeepFactorAgent({
 
 // --- Run the agent ---
 
-const prompt =
-  "What is 42 * 17? Also, what time is it right now? Give me both answers.";
+const prompt = "What is 42 * 17? Also, what time is it right now? Give me both answers.";
 
 console.log(`\nPrompt: ${prompt}\n`);
 console.log("--- Running agent loop ---\n");
@@ -161,12 +159,8 @@ console.log(`Iterations: ${result.iterations}`);
 console.log(`Stop reason: ${result.stopReason}`);
 
 // Show tool call events
-const toolCallEvents = result.thread.events.filter(
-  (e: AgentEvent) => e.type === "tool_call",
-);
-const toolResultEvents = result.thread.events.filter(
-  (e: AgentEvent) => e.type === "tool_result",
-);
+const toolCallEvents = result.thread.events.filter((e: AgentEvent) => e.type === "tool_call");
+const toolResultEvents = result.thread.events.filter((e: AgentEvent) => e.type === "tool_result");
 
 console.log(`\nTool calls: ${toolCallEvents.length}`);
 for (const tc of toolCallEvents) {
@@ -178,10 +172,7 @@ for (const tc of toolCallEvents) {
 console.log(`Tool results: ${toolResultEvents.length}`);
 for (const tr of toolResultEvents) {
   if (tr.type === "tool_result") {
-    const preview =
-      tr.result.length > 100
-        ? tr.result.substring(0, 100) + "..."
-        : tr.result;
+    const preview = tr.result.length > 100 ? tr.result.substring(0, 100) + "..." : tr.result;
     console.log(`  - ${preview}`);
   }
 }
@@ -214,9 +205,11 @@ Add to the "Example Overview" table:
 ## FILE STRUCTURE
 
 ### New
+
 - `packages/deep-factor-agent/examples/14-claude-codex-delegation.ts`
 
 ### Modified
+
 - `packages/deep-factor-agent/examples/README.md` — Add Example 14 entry
 
 ---

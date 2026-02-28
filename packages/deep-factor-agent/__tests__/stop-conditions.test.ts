@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   maxIterations,
   maxTokens,
@@ -30,9 +30,7 @@ function makeUsage(overrides: Partial<TokenUsage> = {}): TokenUsage {
   };
 }
 
-function makeCtx(
-  overrides: Partial<StopConditionContext> = {},
-): StopConditionContext {
+function makeCtx(overrides: Partial<StopConditionContext> = {}): StopConditionContext {
   return {
     iteration: 1,
     usage: makeUsage(),
@@ -66,26 +64,20 @@ describe("maxIterations", () => {
 describe("maxTokens", () => {
   it("does not stop below the limit", () => {
     const condition = maxTokens(1000);
-    const result = condition(
-      makeCtx({ usage: makeUsage({ totalTokens: 999 }) }),
-    );
+    const result = condition(makeCtx({ usage: makeUsage({ totalTokens: 999 }) }));
     expect(result.stop).toBe(false);
   });
 
   it("stops when total tokens reach the limit", () => {
     const condition = maxTokens(1000);
-    const result = condition(
-      makeCtx({ usage: makeUsage({ totalTokens: 1000 }) }),
-    );
+    const result = condition(makeCtx({ usage: makeUsage({ totalTokens: 1000 }) }));
     expect(result.stop).toBe(true);
     expect(result.reason).toContain("1000");
   });
 
   it("stops when exceeding the limit", () => {
     const condition = maxTokens(1000);
-    const result = condition(
-      makeCtx({ usage: makeUsage({ totalTokens: 1500 }) }),
-    );
+    const result = condition(makeCtx({ usage: makeUsage({ totalTokens: 1500 }) }));
     expect(result.stop).toBe(true);
   });
 });
@@ -93,17 +85,13 @@ describe("maxTokens", () => {
 describe("maxInputTokens", () => {
   it("does not stop below the limit", () => {
     const condition = maxInputTokens(500);
-    const result = condition(
-      makeCtx({ usage: makeUsage({ inputTokens: 499 }) }),
-    );
+    const result = condition(makeCtx({ usage: makeUsage({ inputTokens: 499 }) }));
     expect(result.stop).toBe(false);
   });
 
   it("stops when input tokens reach the limit", () => {
     const condition = maxInputTokens(500);
-    const result = condition(
-      makeCtx({ usage: makeUsage({ inputTokens: 500 }) }),
-    );
+    const result = condition(makeCtx({ usage: makeUsage({ inputTokens: 500 }) }));
     expect(result.stop).toBe(true);
     expect(result.reason).toContain("500");
   });
@@ -112,17 +100,13 @@ describe("maxInputTokens", () => {
 describe("maxOutputTokens", () => {
   it("does not stop below the limit", () => {
     const condition = maxOutputTokens(500);
-    const result = condition(
-      makeCtx({ usage: makeUsage({ outputTokens: 499 }) }),
-    );
+    const result = condition(makeCtx({ usage: makeUsage({ outputTokens: 499 }) }));
     expect(result.stop).toBe(false);
   });
 
   it("stops when output tokens reach the limit", () => {
     const condition = maxOutputTokens(500);
-    const result = condition(
-      makeCtx({ usage: makeUsage({ outputTokens: 500 }) }),
-    );
+    const result = condition(makeCtx({ usage: makeUsage({ outputTokens: 500 }) }));
     expect(result.stop).toBe(true);
     expect(result.reason).toContain("500");
   });
@@ -298,11 +282,7 @@ describe("evaluateStopConditions", () => {
   });
 
   it("supports composability with OR semantics", () => {
-    const conditions = [
-      maxIterations(5),
-      maxTokens(2000),
-      maxCost(1.0),
-    ];
+    const conditions = [maxIterations(5), maxTokens(2000), maxCost(1.0)];
     // None should trigger
     const result1 = evaluateStopConditions(
       conditions,
@@ -314,10 +294,7 @@ describe("evaluateStopConditions", () => {
     expect(result1).toBeNull();
 
     // maxIterations triggers
-    const result2 = evaluateStopConditions(
-      conditions,
-      makeCtx({ iteration: 5 }),
-    );
+    const result2 = evaluateStopConditions(conditions, makeCtx({ iteration: 5 }));
     expect(result2).not.toBeNull();
     expect(result2!.reason).toContain("iterations");
   });

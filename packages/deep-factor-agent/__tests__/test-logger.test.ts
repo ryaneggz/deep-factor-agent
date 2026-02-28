@@ -1,10 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import {
-  buildTestSuiteLog,
-  writeTestLog,
-} from "../src/test-logger.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { readFileSync, existsSync, rmSync } from "node:fs";
+import { buildTestSuiteLog, writeTestLog } from "../src/test-logger.js";
 import type { TestResult, TestSuiteLog } from "../src/test-logger.js";
 
 const TEST_LOG_DIR = "./logs/test-logger-tests";
@@ -72,9 +68,7 @@ describe("writeTestLog", () => {
   });
 
   it("writes a JSON file with correct structure", () => {
-    const tests: TestResult[] = [
-      { name: "test1", status: "passed", duration: 42 },
-    ];
+    const tests: TestResult[] = [{ name: "test1", status: "passed", duration: 42 }];
     const log = buildTestSuiteLog("json-test", tests, 42);
 
     const filePath = writeTestLog(log, { logDir: TEST_LOG_DIR });
@@ -97,7 +91,7 @@ describe("writeTestLog", () => {
     const fileName = filePath.split("/").pop()!;
     expect(fileName).toMatch(/^agent-.*-my-suite-with-specials-\.json$/);
     // No slashes, spaces, or exclamation marks in filename
-    expect(fileName).not.toMatch(/[\/\s!]/);
+    expect(fileName).not.toMatch(/[/\s!]/);
   });
 
   it("file name matches pattern: agent-<timestamp>-<suite>.json", () => {

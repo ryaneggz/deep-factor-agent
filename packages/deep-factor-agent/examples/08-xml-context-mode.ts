@@ -9,10 +9,7 @@
  */
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
-import {
-  createDeepFactorAgent,
-  serializeThreadToXml,
-} from "../dist/index.js";
+import { createDeepFactorAgent, serializeThreadToXml } from "../dist/index.js";
 import { MODEL_ID } from "./env.js";
 
 // A simple tool so we can see tool_call/tool_result in the thread
@@ -51,10 +48,7 @@ async function main() {
   console.log("Response:", standardResult.response);
   console.log("Iterations:", standardResult.iterations);
   console.log("Tokens:", standardResult.usage.totalTokens);
-  console.log(
-    "Thread events:",
-    standardResult.thread.events.map((e) => e.type).join(", "),
-  );
+  console.log("Thread events:", standardResult.thread.events.map((e) => e.type).join(", "));
 
   // --- XML mode ---
   console.log("\n=== XML Context Mode ===\n");
@@ -71,10 +65,7 @@ async function main() {
   console.log("Response:", xmlResult.response);
   console.log("Iterations:", xmlResult.iterations);
   console.log("Tokens:", xmlResult.usage.totalTokens);
-  console.log(
-    "Thread events:",
-    xmlResult.thread.events.map((e) => e.type).join(", "),
-  );
+  console.log("Thread events:", xmlResult.thread.events.map((e) => e.type).join(", "));
 
   // --- Show the XML serialization ---
   console.log("\n=== XML Thread Serialization ===\n");

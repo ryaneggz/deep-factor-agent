@@ -14,11 +14,7 @@ function collectTests(children: Iterable<any>): TestResult[] {
       results.push({
         name: child.name,
         status:
-          result?.state === "passed"
-            ? "passed"
-            : result?.state === "failed"
-              ? "failed"
-              : "skipped",
+          result?.state === "passed" ? "passed" : result?.state === "failed" ? "failed" : "skipped",
         duration: result?.duration ?? 0,
         error: result?.errors?.[0]?.message,
       });

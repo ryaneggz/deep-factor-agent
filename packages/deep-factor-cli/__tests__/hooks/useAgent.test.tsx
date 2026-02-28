@@ -17,13 +17,11 @@ const {
     continueLoop: mockContinueLoop,
   }));
   const mockIsPendingResult = vi.fn(() => false);
-  const mockAddUsage = vi.fn(
-    (a: Record<string, number>, b: Record<string, number>) => ({
-      inputTokens: (a.inputTokens ?? 0) + (b.inputTokens ?? 0),
-      outputTokens: (a.outputTokens ?? 0) + (b.outputTokens ?? 0),
-      totalTokens: (a.totalTokens ?? 0) + (b.totalTokens ?? 0),
-    }),
-  );
+  const mockAddUsage = vi.fn((a: Record<string, number>, b: Record<string, number>) => ({
+    inputTokens: (a.inputTokens ?? 0) + (b.inputTokens ?? 0),
+    outputTokens: (a.outputTokens ?? 0) + (b.outputTokens ?? 0),
+    totalTokens: (a.totalTokens ?? 0) + (b.totalTokens ?? 0),
+  }));
   return {
     mockLoop,
     mockResume,
@@ -45,7 +43,6 @@ vi.mock("deep-factor-agent", () => ({
 
 // Import the pure function directly (exported for testing)
 import { eventsToChatMessages } from "../../src/hooks/useAgent.js";
-import type { ChatMessage } from "../../src/types.js";
 
 // --- Test data factories ---
 
@@ -251,15 +248,9 @@ const defaultOptions: UseAgentOptions = {
 // Thin wrapper that renders hook state and optionally triggers sendPrompt
 let hookRef: ReturnType<typeof useAgent> | null = null;
 
-function TestHarness({
-  options,
-  autoPrompt,
-}: {
-  options: UseAgentOptions;
-  autoPrompt?: string;
-}) {
+function TestHarness({ options, autoPrompt }: { options: UseAgentOptions; autoPrompt?: string }) {
   const agent = useAgent(options);
-  hookRef = agent;
+  hookRef = agent; // eslint-disable-line react-hooks/globals
 
   useEffect(() => {
     if (autoPrompt) {
@@ -281,23 +272,17 @@ function TestHarness({
 describe("useAgent hook", () => {
   describe("initial state", () => {
     it("status is idle", () => {
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} />);
       expect(lastFrame()).toContain("STATUS:idle");
     });
 
     it("messages is empty", () => {
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} />);
       expect(lastFrame()).toContain("MESSAGES:0");
     });
 
     it("usage is zero, error null, humanInputRequest null", () => {
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} />);
       const frame = lastFrame() ?? "";
       expect(frame).toContain("USAGE_TOTAL:0");
       expect(frame).toContain("ERROR:null");
@@ -310,9 +295,7 @@ describe("useAgent hook", () => {
       // Never-resolving promise keeps status at "running"
       mockLoop.mockReturnValueOnce(new Promise(() => {}));
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:running");
@@ -341,9 +324,7 @@ describe("useAgent hook", () => {
       await vi.waitFor(() => {
         const callArgs = mockCreateAgent.mock.calls[0][0];
         expect(callArgs.tools).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ name: "requestHumanInput" }),
-          ]),
+          expect.arrayContaining([expect.objectContaining({ name: "requestHumanInput" })]),
         );
       });
     });
@@ -352,9 +333,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makeAgentResult());
       mockIsPendingResult.mockReturnValue(false);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:done");
@@ -365,9 +344,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makePendingResult());
       mockIsPendingResult.mockReturnValue(true);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:pending_input");
@@ -378,9 +355,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makePendingResult());
       mockIsPendingResult.mockReturnValue(true);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("HUMAN_INPUT:Which option?");
@@ -390,9 +365,7 @@ describe("useAgent hook", () => {
     it("Error instance sets error status", async () => {
       mockLoop.mockRejectedValueOnce(new Error("API failed"));
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:error");
@@ -403,9 +376,7 @@ describe("useAgent hook", () => {
     it("non-Error value is wrapped in Error", async () => {
       mockLoop.mockRejectedValueOnce("string error");
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:error");
@@ -419,9 +390,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makeAgentResult());
       mockIsPendingResult.mockReturnValue(false);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:done");
@@ -438,9 +407,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makePendingResult());
       mockIsPendingResult.mockReturnValue(true);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:pending_input");
@@ -459,9 +426,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makePendingResult());
       mockIsPendingResult.mockReturnValue(true);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:pending_input");
@@ -480,9 +445,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makePendingResult());
       mockIsPendingResult.mockReturnValue(true);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:pending_input");
@@ -501,9 +464,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makePendingResult());
       mockIsPendingResult.mockReturnValue(true);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:pending_input");
@@ -523,9 +484,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(makePendingResult());
       mockIsPendingResult.mockReturnValue(true);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:pending_input");
@@ -547,9 +506,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(firstResult);
       mockIsPendingResult.mockReturnValue(false);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       // Wait for first prompt to complete
       await vi.waitFor(() => {
@@ -573,10 +530,7 @@ describe("useAgent hook", () => {
       hookRef!.sendPrompt("follow up");
 
       await vi.waitFor(() => {
-        expect(mockContinueLoop).toHaveBeenCalledWith(
-          firstResult.thread,
-          "follow up",
-        );
+        expect(mockContinueLoop).toHaveBeenCalledWith(firstResult.thread, "follow up");
       });
     });
 
@@ -587,9 +541,7 @@ describe("useAgent hook", () => {
       mockLoop.mockResolvedValueOnce(firstResult);
       mockIsPendingResult.mockReturnValue(false);
 
-      const { lastFrame } = render(
-        <TestHarness options={defaultOptions} autoPrompt="hello" />,
-      );
+      const { lastFrame } = render(<TestHarness options={defaultOptions} autoPrompt="hello" />);
 
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("STATUS:done");

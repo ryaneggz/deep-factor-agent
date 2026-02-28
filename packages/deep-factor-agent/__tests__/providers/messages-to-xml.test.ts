@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { HumanMessage, SystemMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 import {
-  HumanMessage,
-  SystemMessage,
-  AIMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
-import { messagesToXml, messagesToPrompt, parseToolCalls } from "../../src/providers/messages-to-xml.js";
+  messagesToXml,
+  messagesToPrompt,
+  parseToolCalls,
+} from "../../src/providers/messages-to-xml.js";
 
 describe("messagesToXml", () => {
   it("serializes system/human/ai/tool messages to XML", () => {
@@ -49,18 +48,14 @@ describe("messagesToXml", () => {
   });
 
   it("falls back to 'unknown' for unresolvable tool names", () => {
-    const messages = [
-      new ToolMessage({ tool_call_id: "orphan_id", content: "result" }),
-    ];
+    const messages = [new ToolMessage({ tool_call_id: "orphan_id", content: "result" })];
 
     const xml = messagesToXml(messages);
     expect(xml).toContain('name="unknown"');
   });
 
   it("escapes XML special characters", () => {
-    const messages = [
-      new HumanMessage('What is <b>"1 & 2"</b>?'),
-    ];
+    const messages = [new HumanMessage('What is <b>"1 & 2"</b>?')];
 
     const xml = messagesToXml(messages);
     expect(xml).toContain("&lt;b&gt;");
@@ -69,7 +64,8 @@ describe("messagesToXml", () => {
   });
 
   it("passes through pre-serialized XML (content starts with <thread>)", () => {
-    const preSerialized = '<thread>\n  <event type="human" id="0" iteration="1">Hello</event>\n</thread>';
+    const preSerialized =
+      '<thread>\n  <event type="human" id="0" iteration="1">Hello</event>\n</thread>';
     const messages = [new HumanMessage(preSerialized)];
 
     const xml = messagesToXml(messages);
@@ -77,10 +73,7 @@ describe("messagesToXml", () => {
   });
 
   it("sets iteration='0' for all events", () => {
-    const messages = [
-      new SystemMessage("sys"),
-      new HumanMessage("hi"),
-    ];
+    const messages = [new SystemMessage("sys"), new HumanMessage("hi")];
 
     const xml = messagesToXml(messages);
     const iterationMatches = xml.match(/iteration="0"/g);
@@ -113,7 +106,8 @@ describe("messagesToPrompt", () => {
 
 describe("parseToolCalls", () => {
   it("extracts tool calls from a JSON code block", () => {
-    const text = 'Some text\n\n```json\n{"tool_calls": [{"name": "calc", "args": {"x": 1}, "id": "c1"}]}\n```\n\nMore text';
+    const text =
+      'Some text\n\n```json\n{"tool_calls": [{"name": "calc", "args": {"x": 1}, "id": "c1"}]}\n```\n\nMore text';
     const result = parseToolCalls(text);
     expect(result).toEqual([{ name: "calc", args: { x: 1 }, id: "c1" }]);
   });
@@ -133,7 +127,8 @@ describe("parseToolCalls", () => {
   });
 
   it("handles multiple tool calls", () => {
-    const text = '```json\n{"tool_calls": [{"name": "a", "args": {}, "id": "1"}, {"name": "b", "args": {"k": "v"}, "id": "2"}]}\n```';
+    const text =
+      '```json\n{"tool_calls": [{"name": "a", "args": {}, "id": "1"}, {"name": "b", "args": {"k": "v"}, "id": "2"}]}\n```';
     const result = parseToolCalls(text);
     expect(result).toHaveLength(2);
   });

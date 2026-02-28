@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { AIMessage } from "@langchain/core/messages";
 import { ContextManager, estimateTokens } from "../src/context-manager.js";
-import type { AgentThread, SummaryEvent, MessageEvent, TokenUsage } from "../src/types.js";
+import type { AgentThread, SummaryEvent, MessageEvent } from "../src/types.js";
 
 function makeThread(events: AgentThread["events"] = []): AgentThread {
   return {
@@ -54,10 +54,7 @@ describe("ContextManager", () => {
       const cm = new ContextManager();
       const tokens = cm.estimateThreadTokens(thread);
 
-      const expected = events.reduce(
-        (sum, e) => sum + estimateTokens(JSON.stringify(e)),
-        0,
-      );
+      const expected = events.reduce((sum, e) => sum + estimateTokens(JSON.stringify(e)), 0);
       expect(tokens).toBe(expected);
       expect(tokens).toBeGreaterThan(0);
     });
@@ -154,9 +151,7 @@ describe("ContextManager", () => {
   describe("summarize", () => {
     it("replaces old iteration events with SummaryEvent entries", async () => {
       const mockModel = {
-        invoke: vi.fn().mockResolvedValue(
-          new AIMessage({ content: "Summary of iteration" }),
-        ),
+        invoke: vi.fn().mockResolvedValue(new AIMessage({ content: "Summary of iteration" })),
       };
 
       const events: MessageEvent[] = [];
@@ -182,14 +177,10 @@ describe("ContextManager", () => {
 
       const { thread: result } = await cm.summarize(thread, mockModel as any);
 
-      const summaryEvents = result.events.filter(
-        (e) => e.type === "summary",
-      ) as SummaryEvent[];
+      const summaryEvents = result.events.filter((e) => e.type === "summary") as SummaryEvent[];
       expect(summaryEvents.length).toBeGreaterThan(0);
 
-      const recentEvents = result.events.filter(
-        (e) => e.type !== "summary" && e.iteration > 1,
-      );
+      const recentEvents = result.events.filter((e) => e.type !== "summary" && e.iteration > 1);
       expect(recentEvents.length).toBe(6);
     });
 
@@ -214,9 +205,7 @@ describe("ContextManager", () => {
 
       const { thread: result, usage } = await cm.summarize(thread, mockModel as any);
 
-      const summaryEvents = result.events.filter(
-        (e) => e.type === "summary",
-      ) as SummaryEvent[];
+      const summaryEvents = result.events.filter((e) => e.type === "summary") as SummaryEvent[];
       expect(summaryEvents.length).toBeGreaterThan(0);
 
       // Fallback summaries contain "summarization failed"
@@ -289,16 +278,14 @@ describe("ContextManager", () => {
       const { usage } = await cm.summarize(thread, mockModel as any);
 
       expect(mockModel.invoke).toHaveBeenCalledTimes(2);
-      expect(usage.inputTokens).toBe(200);  // 2 calls × 100
+      expect(usage.inputTokens).toBe(200); // 2 calls × 100
       expect(usage.outputTokens).toBe(100); // 2 calls × 50
-      expect(usage.totalTokens).toBe(300);  // 2 calls × 150
+      expect(usage.totalTokens).toBe(300); // 2 calls × 150
     });
 
     it("returns zero usage when model has no usage_metadata", async () => {
       const mockModel = {
-        invoke: vi.fn().mockResolvedValue(
-          new AIMessage({ content: "Summary of iteration" }),
-        ),
+        invoke: vi.fn().mockResolvedValue(new AIMessage({ content: "Summary of iteration" })),
       };
 
       const events: MessageEvent[] = [];
@@ -341,9 +328,7 @@ describe("ContextManager", () => {
 
       expect(injection).toContain("Previous Iteration Summaries");
       expect(injection).toContain("1, 2");
-      expect(injection).toContain(
-        "These iterations handled user authentication setup.",
-      );
+      expect(injection).toContain("These iterations handled user authentication setup.");
     });
 
     it("returns empty string when no summaries exist", () => {

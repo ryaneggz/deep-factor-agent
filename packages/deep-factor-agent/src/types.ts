@@ -155,10 +155,7 @@ export interface AgentMiddleware {
   name: string;
   tools?: StructuredToolInterface[];
   beforeIteration?: (ctx: MiddlewareContext) => Promise<void>;
-  afterIteration?: (
-    ctx: MiddlewareContext,
-    result: unknown,
-  ) => Promise<void>;
+  afterIteration?: (ctx: MiddlewareContext, result: unknown) => Promise<void>;
 }
 
 // --- Agent Settings ---
@@ -203,8 +200,6 @@ export interface PendingResult {
   resume: (humanResponse: string) => Promise<AgentResult | PendingResult>;
 }
 
-export function isPendingResult(
-  r: AgentResult | PendingResult,
-): r is PendingResult {
+export function isPendingResult(r: AgentResult | PendingResult): r is PendingResult {
   return r.stopReason === "human_input_needed";
 }

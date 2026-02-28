@@ -8,21 +8,21 @@ With the `ModelAdapter` interface established in SPEC-01, we need a second concr
 
 ### Derives From
 
-| Source | What it provides |
-|--------|-----------------|
-| Plan: `abundant-snacking-sprout.md` | Codex CLI invocation pattern: `codex exec "prompt" --full-auto --sandbox read-only` |
-| SPEC-01 | `ModelAdapter` interface, `isModelAdapter()` type guard, prompt engineering pattern for tool calls |
-| `src/providers/claude-cli.ts` | Reference implementation — same structure adapted for Codex CLI |
+| Source                              | What it provides                                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Plan: `abundant-snacking-sprout.md` | Codex CLI invocation pattern: `codex exec "prompt" --full-auto --sandbox read-only`                |
+| SPEC-01                             | `ModelAdapter` interface, `isModelAdapter()` type guard, prompt engineering pattern for tool calls |
+| `src/providers/claude-cli.ts`       | Reference implementation — same structure adapted for Codex CLI                                    |
 
 ### Relevant Files
 
-| File | Purpose |
-|------|---------|
-| `packages/deep-factor-agent/src/providers/types.ts` | `ModelAdapter` interface (from SPEC-01) |
+| File                                                          | Purpose                                                                                                       |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `packages/deep-factor-agent/src/providers/types.ts`           | `ModelAdapter` interface (from SPEC-01)                                                                       |
 | `packages/deep-factor-agent/src/providers/messages-to-xml.ts` | Shared utility (from SPEC-01): `messagesToXml()`, `messagesToPrompt()`, `parseToolCalls()`, `execFileAsync()` |
-| `packages/deep-factor-agent/src/providers/claude-cli.ts` | Reference — parallel structure |
-| `packages/deep-factor-agent/src/xml-serializer.ts` | `escapeXml()` — used by shared utility |
-| `packages/deep-factor-agent/src/index.ts` | Needs export of `createCodexCliProvider` |
+| `packages/deep-factor-agent/src/providers/claude-cli.ts`      | Reference — parallel structure                                                                                |
+| `packages/deep-factor-agent/src/xml-serializer.ts`            | `escapeXml()` — used by shared utility                                                                        |
+| `packages/deep-factor-agent/src/index.ts`                     | Needs export of `createCodexCliProvider`                                                                      |
 
 ---
 
@@ -38,7 +38,7 @@ With the `ModelAdapter` interface established in SPEC-01, we need a second concr
 
 ### `src/providers/codex-cli.ts` — Codex CLI Provider
 
-```ts
+````ts
 import { AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -91,9 +91,7 @@ If you do not need to call any tools, respond with plain text (no JSON block).`;
  * By default, messages are serialized as `<thread>` XML (matching the agent's
  * `contextMode: "xml"` pattern). Set `inputEncoding: "text"` for plain-text labels.
  */
-export function createCodexCliProvider(
-  opts?: CodexCliProviderOptions,
-): ModelAdapter {
+export function createCodexCliProvider(opts?: CodexCliProviderOptions): ModelAdapter {
   const cliPath = opts?.cliPath ?? "codex";
   const model = opts?.model;
   const timeout = opts?.timeout ?? 120_000;
@@ -112,19 +110,13 @@ export function createCodexCliProvider(
           const toolDefs = boundToolDefs.map((t) => ({
             name: t.name,
             description: t.description,
-            parameters:
-              "schema" in t && t.schema
-                ? JSON.parse(JSON.stringify(t.schema))
-                : {},
+            parameters: "schema" in t && t.schema ? JSON.parse(JSON.stringify(t.schema)) : {},
           }));
           prompt += `[Available Tools]\n${JSON.stringify(toolDefs, null, 2)}\n\n${TOOL_CALL_FORMAT}\n\n`;
         }
 
         // Serialize messages using the configured encoding
-        prompt +=
-          inputEncoding === "xml"
-            ? messagesToXml(messages)
-            : messagesToPrompt(messages);
+        prompt += inputEncoding === "xml" ? messagesToXml(messages) : messagesToPrompt(messages);
 
         const args = ["exec", prompt, "--full-auto", "--sandbox", "read-only"];
         if (model) {
@@ -141,9 +133,7 @@ export function createCodexCliProvider(
 
         if (toolCalls.length > 0) {
           // Extract any text outside the JSON block as content
-          const contentOutsideJson = text
-            .replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "")
-            .trim();
+          const contentOutsideJson = text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
           return new AIMessage({
             content: contentOutsideJson || "",
             tool_calls: toolCalls,
@@ -162,7 +152,7 @@ export function createCodexCliProvider(
 
   return buildAdapter();
 }
-```
+````
 
 ### `src/index.ts` — New Exports
 
@@ -192,21 +182,17 @@ import { isModelAdapter } from "../../src/providers/types.js";
 const mockExecFile = vi.mocked(execFile);
 
 function simulateExecFile(stdout: string) {
-  mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, cb: any) => {
-      cb(null, stdout, "");
-      return {} as any;
-    },
-  );
+  mockExecFile.mockImplementation((_file: any, _args: any, _opts: any, cb: any) => {
+    cb(null, stdout, "");
+    return {} as any;
+  });
 }
 
 function simulateExecFileError(message: string) {
-  mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, cb: any) => {
-      cb(new Error(message), "", "");
-      return {} as any;
-    },
-  );
+  mockExecFile.mockImplementation((_file: any, _args: any, _opts: any, cb: any) => {
+    cb(new Error(message), "", "");
+    return {} as any;
+  });
 }
 
 beforeEach(() => {
@@ -258,10 +244,7 @@ describe("createCodexCliProvider", () => {
     simulateExecFile("Response");
     const provider = createCodexCliProvider({ inputEncoding: "text" });
 
-    await provider.invoke([
-      new SystemMessage("Be concise."),
-      new HumanMessage("What is 2+2?"),
-    ]);
+    await provider.invoke([new SystemMessage("Be concise."), new HumanMessage("What is 2+2?")]);
 
     const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
     const prompt = args[1];
@@ -297,9 +280,9 @@ describe("createCodexCliProvider", () => {
     simulateExecFileError("CLI process exited with code 1");
     const provider = createCodexCliProvider();
 
-    await expect(
-      provider.invoke([new HumanMessage("Hi")]),
-    ).rejects.toThrow("CLI process exited with code 1");
+    await expect(provider.invoke([new HumanMessage("Hi")])).rejects.toThrow(
+      "CLI process exited with code 1",
+    );
   });
 
   it("parses tool calls from JSON code block", async () => {
@@ -418,13 +401,16 @@ describe("createCodexCliProvider", () => {
 ## FILE STRUCTURE
 
 ### New
+
 - `packages/deep-factor-agent/src/providers/codex-cli.ts`
 - `packages/deep-factor-agent/__tests__/providers/codex-cli.test.ts`
 
 ### Modified (no new files — uses shared module from SPEC-01)
+
 - `packages/deep-factor-agent/src/index.ts` — Export `createCodexCliProvider`, `CodexCliProviderOptions`
 
 ### Shared Dependencies (from SPEC-01)
+
 - `packages/deep-factor-agent/src/providers/messages-to-xml.ts` — `messagesToXml()`, `messagesToPrompt()`, `parseToolCalls()`, `execFileAsync()`
 
 ---

@@ -8,18 +8,18 @@ The deep-factor-agent test suite runs via `vitest` but produces no persistent lo
 
 ### Derives From
 
-| Source | What it provides |
-|--------|-----------------|
+| Source                              | What it provides                                                  |
+| ----------------------------------- | ----------------------------------------------------------------- |
 | Plan: `abundant-snacking-sprout.md` | Test logging requirement — JSON logs in `./logs/`, format example |
-| Smoke test step 9 | Expected log format: `{ suite, passed, failed }` per file |
+| Smoke test step 9                   | Expected log format: `{ suite, passed, failed }` per file         |
 
 ### Relevant Files
 
-| File | Purpose |
-|------|---------|
-| `packages/deep-factor-agent/package.json` | `"test": "vitest run"` — test runner config |
-| `packages/deep-factor-agent/__tests__/*.test.ts` | Existing test files |
-| `.gitignore` | Needs `logs/` entry |
+| File                                             | Purpose                                     |
+| ------------------------------------------------ | ------------------------------------------- |
+| `packages/deep-factor-agent/package.json`        | `"test": "vitest run"` — test runner config |
+| `packages/deep-factor-agent/__tests__/*.test.ts` | Existing test files                         |
+| `.gitignore`                                     | Needs `logs/` entry                         |
 
 ---
 
@@ -66,10 +66,7 @@ export interface TestLoggerOptions {
  * Write a test suite result as a JSON log file.
  * File name format: agent-<timestamp>-<suite>.json
  */
-export function writeTestLog(
-  suiteLog: TestSuiteLog,
-  options?: TestLoggerOptions,
-): string {
+export function writeTestLog(suiteLog: TestSuiteLog, options?: TestLoggerOptions): string {
   const logDir = options?.logDir ?? "./logs";
   mkdirSync(logDir, { recursive: true });
 
@@ -78,11 +75,7 @@ export function writeTestLog(
     .replace(/-+/g, "-")
     .toLowerCase();
 
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[:.]/g, "-")
-    .replace("T", "_")
-    .slice(0, 19);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
 
   const fileName = `agent-${timestamp}-${sanitizedSuite}.json`;
   const filePath = join(logDir, fileName);
@@ -133,11 +126,12 @@ export default class TestLogReporter implements Reporter {
         if (task.type === "test") {
           tests.push({
             name: task.name,
-            status: task.result?.state === "pass"
-              ? "passed"
-              : task.result?.state === "fail"
-                ? "failed"
-                : "skipped",
+            status:
+              task.result?.state === "pass"
+                ? "passed"
+                : task.result?.state === "fail"
+                  ? "failed"
+                  : "skipped",
             duration: task.result?.duration ?? 0,
             error: task.result?.errors?.[0]?.message,
           });
@@ -158,7 +152,7 @@ Then update `vitest.config.ts` (or create it) to include the reporter:
 ```ts
 // In vitest config (vitest.config.ts or package.json vitest section):
 {
-  reporters: ["default", "./vitest.setup.ts"]
+  reporters: ["default", "./vitest.setup.ts"];
 }
 ```
 
@@ -253,11 +247,13 @@ describe("writeTestLog", () => {
 ## FILE STRUCTURE
 
 ### New
+
 - `packages/deep-factor-agent/src/test-logger.ts`
 - `packages/deep-factor-agent/__tests__/test-logger.test.ts`
 - `packages/deep-factor-agent/vitest.setup.ts` (custom reporter)
 
 ### Modified
+
 - `.gitignore` — Add `logs/`
 - `packages/deep-factor-agent/package.json` or `vitest.config.ts` — Add custom reporter
 

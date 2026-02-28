@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
-import { HumanMessage, SystemMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
+import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 
 // Mock node:child_process before importing the module under test
 vi.mock("node:child_process", () => ({
@@ -15,21 +15,17 @@ import { isModelAdapter } from "../../src/providers/types.js";
 const mockExecFile = vi.mocked(execFile);
 
 function simulateExecFile(stdout: string) {
-  mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, cb: any) => {
-      cb(null, stdout, "");
-      return {} as any;
-    },
-  );
+  mockExecFile.mockImplementation((_file: any, _args: any, _opts: any, cb: any) => {
+    cb(null, stdout, "");
+    return {} as any;
+  });
 }
 
 function simulateExecFileError(message: string) {
-  mockExecFile.mockImplementation(
-    (_file: any, _args: any, _opts: any, cb: any) => {
-      cb(new Error(message), "", "");
-      return {} as any;
-    },
-  );
+  mockExecFile.mockImplementation((_file: any, _args: any, _opts: any, cb: any) => {
+    cb(new Error(message), "", "");
+    return {} as any;
+  });
 }
 
 beforeEach(() => {
@@ -81,10 +77,7 @@ describe("createCodexCliProvider", () => {
     simulateExecFile("Response");
     const provider = createCodexCliProvider({ inputEncoding: "text" });
 
-    await provider.invoke([
-      new SystemMessage("Be concise."),
-      new HumanMessage("What is 2+2?"),
-    ]);
+    await provider.invoke([new SystemMessage("Be concise."), new HumanMessage("What is 2+2?")]);
 
     const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
     const prompt = args[1];
@@ -120,9 +113,9 @@ describe("createCodexCliProvider", () => {
     simulateExecFileError("CLI process exited with code 1");
     const provider = createCodexCliProvider();
 
-    await expect(
-      provider.invoke([new HumanMessage("Hi")]),
-    ).rejects.toThrow("CLI process exited with code 1");
+    await expect(provider.invoke([new HumanMessage("Hi")])).rejects.toThrow(
+      "CLI process exited with code 1",
+    );
   });
 
   it("parses tool calls from JSON code block", async () => {
@@ -208,16 +201,13 @@ describe("createCodexCliProvider", () => {
     simulateExecFile("Plain response");
     const provider = createCodexCliProvider();
 
-    const calcTool = tool(
-      async ({ expression }: { expression: string }) => expression,
-      {
-        name: "calculator",
-        description: "Evaluate math",
-        schema: z.object({
-          expression: z.string().describe("The math expression"),
-        }),
-      },
-    );
+    const calcTool = tool(async ({ expression }: { expression: string }) => expression, {
+      name: "calculator",
+      description: "Evaluate math",
+      schema: z.object({
+        expression: z.string().describe("The math expression"),
+      }),
+    });
 
     provider.bindTools!([calcTool]);
     await provider.invoke([new HumanMessage("Hi")]);

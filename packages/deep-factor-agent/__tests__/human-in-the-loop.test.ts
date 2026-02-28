@@ -120,9 +120,7 @@ describe("human-in-the-loop: requestHumanInput tool call", () => {
     });
 
     const result = await agent.loop("Ask user something");
-    const hirEvents = result.thread.events.filter(
-      (e) => e.type === "human_input_requested",
-    );
+    const hirEvents = result.thread.events.filter((e) => e.type === "human_input_requested");
     expect(hirEvents.length).toBe(1);
     if (hirEvents[0].type === "human_input_requested") {
       expect(hirEvents[0].question).toBe("What color do you prefer?");
@@ -153,9 +151,7 @@ describe("human-in-the-loop: requestHumanInput tool call", () => {
       tools: [requestHumanInput],
     });
 
-    const pendingResult = (await agent.loop(
-      "Ask user something",
-    )) as PendingResult;
+    const pendingResult = (await agent.loop("Ask user something")) as PendingResult;
     expect(pendingResult.stopReason).toBe("human_input_needed");
 
     const finalResult = await pendingResult.resume("Blue");
@@ -184,9 +180,7 @@ describe("human-in-the-loop: requestHumanInput tool call", () => {
       tools: [requestHumanInput],
     });
 
-    const pendingResult = (await agent.loop(
-      "Ask user something",
-    )) as PendingResult;
+    const pendingResult = (await agent.loop("Ask user something")) as PendingResult;
 
     const finalResult = await pendingResult.resume("My answer");
 
@@ -243,18 +237,14 @@ describe("human-in-the-loop: interruptOn", () => {
         }),
       )
       .mockResolvedValueOnce(makeAIMessage(""))
-      .mockResolvedValueOnce(
-        makeAIMessage("User deleted successfully"),
-      );
+      .mockResolvedValueOnce(makeAIMessage("User deleted successfully"));
 
     const agent = new DeepFactorAgent({
       model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
-    const pendingResult = (await agent.loop(
-      "Delete user 123",
-    )) as PendingResult;
+    const pendingResult = (await agent.loop("Delete user 123")) as PendingResult;
 
     const finalResult = await pendingResult.resume("approved");
     expect(finalResult.stopReason).toBe("completed");
@@ -275,22 +265,16 @@ describe("human-in-the-loop: interruptOn", () => {
         }),
       )
       .mockResolvedValueOnce(makeAIMessage(""))
-      .mockResolvedValueOnce(
-        makeAIMessage("Understood, deletion was denied."),
-      );
+      .mockResolvedValueOnce(makeAIMessage("Understood, deletion was denied."));
 
     const agent = new DeepFactorAgent({
       model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
-    const pendingResult = (await agent.loop(
-      "Delete user 123",
-    )) as PendingResult;
+    const pendingResult = (await agent.loop("Delete user 123")) as PendingResult;
 
-    const finalResult = await pendingResult.resume(
-      "denied: User deletion not authorized",
-    );
+    const finalResult = await pendingResult.resume("denied: User deletion not authorized");
     expect(finalResult.stopReason).toBe("completed");
 
     const receivedEvents = finalResult.thread.events.filter(
@@ -317,23 +301,17 @@ describe("human-in-the-loop: interruptOn", () => {
         }),
       )
       .mockResolvedValueOnce(makeAIMessage(""))
-      .mockResolvedValueOnce(
-        makeAIMessage("Done"),
-      );
+      .mockResolvedValueOnce(makeAIMessage("Done"));
 
     const agent = new DeepFactorAgent({
       model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
-    const pendingResult = (await agent.loop(
-      "Delete user 123",
-    )) as PendingResult;
+    const pendingResult = (await agent.loop("Delete user 123")) as PendingResult;
 
     // Verify the thread has a synthetic tool_result for the interrupted tool
-    const toolResults = pendingResult.thread.events.filter(
-      (e) => e.type === "tool_result",
-    );
+    const toolResults = pendingResult.thread.events.filter((e) => e.type === "tool_result");
     expect(toolResults.length).toBe(1);
     expect(String(toolResults[0].result)).toContain("not executed");
 
@@ -379,18 +357,14 @@ describe("human-in-the-loop: interruptOn", () => {
         }),
       )
       .mockResolvedValueOnce(makeAIMessage(""))
-      .mockResolvedValueOnce(
-        makeAIMessage("Continuing after approval"),
-      );
+      .mockResolvedValueOnce(makeAIMessage("Continuing after approval"));
 
     const agent = new DeepFactorAgent({
       model: mockModel,
       interruptOn: ["deleteUser"],
     });
 
-    const pendingResult = (await agent.loop(
-      "Delete user 123",
-    )) as PendingResult;
+    const pendingResult = (await agent.loop("Delete user 123")) as PendingResult;
     expect(pendingResult.iterations).toBe(1);
 
     const finalResult = await pendingResult.resume("approved");
@@ -428,14 +402,10 @@ describe("multiple pause/resume cycles", () => {
         .mockResolvedValueOnce({ complete: true }),
     });
 
-    const pending1 = (await agent.loop(
-      "Multi-step task",
-    )) as PendingResult;
+    const pending1 = (await agent.loop("Multi-step task")) as PendingResult;
     expect(pending1.stopReason).toBe("human_input_needed");
 
     const finalResult = await pending1.resume("Use blue theme");
-    expect(
-      ["completed", "stop_condition"].includes(finalResult.stopReason),
-    ).toBe(true);
+    expect(["completed", "stop_condition"].includes(finalResult.stopReason)).toBe(true);
   });
 });

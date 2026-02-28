@@ -19,12 +19,7 @@ import { execSync } from "node:child_process";
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
 import { initChatModel } from "langchain/chat_models/universal";
-import {
-  HumanMessage,
-  AIMessage,
-  SystemMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { AgentEvent, AgentThread } from "../dist/index.js";
 import { serializeThreadToXml } from "../dist/index.js";
@@ -177,9 +172,7 @@ async function runToolLoop(
       // Execute
       const result = await bashTool.invoke(tc.args);
       const resultStr = typeof result === "string" ? result : JSON.stringify(result);
-      const preview = resultStr.length > 200
-        ? resultStr.substring(0, 200) + "..."
-        : resultStr;
+      const preview = resultStr.length > 200 ? resultStr.substring(0, 200) + "..." : resultStr;
       console.log(`  [result] ${preview.replace(/\n/g, "\n           ")}`);
 
       // Record tool_result event
@@ -192,9 +185,7 @@ async function runToolLoop(
       });
 
       // Add to LangChain messages for next model call
-      messages.push(
-        new ToolMessage({ tool_call_id: tc.id, content: resultStr }),
-      );
+      messages.push(new ToolMessage({ tool_call_id: tc.id, content: resultStr }));
     }
 
     // Loop back so the model can respond to the tool results
@@ -250,10 +241,7 @@ async function main() {
 
     // Build messages: system + XML thread
     const xml = serializeThreadToXml(thread.events);
-    const messages: BaseMessage[] = [
-      new SystemMessage(instructions),
-      new HumanMessage(xml),
-    ];
+    const messages: BaseMessage[] = [new SystemMessage(instructions), new HumanMessage(xml)];
 
     // Run the tool loop (streams text, executes tools inline)
     const response = await runToolLoop(model, messages, thread, turn);
