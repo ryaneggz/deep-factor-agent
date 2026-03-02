@@ -17,6 +17,7 @@ export function Footer({ usage, iterations, status, onSubmit }: FooterProps) {
 
   return (
     <Box
+      flexShrink={0}
       flexDirection="column"
       borderStyle="single"
       borderTop={true}

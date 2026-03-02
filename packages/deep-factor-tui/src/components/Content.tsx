@@ -9,12 +9,11 @@ interface ContentProps {
   status: AgentStatus;
   error: Error | null;
   humanInputRequest: HumanInputRequestedEvent | null;
-  height: number;
 }
 
-export function Content({ messages, status, error, humanInputRequest, height }: ContentProps) {
+export function Content({ messages, status, error, humanInputRequest }: ContentProps) {
   return (
-    <Box flexDirection="column" height={height} overflow="hidden">
+    <Box flexDirection="column" flexGrow={1} overflow="hidden">
       <MessageList messages={messages} />
 
       {status === "running" && (

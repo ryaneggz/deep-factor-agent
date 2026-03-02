@@ -74,6 +74,8 @@ Options
   --model, -m      Model identifier (default: gpt-4.1-mini)
   --max-iter, -i   Maximum agent iterations (default: 10)
   --bash           Enable bash execution tool
+  --print, -p      Non-interactive print mode (output answer to stdout)
+  --sandbox        Enable bash tool in print mode
 ```
 
 ### Examples
@@ -87,6 +89,15 @@ node dist/cli.js --bash "What OS is this?"
 
 # Launch with no prompt — type interactively in the TUI
 node dist/cli.js
+
+# Print mode — non-interactive, outputs answer to stdout
+node dist/cli.js -p "What is 2+2?"
+
+# Print mode with bash tool
+node dist/cli.js -p --sandbox "List files in the current directory"
+
+# Pipe stdin in print mode
+cat PROMPT.md | node dist/cli.js -p --sandbox
 ```
 
 ## Architecture
@@ -94,17 +105,17 @@ node dist/cli.js
 ```
 src/
 ├── cli.tsx              # Entry point — meow arg parsing + withFullScreen
-├── app.tsx              # Root layout — Header / Content / Footer
+├── app.tsx              # Root layout — flex-based Header / Content / Footer
 ├── types.ts             # Shared types (TuiAppProps, ChatMessage, AgentStatus)
 ├── index.ts             # Public exports (TuiApp + TuiAppProps)
 ├── hooks/
 │   ├── useAgent.ts      # React hook bridging agent events to UI state
 │   └── useTextInput.ts  # Text input with cursor (ref-based to avoid stale closures)
 ├── components/
-│   ├── Header.tsx       # Fixed: title, model name, color-coded status indicator
-│   ├── Content.tsx      # Flex-grow: message list + spinner + human input + errors
-│   ├── Footer.tsx       # Fixed: status line + input bar
-│   ├── MessageList.tsx  # Tail-sliced message rendering
+│   ├── Header.tsx       # flexShrink=0: title, model name, color-coded status indicator
+│   ├── Content.tsx      # flexGrow=1: message list + spinner + human input + errors
+│   ├── Footer.tsx       # flexShrink=0: status line + input bar
+│   ├── MessageList.tsx  # flexGrow=1: tail-sliced message rendering
 │   ├── MessageBubble.tsx # Single message by role (user/assistant/tool_call/tool_result)
 │   ├── ToolCallBlock.tsx # Tool name (bold yellow) + truncated JSON args
 │   ├── InputBar.tsx     # Blue "> " prompt + text + cursor
@@ -131,8 +142,8 @@ src/
 
 **Data flow:**
 
-1. `cli.tsx` parses flags and renders `<TuiApp>` via `withFullScreen()`
-2. `<TuiApp>` uses `useScreenSize()` to calculate content height and renders Header/Content/Footer
+1. `cli.tsx` parses flags and renders `<TuiApp>` inside `withFullScreen()` — the `FullScreenBox` wrapper provides terminal height/width constraints
+2. `<TuiApp>` uses `flexGrow={1}` to fill the `FullScreenBox`, with Header (`flexShrink=0`), Content (`flexGrow=1`), and Footer (`flexShrink=0`) — no manual height arithmetic
 3. `useAgent()` creates a `DeepFactorAgent` and runs the loop
 4. Agent events (messages, tool calls, tool results) are converted to `ChatMessage[]`
 5. Components render messages, status, spinner, and input prompts
@@ -150,6 +161,15 @@ pnpm test:watch
 # With coverage report
 pnpm coverage
 ```
+
+Test suite:
+
+| File                  | Type        | Coverage                                                                                              |
+| --------------------- | ----------- | ----------------------------------------------------------------------------------------------------- |
+| `components.test.tsx` | Unit        | Header, StatusLine, MessageList, MessageBubble, Content, Footer                                       |
+| `app.test.tsx`        | Integration | TuiApp with mocked useAgent — verifies flex layout fills full height, messages display, status states |
+| `print.test.ts`       | Unit        | Print mode headless agent output                                                                      |
+| `cli-e2e.test.ts`     | E2E         | Binary startup smoke test, flag parsing, print mode errors                                            |
 
 ## Development
 

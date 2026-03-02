@@ -368,11 +368,22 @@ This library is designed around the [12-factor agent](https://github.com/humanla
 ## Development
 
 ```bash
+# Agent package
 make install        # install dependencies
 make build          # compile TypeScript
 make test           # run tests (vitest)
 make type-check     # type-check without emitting
 make dev            # watch mode
+
+# TUI package
+make build-tui      # build TUI (tsc + shebang)
+make test-tui       # run TUI tests (unit, integration, e2e)
+make dev-tui        # watch mode
+
+# All packages
+make build-all      # build all packages (pnpm -r build)
+make test-all       # test all packages (pnpm -r test)
+make check-all      # type-check + test all packages
 ```
 
 ## License

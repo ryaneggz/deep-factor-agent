@@ -12,7 +12,7 @@ export function MessageList({ messages, maxVisible = 50 }: MessageListProps) {
   const visible = messages.slice(-maxVisible);
 
   return (
-    <Box flexDirection="column" gap={0}>
+    <Box flexDirection="column" flexGrow={1} gap={0}>
       {visible.map((msg, i) => (
         <MessageBubble key={i} message={msg} />
       ))}

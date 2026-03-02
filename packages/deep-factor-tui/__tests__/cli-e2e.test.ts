@@ -21,6 +21,19 @@ function run(
   });
 }
 
+describe("TUI startup e2e", () => {
+  it("starts without JS crash errors", async () => {
+    // Spawn in default TUI mode (no -p), close stdin immediately, and let it time out.
+    // We only check that there are no JS crash errors in stderr.
+    const result = await run([], 3000);
+    const stderr = result.stderr;
+    expect(stderr).not.toContain("SyntaxError");
+    expect(stderr).not.toContain("Cannot find module");
+    expect(stderr).not.toContain("ReferenceError");
+    expect(stderr).not.toContain("TypeError");
+  });
+});
+
 describe("CLI e2e", () => {
   it("-p without a prompt exits with code 1 and prints error to stderr", async () => {
     const result = await run(["-p"]);

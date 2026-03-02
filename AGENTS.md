@@ -73,13 +73,13 @@
 ### TUI Codebase Patterns
 
 - Entry point: `packages/deep-factor-tui/src/cli.tsx` (meow + withFullScreen)
-- App shell: `packages/deep-factor-tui/src/app.tsx` (Header/Content/Footer layout)
+- App shell: `packages/deep-factor-tui/src/app.tsx` (flex-based Header/Content/Footer layout; FullScreenBox handles terminal dimensions)
 - Agent hook: `packages/deep-factor-tui/src/hooks/useAgent.ts` (React state bridge)
 - Text input hook: `packages/deep-factor-tui/src/hooks/useTextInput.ts` (cursor input handling)
 - Components: `packages/deep-factor-tui/src/components/` (Header, Content, Footer, MessageList, MessageBubble, ToolCallBlock, InputBar, StatusLine)
 - Bash tool: `packages/deep-factor-tui/src/tools/bash.ts` (optional, --bash flag)
 - TUI types: `packages/deep-factor-tui/src/types.ts` (TuiAppProps, ChatMessage, AgentStatus)
-- Tests: `packages/deep-factor-tui/__tests__/` (placeholder)
+- Tests: `packages/deep-factor-tui/__tests__/` (components, integration, e2e)
 
 ### Huntley Layout
 

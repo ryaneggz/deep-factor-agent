@@ -18,6 +18,7 @@ const STATUS_COLORS: Record<AgentStatus, string> = {
 export function Header({ model, status }: HeaderProps) {
   return (
     <Box
+      flexShrink={0}
       borderStyle="single"
       borderBottom={true}
       borderTop={false}
