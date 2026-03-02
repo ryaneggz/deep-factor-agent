@@ -16,6 +16,8 @@ function run(
         code: error ? ((error as any).code ?? child.exitCode ?? 1) : 0,
       });
     });
+    // Close stdin so the child gets EOF immediately (prevents hanging on stdin read)
+    child.stdin?.end();
   });
 }
 

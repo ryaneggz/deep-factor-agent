@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "type": "module",
   "bin": {
-    "deep-factor-tui": "./dist/cli.js"
+    "deep-factor-tui": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -37,5 +37,9 @@
     "ink-testing-library": "^4.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
-  }
+  },
+  "description": "Fullscreen terminal UI for the [deep-factor-agent](../deep-factor-agent) — an LLM agent loop with tool use, human-in-the-loop, and token tracking. Built with [fullscreen-ink](https://github.com/DaniGuardiola/fullscreen-ink) (alternate screen buffer), [Ink](https://github.com/vadimdemedes/ink) (React for the terminal), and [meow](https://github.com/sindresorhus/meow) for arg parsing.",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

@@ -24,6 +24,7 @@ const cli = meow(
     $ deep-factor-tui "Explain how React hooks work"
     $ deep-factor-tui -p "What is 2+2?"
     $ deep-factor-tui -p --sandbox "List files in the current directory"
+    $ cat PROMPT.md | deep-factor-tui -p --sandbox
 `,
   {
     importMeta: import.meta,
@@ -55,12 +56,21 @@ const cli = meow(
   },
 );
 
-const prompt = cli.input.join(" ") || undefined;
+let prompt = cli.input.join(" ") || undefined;
 
 if (cli.flags.print) {
   // Print mode: non-interactive, headless agent
+  // If no positional prompt, try reading from stdin (piped input)
+  if (!prompt && !process.stdin.isTTY) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk);
+    }
+    prompt = Buffer.concat(chunks).toString().trim() || undefined;
+  }
+
   if (!prompt) {
-    process.stderr.write("Error: Print mode requires a prompt argument.\n");
+    process.stderr.write("Error: Print mode requires a prompt argument or piped stdin.\n");
     process.exit(1);
   }
 
