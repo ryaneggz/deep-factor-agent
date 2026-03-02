@@ -1,0 +1,42 @@
+import { describe, it, expect } from "vitest";
+import { execFile } from "node:child_process";
+import { join } from "node:path";
+
+const CLI_PATH = join(import.meta.dirname, "..", "dist", "cli.js");
+
+function run(
+  args: string[],
+  timeout = 5000,
+): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  return new Promise((resolve) => {
+    const child = execFile("node", [CLI_PATH, ...args], { timeout }, (error, stdout, stderr) => {
+      resolve({
+        stdout: stdout ?? "",
+        stderr: stderr ?? "",
+        code: error ? ((error as any).code ?? child.exitCode ?? 1) : 0,
+      });
+    });
+  });
+}
+
+describe("CLI e2e", () => {
+  it("-p without a prompt exits with code 1 and prints error to stderr", async () => {
+    const result = await run(["-p"]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain("requires a prompt");
+  });
+
+  it("--help outputs usage text with --print and --sandbox, no --parallel", async () => {
+    const result = await run(["--help"]);
+    const output = result.stdout + result.stderr;
+    expect(output).toContain("--print");
+    expect(output).toContain("--sandbox");
+    expect(output).not.toContain("--parallel");
+  });
+
+  it("-p is recognized as --print (not --parallel)", async () => {
+    // -p without prompt should give the print-mode error, confirming -p maps to --print
+    const result = await run(["-p"]);
+    expect(result.stderr).toContain("requires a prompt");
+  });
+});

@@ -111,7 +111,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         tools,
         stopWhen: [maxIterations(options.maxIter)],
         interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
-        parallelToolCalls: options.parallelToolCalls,
+        parallelToolCalls: options.parallelToolCalls ?? true,
       });
 
       const existingThread = threadRef.current;
