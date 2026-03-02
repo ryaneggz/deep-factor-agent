@@ -30,3 +30,4 @@ archive/
 **/dist/
 !specs/.gitkeep
 specs/*.md
+specs/*.png
