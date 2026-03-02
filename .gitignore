@@ -28,3 +28,5 @@ coverage/
 logs/
 archive/
 **/dist/
+!specs/.gitkeep
+specs/*.md
