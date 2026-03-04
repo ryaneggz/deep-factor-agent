@@ -5,16 +5,20 @@ export interface XmlSerializerOptions {
   assistantPrefill?: string;
 }
 
+const XML_ESCAPE_MAP: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&apos;",
+};
+const XML_ESCAPE_REGEX = /[&<>"']/g;
+
 /**
  * Escapes XML special characters in text content and attribute values.
  */
 export function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+  return text.replace(XML_ESCAPE_REGEX, (ch) => XML_ESCAPE_MAP[ch]);
 }
 
 /**

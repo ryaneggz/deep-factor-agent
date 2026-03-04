@@ -39,7 +39,12 @@ export class ContextManager {
   }
 
   needsSummarization(thread: AgentThread): boolean {
-    return this.estimateThreadTokens(thread) > this.maxContextTokens;
+    let total = 0;
+    for (const event of thread.events) {
+      total += this.tokenEstimator(JSON.stringify(event));
+      if (total > this.maxContextTokens) return true;
+    }
+    return false;
   }
 
   async summarize(
