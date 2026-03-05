@@ -1,6 +1,7 @@
 import { AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
+import { toJSONSchema } from "zod";
 import type { ModelAdapter } from "./types.js";
 
 export interface ClaudeAgentSdkProviderOptions {
@@ -308,6 +309,39 @@ function isAssistantMessage(msg: unknown): msg is SdkResponseMessage {
   );
 }
 
+// --- Tool schema formatting ---
+
+/**
+ * Extract a JSON Schema object from a LangChain StructuredToolInterface.
+ * Handles both Zod schemas and plain JSON Schema objects.
+ */
+function extractToolSchema(tool: StructuredToolInterface): Record<string, unknown> {
+  if ("schema" in tool && tool.schema) {
+    const schema = tool.schema as object;
+    if ("_zod" in schema) {
+      return toJSONSchema(schema as import("zod").ZodType) as Record<string, unknown>;
+    }
+    return schema as Record<string, unknown>;
+  }
+  return {};
+}
+
+/**
+ * Format bound tool definitions as a prompt section for the SDK model.
+ * Each tool is described with its name, description, and parameter schema.
+ */
+export function formatToolDefinitions(tools: StructuredToolInterface[]): string {
+  const toolDefs = tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    parameters: extractToolSchema(t),
+  }));
+  return (
+    `[Available Tools]\n${JSON.stringify(toolDefs, null, 2)}\n\n` +
+    `When you need to call a tool, respond with a tool_use block for the matching tool name.`
+  );
+}
+
 // --- Provider factory ---
 
 /**
@@ -319,9 +353,8 @@ function isAssistantMessage(msg: unknown): msg is SdkResponseMessage {
  */
 export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOptions): ModelAdapter {
   const options = { ...opts };
-  let _boundTools: StructuredToolInterface[] = [];
 
-  function buildAdapter(): ModelAdapter {
+  function buildAdapter(boundTools: StructuredToolInterface[] = []): ModelAdapter {
     return {
       async invoke(messages: BaseMessage[]): Promise<AIMessage> {
         // Dynamically import the SDK (optional dependency).
@@ -352,10 +385,13 @@ export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOption
           permissionMode: options.permissionMode ?? "bypassPermissions",
         };
 
-        // System prompt: combine provider option and extracted SystemMessages
+        // System prompt: combine provider option, extracted SystemMessages, and tool definitions
         const systemParts: string[] = [];
         if (options.systemPrompt) systemParts.push(options.systemPrompt);
         if (converted.systemPrompt) systemParts.push(converted.systemPrompt);
+        if (boundTools.length > 0) {
+          systemParts.push(formatToolDefinitions(boundTools));
+        }
         if (systemParts.length > 0) {
           sdkOptions.systemPrompt = systemParts.join("\n\n");
         }
@@ -368,7 +404,14 @@ export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOption
         if (options.thinking) sdkOptions.thinking = options.thinking;
         if (options.effort) sdkOptions.effort = options.effort;
         if (options.mcpServers) sdkOptions.mcpServers = options.mcpServers;
-        if (options.allowedTools) sdkOptions.allowedTools = options.allowedTools;
+
+        // Merge allowedTools: provider options + bound tool names
+        const allowedToolNames = [
+          ...(options.allowedTools ?? []),
+          ...boundTools.map((t) => t.name),
+        ];
+        if (allowedToolNames.length > 0) sdkOptions.allowedTools = allowedToolNames;
+
         if (options.disallowedTools) sdkOptions.disallowedTools = options.disallowedTools;
         if (options.persistSession !== undefined)
           sdkOptions.persistSession = options.persistSession;
@@ -426,8 +469,7 @@ export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOption
       },
 
       bindTools(tools: StructuredToolInterface[]): ModelAdapter {
-        _boundTools = tools;
-        return buildAdapter();
+        return buildAdapter(tools);
       },
     };
   }

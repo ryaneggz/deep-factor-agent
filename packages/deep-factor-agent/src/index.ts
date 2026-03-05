@@ -91,6 +91,7 @@ export {
   parseUsageMetadata,
   throwOnSdkError,
   parseSdkResponse,
+  formatToolDefinitions,
 } from "./providers/claude-agent-sdk.js";
 export type {
   ClaudeAgentSdkProviderOptions,
