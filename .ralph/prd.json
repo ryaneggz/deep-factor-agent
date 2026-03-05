@@ -14,7 +14,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Follow existing pattern from claude-cli.ts"
     },
     {
@@ -30,7 +30,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "SDK query() takes a prompt string or AsyncIterable<SDKUserMessage>"
     },
     {
@@ -46,7 +46,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "BetaMessage.content is array of {type:'text',text:string} | {type:'tool_use',id,name,input}"
     },
     {

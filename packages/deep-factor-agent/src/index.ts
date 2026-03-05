@@ -86,8 +86,20 @@ export {
   extractSystemPrompt,
   convertMessagesToPrompt,
   convertMessages,
+  parseResponseText,
+  parseToolUseBlocks,
+  parseUsageMetadata,
+  throwOnSdkError,
+  parseSdkResponse,
 } from "./providers/claude-agent-sdk.js";
 export type {
   ClaudeAgentSdkProviderOptions,
   ConvertedMessages,
+  SdkTextBlock,
+  SdkToolUseBlock,
+  SdkContentBlock,
+  SdkUsage,
+  SdkResponseMessage,
+  SdkErrorType,
+  SdkErrorResult,
 } from "./providers/claude-agent-sdk.js";

@@ -148,6 +148,152 @@ export function convertMessages(messages: BaseMessage[]): ConvertedMessages {
   };
 }
 
+// --- SDK response types (local definitions to avoid hard dependency) ---
+
+/** A text content block from the SDK BetaMessage. */
+export interface SdkTextBlock {
+  type: "text";
+  text: string;
+}
+
+/** A tool_use content block from the SDK BetaMessage. */
+export interface SdkToolUseBlock {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+/** Union of content block types we handle from BetaMessage. */
+export type SdkContentBlock =
+  | SdkTextBlock
+  | SdkToolUseBlock
+  | { type: string; [key: string]: unknown };
+
+/** Token usage data from the SDK response. */
+export interface SdkUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}
+
+/** Subset of BetaMessage fields needed for response parsing. */
+export interface SdkResponseMessage {
+  role: "assistant";
+  content: SdkContentBlock[];
+  usage?: SdkUsage;
+  stop_reason?: string | null;
+}
+
+/** Known SDK error result types. */
+export type SdkErrorType = "rate_limit" | "auth_failed" | "overloaded" | "api_error";
+
+/** SDK error result shape. */
+export interface SdkErrorResult {
+  type: "error";
+  error_type: SdkErrorType | string;
+  message?: string;
+}
+
+// --- Response parsing (SDK → LangChain) ---
+
+/**
+ * Extract text content from SDK content blocks.
+ * Joins all text blocks with empty string (they are contiguous parts).
+ */
+export function parseResponseText(content: SdkContentBlock[]): string {
+  return content
+    .filter((block): block is SdkTextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+}
+
+/**
+ * Extract tool_use blocks from SDK content and map to LangChain tool_calls format.
+ */
+export function parseToolUseBlocks(
+  content: SdkContentBlock[],
+): Array<{ name: string; args: Record<string, unknown>; id: string; type: "tool_call" }> {
+  return content
+    .filter((block): block is SdkToolUseBlock => block.type === "tool_use")
+    .map((block) => ({
+      name: block.name,
+      args: (typeof block.input === "object" && block.input !== null ? block.input : {}) as Record<
+        string,
+        unknown
+      >,
+      id: block.id,
+      type: "tool_call" as const,
+    }));
+}
+
+/**
+ * Map SDK usage data to LangChain usage_metadata format.
+ */
+export function parseUsageMetadata(
+  usage: SdkUsage | undefined,
+): { input_tokens: number; output_tokens: number; total_tokens: number } | undefined {
+  if (!usage) return undefined;
+  return {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    total_tokens: usage.input_tokens + usage.output_tokens,
+  };
+}
+
+/**
+ * Check if an SDK result is an error and throw a descriptive error.
+ */
+export function throwOnSdkError(result: unknown): void {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    "type" in result &&
+    (result as { type: string }).type === "error"
+  ) {
+    const err = result as SdkErrorResult;
+    const errorType = err.error_type ?? "unknown";
+    const message = err.message ?? "Unknown SDK error";
+
+    switch (errorType) {
+      case "rate_limit":
+        throw new Error(`Claude Agent SDK rate limited: ${message}`);
+      case "auth_failed":
+        throw new Error(`Claude Agent SDK authentication failed: ${message}`);
+      case "overloaded":
+        throw new Error(`Claude Agent SDK overloaded: ${message}`);
+      default:
+        throw new Error(`Claude Agent SDK error (${errorType}): ${message}`);
+    }
+  }
+}
+
+/**
+ * Parse an SDK BetaMessage-shaped response into a LangChain AIMessage.
+ *
+ * - Text content blocks → AIMessage.content (joined string)
+ * - tool_use content blocks → AIMessage.tool_calls array
+ * - usage data → AIMessage.usage_metadata
+ */
+export function parseSdkResponse(response: SdkResponseMessage): AIMessage {
+  const text = parseResponseText(response.content);
+  const toolCalls = parseToolUseBlocks(response.content);
+  const usageMeta = parseUsageMetadata(response.usage);
+
+  const msg = new AIMessage({
+    content: text,
+    tool_calls: toolCalls,
+  });
+
+  if (usageMeta) {
+    // LangChain AIMessage supports usage_metadata as a dynamic property
+    (msg as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMeta;
+  }
+
+  return msg;
+}
+
 // --- Provider factory ---
 
 /**
