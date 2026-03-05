@@ -5,20 +5,48 @@ export interface XmlSerializerOptions {
   assistantPrefill?: string;
 }
 
-const XML_ESCAPE_MAP: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&apos;",
-};
-const XML_ESCAPE_REGEX = /[&<>"']/g;
+const NEEDS_ESCAPE = /[&<>"']/;
 
 /**
  * Escapes XML special characters in text content and attribute values.
+ * Uses a regex fast-path for plain text, and a manual charCode scan
+ * to avoid regex callback overhead on large strings with specials.
  */
 export function escapeXml(text: string): string {
-  return text.replace(XML_ESCAPE_REGEX, (ch) => XML_ESCAPE_MAP[ch]);
+  if (!NEEDS_ESCAPE.test(text)) return text;
+
+  let result = "";
+  let lastIndex = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    let replacement: string | undefined;
+    switch (text.charCodeAt(i)) {
+      case 38:
+        replacement = "&amp;";
+        break; // &
+      case 60:
+        replacement = "&lt;";
+        break; // <
+      case 62:
+        replacement = "&gt;";
+        break; // >
+      case 34:
+        replacement = "&quot;";
+        break; // "
+      case 39:
+        replacement = "&apos;";
+        break; // '
+    }
+    if (replacement) {
+      if (lastIndex < i) result += text.slice(lastIndex, i);
+      result += replacement;
+      lastIndex = i + 1;
+    }
+  }
+
+  if (lastIndex === 0) return text;
+  if (lastIndex < text.length) result += text.slice(lastIndex);
+  return result;
 }
 
 /**
