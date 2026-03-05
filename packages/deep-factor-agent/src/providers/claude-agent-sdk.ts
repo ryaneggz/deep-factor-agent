@@ -294,6 +294,20 @@ export function parseSdkResponse(response: SdkResponseMessage): AIMessage {
   return msg;
 }
 
+// --- SDK message type guard ---
+
+/** Check if a yielded SDK message looks like an assistant response (BetaMessage shape). */
+function isAssistantMessage(msg: unknown): msg is SdkResponseMessage {
+  return (
+    typeof msg === "object" &&
+    msg !== null &&
+    "role" in msg &&
+    (msg as { role: unknown }).role === "assistant" &&
+    "content" in msg &&
+    Array.isArray((msg as { content: unknown }).content)
+  );
+}
+
 // --- Provider factory ---
 
 /**
@@ -305,20 +319,114 @@ export function parseSdkResponse(response: SdkResponseMessage): AIMessage {
  */
 export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOptions): ModelAdapter {
   const options = { ...opts };
-  let boundTools: StructuredToolInterface[] = [];
+  let _boundTools: StructuredToolInterface[] = [];
 
   function buildAdapter(): ModelAdapter {
     return {
       async invoke(messages: BaseMessage[]): Promise<AIMessage> {
-        // Implemented in US-003/004
-        void messages;
-        void options;
-        void boundTools;
-        throw new Error("claude-agent-sdk provider invoke() not yet implemented");
+        // Dynamically import the SDK (optional dependency).
+        // Use a variable to prevent TypeScript from resolving the module at compile time.
+        const sdkModuleId = "@anthropic-ai/claude-agent-sdk";
+        let query: (args: {
+          prompt: string;
+          options?: Record<string, unknown>;
+        }) => AsyncIterable<unknown>;
+        try {
+          const sdk = (await import(/* webpackIgnore: true */ sdkModuleId)) as {
+            query: typeof query;
+          };
+          query = sdk.query;
+        } catch {
+          throw new Error(
+            "Claude Agent SDK (@anthropic-ai/claude-agent-sdk) is not installed. " +
+              "Install it with: npm install @anthropic-ai/claude-agent-sdk",
+          );
+        }
+
+        // Convert LangChain messages to SDK format
+        const converted = convertMessages(messages);
+
+        // Build SDK query options
+        const sdkOptions: Record<string, unknown> = {
+          maxTurns: options.maxTurns ?? 1,
+          permissionMode: options.permissionMode ?? "bypassPermissions",
+        };
+
+        // System prompt: combine provider option and extracted SystemMessages
+        const systemParts: string[] = [];
+        if (options.systemPrompt) systemParts.push(options.systemPrompt);
+        if (converted.systemPrompt) systemParts.push(converted.systemPrompt);
+        if (systemParts.length > 0) {
+          sdkOptions.systemPrompt = systemParts.join("\n\n");
+        }
+
+        if (sdkOptions.permissionMode === "bypassPermissions") {
+          sdkOptions.allowDangerouslySkipPermissions = true;
+        }
+        if (options.model) sdkOptions.model = options.model;
+        if (options.cwd) sdkOptions.cwd = options.cwd;
+        if (options.thinking) sdkOptions.thinking = options.thinking;
+        if (options.effort) sdkOptions.effort = options.effort;
+        if (options.mcpServers) sdkOptions.mcpServers = options.mcpServers;
+        if (options.allowedTools) sdkOptions.allowedTools = options.allowedTools;
+        if (options.disallowedTools) sdkOptions.disallowedTools = options.disallowedTools;
+        if (options.persistSession !== undefined)
+          sdkOptions.persistSession = options.persistSession;
+
+        // Collect messages from the SDK AsyncGenerator
+        let lastAssistantMessage: SdkResponseMessage | undefined;
+        let resultText: string | undefined;
+
+        const runQuery = async () => {
+          for await (const message of query({ prompt: converted.prompt, options: sdkOptions })) {
+            // Check for error results
+            throwOnSdkError(message);
+
+            // Capture assistant messages (BetaMessage shape)
+            if (isAssistantMessage(message)) {
+              lastAssistantMessage = message;
+            }
+
+            // Capture result text as fallback
+            if (
+              typeof message === "object" &&
+              message !== null &&
+              "result" in message &&
+              typeof (message as { result: unknown }).result === "string"
+            ) {
+              resultText = (message as { result: string }).result;
+            }
+          }
+        };
+
+        // Apply timeout
+        const timeoutMs = options.timeout ?? 120_000;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          const timer = setTimeout(
+            () => reject(new Error(`Claude Agent SDK query timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+          // Allow Node to exit even if timeout is pending
+          if (typeof timer === "object" && "unref" in timer) timer.unref();
+        });
+
+        await Promise.race([runQuery(), timeoutPromise]);
+
+        // Parse the assistant response
+        if (lastAssistantMessage) {
+          return parseSdkResponse(lastAssistantMessage);
+        }
+
+        // Fallback: if we only got a result string, wrap in AIMessage
+        if (resultText !== undefined) {
+          return new AIMessage({ content: resultText });
+        }
+
+        throw new Error("Claude Agent SDK query returned no assistant message");
       },
 
       bindTools(tools: StructuredToolInterface[]): ModelAdapter {
-        boundTools = tools;
+        _boundTools = tools;
         return buildAdapter();
       },
     };
