@@ -10,5 +10,8 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       reporter: ["text", "lcov"],
     },
+    benchmark: {
+      include: ["__benchmarks__/**/*.bench.ts"],
+    },
   },
 });

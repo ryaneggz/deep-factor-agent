@@ -31,3 +31,4 @@ archive/
 !specs/.gitkeep
 specs/*.md
 specs/*.png
+bench-results.json

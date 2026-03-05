@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "bench": "vitest bench"
   },
   "peerDependencies": {
     "zod": ">=4.0.0"
