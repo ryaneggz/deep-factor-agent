@@ -6,7 +6,8 @@
  * that handles tool execution natively, while deep-factor-agent manages
  * the outer loop, stop conditions, and middleware.
  *
- * Requires: ANTHROPIC_API_KEY in your .env file
+ * Requires: `claude auth login` (OAuth) — the SDK uses the Claude CLI's
+ * auth session, not ANTHROPIC_API_KEY.
  *
  * Usage:
  *   npx tsx examples/15-claude-agent-sdk.ts
@@ -21,21 +22,32 @@ import {
 import type { AgentEvent } from "../dist/index.js";
 
 // ---------------------------------------------------------------------------
-// Env setup (inline — SDK only needs ANTHROPIC_API_KEY)
+// Auth check — SDK uses Claude CLI OAuth, not ANTHROPIC_API_KEY
 // ---------------------------------------------------------------------------
 
-import { config } from "dotenv";
-import { resolve } from "node:path";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { execSync } from "node:child_process";
 
-const globalEnv = resolve(homedir(), ".deep-factor", ".env");
-const localEnv = resolve(process.cwd(), ".env");
-config({ path: existsSync(globalEnv) ? globalEnv : localEnv });
+let isAuthed = false;
+try {
+  const status = JSON.parse(execSync("claude auth status", { encoding: "utf8", timeout: 5000 }));
+  isAuthed = status.loggedIn === true;
+} catch {
+  isAuthed = false;
+}
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error("Error: ANTHROPIC_API_KEY is required. Set it in your .env file.");
+if (!isAuthed) {
+  console.error("Error: Not authenticated. Run `claude auth login` first.");
   process.exit(1);
+}
+
+// Strip env vars that block nested SDK sessions (when run inside Claude Code)
+for (const key of [
+  "CLAUDECODE",
+  "CLAUDE_CODE_SSE_PORT",
+  "CLAUDE_CODE_ENTRYPOINT",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+]) {
+  delete process.env[key];
 }
 
 // ---------------------------------------------------------------------------

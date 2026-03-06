@@ -77,7 +77,7 @@ npx tsx examples/13-parallel-tool-calls.ts
 npx tsx examples/14-claude-codex-delegation.ts
 npx tsx examples/14-claude-codex-delegation.ts --provider codex
 
-# Claude Agent SDK provider (non-interactive, requires ANTHROPIC_API_KEY)
+# Claude Agent SDK provider (non-interactive, requires `claude auth login`)
 npx tsx examples/15-claude-agent-sdk.ts
 ```
 
