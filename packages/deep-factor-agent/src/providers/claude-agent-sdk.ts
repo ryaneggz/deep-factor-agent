@@ -447,6 +447,7 @@ export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOption
         // Collect messages from the SDK AsyncGenerator
         let lastAssistantMessage: SdkResponseMessage | undefined;
         let resultText: string | undefined;
+        let resultUsage: SdkUsage | undefined;
 
         const runQuery = async () => {
           for await (const message of query({ prompt: converted.prompt, options: sdkOptions })) {
@@ -458,14 +459,20 @@ export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOption
               lastAssistantMessage = extractAssistantMessage(message);
             }
 
-            // Capture result text as fallback
+            // Capture result event (has authoritative usage totals)
             if (
               typeof message === "object" &&
               message !== null &&
-              "result" in message &&
-              typeof (message as { result: unknown }).result === "string"
+              "type" in message &&
+              (message as { type: string }).type === "result"
             ) {
-              resultText = (message as { result: string }).result;
+              const resultMsg = message as { result?: string; usage?: SdkUsage };
+              if (typeof resultMsg.result === "string") {
+                resultText = resultMsg.result;
+              }
+              if (resultMsg.usage) {
+                resultUsage = resultMsg.usage;
+              }
             }
           }
         };
@@ -483,14 +490,24 @@ export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOption
 
         await Promise.race([runQuery(), timeoutPromise]);
 
-        // Parse the assistant response
+        // Parse the assistant response, preferring result-level usage
         if (lastAssistantMessage) {
+          if (resultUsage) {
+            lastAssistantMessage = { ...lastAssistantMessage, usage: resultUsage };
+          }
           return parseSdkResponse(lastAssistantMessage);
         }
 
         // Fallback: if we only got a result string, wrap in AIMessage
         if (resultText !== undefined) {
-          return new AIMessage({ content: resultText });
+          const msg = new AIMessage({ content: resultText });
+          if (resultUsage) {
+            const usageMeta = parseUsageMetadata(resultUsage);
+            if (usageMeta) {
+              (msg as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMeta;
+            }
+          }
+          return msg;
         }
 
         throw new Error("Claude Agent SDK query returned no assistant message");

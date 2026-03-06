@@ -144,7 +144,7 @@ describe("createClaudeAgentSdkProvider invoke()", () => {
   });
 
   it("falls back to result text when no assistant message", async () => {
-    const resultMsg = { result: "Fallback result text" };
+    const resultMsg = { type: "result", result: "Fallback result text" };
     const { queryFn } = createMockQuery([resultMsg]);
     mockQueryFn = queryFn;
 
