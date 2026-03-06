@@ -900,7 +900,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
             usage: totalUsage,
             iterations: iteration,
             stopReason: "max_errors",
-            stopDetail: `${consecutiveErrors} consecutive errors`,
+            stopDetail: `${consecutiveErrors} consecutive errors: ${errorEvent.error}`,
           };
         }
 

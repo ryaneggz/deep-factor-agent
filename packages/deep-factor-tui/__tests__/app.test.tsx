@@ -20,6 +20,7 @@ let mockUseAgent: UseAgentReturn = {
   sendPrompt: vi.fn(),
   submitHumanInput: vi.fn(),
   humanInputRequest: null,
+  resetThread: vi.fn(),
 };
 
 vi.mock("../src/hooks/useAgent.js", () => ({
@@ -29,6 +30,17 @@ vi.mock("../src/hooks/useAgent.js", () => ({
 vi.mock("../src/tools/bash.js", () => ({
   bashTool: { name: "bash", description: "mock", invoke: vi.fn() },
 }));
+
+vi.mock("deep-factor-agent", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("deep-factor-agent")>();
+  return {
+    ...actual,
+    createClaudeAgentSdkProvider: vi.fn(() => ({
+      invoke: vi.fn(),
+      bindTools: vi.fn(),
+    })),
+  };
+});
 
 // Import after mocks are set up
 const { TuiApp } = await import("../src/app.js");
@@ -40,7 +52,7 @@ function renderApp(overrides?: Partial<UseAgentReturn>) {
   }
   return render(
     <Box height={24} width={80}>
-      <TuiApp model="gpt-4" maxIter={10} enableBash={false} />
+      <TuiApp model="gpt-4" maxIter={10} enableBash={false} provider="langchain" />
     </Box>,
   );
 }
@@ -60,6 +72,7 @@ describe("TuiApp integration", () => {
       sendPrompt: vi.fn(),
       submitHumanInput: vi.fn(),
       humanInputRequest: null,
+      resetThread: vi.fn(),
     };
   });
 

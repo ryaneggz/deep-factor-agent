@@ -1,0 +1,523 @@
+import { AIMessage } from "@langchain/core/messages";
+import type { BaseMessage } from "@langchain/core/messages";
+import type { StructuredToolInterface } from "@langchain/core/tools";
+import { toJSONSchema } from "zod";
+import type { ModelAdapter } from "./types.js";
+
+export interface ClaudeAgentSdkProviderOptions {
+  /** Claude model ID (e.g. "claude-opus-4-6"). */
+  model?: string;
+  /** Permission mode for the SDK session. Default: "bypassPermissions" */
+  permissionMode?: "default" | "plan" | "acceptEdits" | "dontAsk" | "bypassPermissions";
+  /** Working directory for file operations. */
+  cwd?: string;
+  /** Maximum agent turns before stopping. Default: 1 (single-turn). */
+  maxTurns?: number;
+  /** Thinking/reasoning configuration. */
+  thinking?: { type: "adaptive" } | { type: "enabled"; budgetTokens: number };
+  /** Effort level for output quality. */
+  effort?: "low" | "medium" | "high" | "max";
+  /** MCP server definitions. */
+  mcpServers?: Record<string, { command: string; args?: string[] } | unknown>;
+  /** Built-in tools the agent can use (e.g. ["Read", "Edit", "Bash"]). */
+  allowedTools?: string[];
+  /** Tools to explicitly disallow. */
+  disallowedTools?: string[];
+  /** Custom system prompt for the session. */
+  systemPrompt?: string;
+  /** Whether to persist/resume the SDK session. */
+  persistSession?: boolean;
+  /** Timeout in milliseconds for the query. Default: 120000 (2 min). */
+  timeout?: number;
+}
+
+// --- Message conversion (LangChain → SDK) ---
+
+/** Result of converting LangChain messages for the SDK query() call. */
+export interface ConvertedMessages {
+  /** Combined SystemMessage content to pass as SDK systemPrompt option. */
+  systemPrompt: string | undefined;
+  /** Serialized conversation prompt string for SDK query(). */
+  prompt: string;
+}
+
+/** Extract text content from a LangChain message content field. */
+function extractContent(content: string | unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((block: unknown) => {
+        if (typeof block === "string") return block;
+        if (
+          typeof block === "object" &&
+          block !== null &&
+          "type" in block &&
+          (block as { type: string }).type === "text" &&
+          "text" in block
+        ) {
+          return (block as { text: string }).text;
+        }
+        return JSON.stringify(block);
+      })
+      .join("");
+  }
+  return JSON.stringify(content);
+}
+
+/**
+ * Extract SystemMessage content from a LangChain message array.
+ * Multiple SystemMessages are joined with double-newlines.
+ */
+export function extractSystemPrompt(messages: BaseMessage[]): string | undefined {
+  const systemParts: string[] = [];
+  for (const msg of messages) {
+    if (msg._getType() === "system") {
+      systemParts.push(extractContent(msg.content));
+    }
+  }
+  return systemParts.length > 0 ? systemParts.join("\n\n") : undefined;
+}
+
+/**
+ * Convert LangChain messages to a structured prompt string for the SDK.
+ *
+ * - SystemMessages are skipped (extracted separately via extractSystemPrompt)
+ * - HumanMessage content maps to `[User]: ...`
+ * - AIMessage text content maps to `[Assistant]: ...`
+ * - AIMessage tool_calls are serialized as `[Tool Calls]: ...`
+ * - ToolMessage results are serialized as `[Tool Result (<id>)]: ...`
+ */
+export function convertMessagesToPrompt(messages: BaseMessage[]): string {
+  const parts: string[] = [];
+
+  for (const msg of messages) {
+    const type = msg._getType();
+
+    switch (type) {
+      case "system":
+        // Skipped — extracted via extractSystemPrompt()
+        break;
+
+      case "human":
+        parts.push(`[User]: ${extractContent(msg.content)}`);
+        break;
+
+      case "ai": {
+        const aiMsg = msg as AIMessage;
+        const text = extractContent(aiMsg.content);
+        const toolCalls = aiMsg.tool_calls ?? [];
+
+        if (toolCalls.length > 0) {
+          const tcLines = toolCalls.map(
+            (tc) => `  - ${tc.name}(${JSON.stringify(tc.args)}) [id: ${tc.id}]`,
+          );
+          const toolSection = `[Tool Calls]:\n${tcLines.join("\n")}`;
+          if (text) {
+            parts.push(`[Assistant]: ${text}\n${toolSection}`);
+          } else {
+            parts.push(`[Assistant]:\n${toolSection}`);
+          }
+        } else if (text) {
+          parts.push(`[Assistant]: ${text}`);
+        }
+        break;
+      }
+
+      case "tool": {
+        const toolCallId = (msg as unknown as { tool_call_id?: string }).tool_call_id ?? "unknown";
+        parts.push(`[Tool Result (${toolCallId})]: ${extractContent(msg.content)}`);
+        break;
+      }
+
+      default:
+        parts.push(`[${type}]: ${extractContent(msg.content)}`);
+        break;
+    }
+  }
+
+  return parts.join("\n\n");
+}
+
+/**
+ * Convert a full LangChain message array into the shape needed by SDK query().
+ * Combines extractSystemPrompt() and convertMessagesToPrompt().
+ */
+export function convertMessages(messages: BaseMessage[]): ConvertedMessages {
+  return {
+    systemPrompt: extractSystemPrompt(messages),
+    prompt: convertMessagesToPrompt(messages),
+  };
+}
+
+// --- SDK response types (local definitions to avoid hard dependency) ---
+
+/** A text content block from the SDK BetaMessage. */
+export interface SdkTextBlock {
+  type: "text";
+  text: string;
+}
+
+/** A tool_use content block from the SDK BetaMessage. */
+export interface SdkToolUseBlock {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+/** Union of content block types we handle from BetaMessage. */
+export type SdkContentBlock =
+  | SdkTextBlock
+  | SdkToolUseBlock
+  | { type: string; [key: string]: unknown };
+
+/** Token usage data from the SDK response. */
+export interface SdkUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}
+
+/** Subset of BetaMessage fields needed for response parsing. */
+export interface SdkResponseMessage {
+  role: "assistant";
+  content: SdkContentBlock[];
+  usage?: SdkUsage;
+  stop_reason?: string | null;
+}
+
+/** Known SDK error result types. */
+export type SdkErrorType = "rate_limit" | "auth_failed" | "overloaded" | "api_error";
+
+/** SDK error result shape. */
+export interface SdkErrorResult {
+  type: "error";
+  error_type: SdkErrorType | string;
+  message?: string;
+}
+
+// --- Response parsing (SDK → LangChain) ---
+
+/**
+ * Extract text content from SDK content blocks.
+ * Joins all text blocks with empty string (they are contiguous parts).
+ */
+export function parseResponseText(content: SdkContentBlock[]): string {
+  return content
+    .filter((block): block is SdkTextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+}
+
+/**
+ * Extract tool_use blocks from SDK content and map to LangChain tool_calls format.
+ */
+export function parseToolUseBlocks(
+  content: SdkContentBlock[],
+): Array<{ name: string; args: Record<string, unknown>; id: string; type: "tool_call" }> {
+  return content
+    .filter((block): block is SdkToolUseBlock => block.type === "tool_use")
+    .map((block) => ({
+      name: block.name,
+      args: (typeof block.input === "object" && block.input !== null ? block.input : {}) as Record<
+        string,
+        unknown
+      >,
+      id: block.id,
+      type: "tool_call" as const,
+    }));
+}
+
+/**
+ * Map SDK usage data to LangChain usage_metadata format.
+ */
+export function parseUsageMetadata(
+  usage: SdkUsage | undefined,
+): { input_tokens: number; output_tokens: number; total_tokens: number } | undefined {
+  if (!usage) return undefined;
+  return {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    total_tokens: usage.input_tokens + usage.output_tokens,
+  };
+}
+
+/**
+ * Check if an SDK result is an error and throw a descriptive error.
+ */
+export function throwOnSdkError(result: unknown): void {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    "type" in result &&
+    (result as { type: string }).type === "error"
+  ) {
+    const err = result as SdkErrorResult;
+    const errorType = err.error_type ?? "unknown";
+    const message = err.message ?? "Unknown SDK error";
+
+    switch (errorType) {
+      case "rate_limit":
+        throw new Error(`Claude Agent SDK rate limited: ${message}`);
+      case "auth_failed":
+        throw new Error(`Claude Agent SDK authentication failed: ${message}`);
+      case "overloaded":
+        throw new Error(`Claude Agent SDK overloaded: ${message}`);
+      default:
+        throw new Error(`Claude Agent SDK error (${errorType}): ${message}`);
+    }
+  }
+}
+
+/**
+ * Parse an SDK BetaMessage-shaped response into a LangChain AIMessage.
+ *
+ * - Text content blocks → AIMessage.content (joined string)
+ * - tool_use content blocks → AIMessage.tool_calls array
+ * - usage data → AIMessage.usage_metadata
+ */
+export function parseSdkResponse(response: SdkResponseMessage): AIMessage {
+  const text = parseResponseText(response.content);
+  const toolCalls = parseToolUseBlocks(response.content);
+  const usageMeta = parseUsageMetadata(response.usage);
+
+  const msg = new AIMessage({
+    content: text,
+    tool_calls: toolCalls,
+  });
+
+  if (usageMeta) {
+    // LangChain AIMessage supports usage_metadata as a dynamic property
+    (msg as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMeta;
+  }
+
+  return msg;
+}
+
+// --- SDK message type guard ---
+
+/** Check if a yielded SDK message looks like an assistant response (BetaMessage shape). */
+function isAssistantMessage(msg: unknown): msg is SdkResponseMessage {
+  if (typeof msg !== "object" || msg === null) return false;
+
+  // Direct shape: { role: "assistant", content: [...] }
+  if (
+    "role" in msg &&
+    (msg as { role: unknown }).role === "assistant" &&
+    "content" in msg &&
+    Array.isArray((msg as { content: unknown }).content)
+  ) {
+    return true;
+  }
+
+  // Wrapped shape: { type: "assistant", message: { role: "assistant", content: [...] } }
+  if ("type" in msg && (msg as { type: unknown }).type === "assistant" && "message" in msg) {
+    const inner = (msg as { message: unknown }).message;
+    return isAssistantMessage(inner);
+  }
+
+  return false;
+}
+
+/** Extract the inner BetaMessage from a possibly-wrapped SDK message. */
+function extractAssistantMessage(msg: unknown): SdkResponseMessage {
+  if (typeof msg === "object" && msg !== null && "message" in msg) {
+    const inner = (msg as { message: unknown }).message;
+    if (
+      typeof inner === "object" &&
+      inner !== null &&
+      "role" in inner &&
+      (inner as { role: unknown }).role === "assistant" &&
+      "content" in inner
+    ) {
+      return inner as SdkResponseMessage;
+    }
+  }
+  return msg as SdkResponseMessage;
+}
+
+// --- Tool schema formatting ---
+
+/**
+ * Extract a JSON Schema object from a LangChain StructuredToolInterface.
+ * Handles both Zod schemas and plain JSON Schema objects.
+ */
+function extractToolSchema(tool: StructuredToolInterface): Record<string, unknown> {
+  if ("schema" in tool && tool.schema) {
+    const schema = tool.schema as object;
+    if ("_zod" in schema) {
+      return toJSONSchema(schema as import("zod").ZodType) as Record<string, unknown>;
+    }
+    return schema as Record<string, unknown>;
+  }
+  return {};
+}
+
+/**
+ * Format bound tool definitions as a prompt section for the SDK model.
+ * Each tool is described with its name, description, and parameter schema.
+ */
+export function formatToolDefinitions(tools: StructuredToolInterface[]): string {
+  const toolDefs = tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    parameters: extractToolSchema(t),
+  }));
+  return (
+    `[Available Tools]\n${JSON.stringify(toolDefs, null, 2)}\n\n` +
+    `When you need to call a tool, respond with a tool_use block for the matching tool name.`
+  );
+}
+
+// --- Provider factory ---
+
+/**
+ * Create a Claude Agent SDK model adapter.
+ *
+ * Uses `@anthropic-ai/claude-agent-sdk` query() to run prompts through
+ * the Claude agent with built-in tools, MCP support, and permissions.
+ * The SDK is dynamically imported so it remains an optional dependency.
+ */
+export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOptions): ModelAdapter {
+  const options = { ...opts };
+
+  function buildAdapter(boundTools: StructuredToolInterface[] = []): ModelAdapter {
+    return {
+      async invoke(messages: BaseMessage[]): Promise<AIMessage> {
+        // Dynamically import the SDK (optional dependency).
+        // Use a variable to prevent TypeScript from resolving the module at compile time.
+        const sdkModuleId = "@anthropic-ai/claude-agent-sdk";
+        let query: (args: {
+          prompt: string;
+          options?: Record<string, unknown>;
+        }) => AsyncIterable<unknown>;
+        try {
+          const sdk = (await import(/* webpackIgnore: true */ sdkModuleId)) as {
+            query: typeof query;
+          };
+          query = sdk.query;
+        } catch {
+          throw new Error(
+            "Claude Agent SDK (@anthropic-ai/claude-agent-sdk) is not installed. " +
+              "Install it with: npm install @anthropic-ai/claude-agent-sdk",
+          );
+        }
+
+        // Convert LangChain messages to SDK format
+        const converted = convertMessages(messages);
+
+        // Build SDK query options
+        const sdkOptions: Record<string, unknown> = {
+          maxTurns: options.maxTurns ?? 1,
+          permissionMode: options.permissionMode ?? "bypassPermissions",
+        };
+
+        // System prompt: combine provider option, extracted SystemMessages, and tool definitions
+        const systemParts: string[] = [];
+        if (options.systemPrompt) systemParts.push(options.systemPrompt);
+        if (converted.systemPrompt) systemParts.push(converted.systemPrompt);
+        if (boundTools.length > 0) {
+          systemParts.push(formatToolDefinitions(boundTools));
+        }
+        if (systemParts.length > 0) {
+          sdkOptions.systemPrompt = systemParts.join("\n\n");
+        }
+
+        if (sdkOptions.permissionMode === "bypassPermissions") {
+          sdkOptions.allowDangerouslySkipPermissions = true;
+        }
+        if (options.model) sdkOptions.model = options.model;
+        if (options.cwd) sdkOptions.cwd = options.cwd;
+        if (options.thinking) sdkOptions.thinking = options.thinking;
+        if (options.effort) sdkOptions.effort = options.effort;
+        if (options.mcpServers) sdkOptions.mcpServers = options.mcpServers;
+
+        // Merge allowedTools: provider options + bound tool names
+        const allowedToolNames = [
+          ...(options.allowedTools ?? []),
+          ...boundTools.map((t) => t.name),
+        ];
+        if (allowedToolNames.length > 0) sdkOptions.allowedTools = allowedToolNames;
+
+        if (options.disallowedTools) sdkOptions.disallowedTools = options.disallowedTools;
+        if (options.persistSession !== undefined)
+          sdkOptions.persistSession = options.persistSession;
+
+        // Collect messages from the SDK AsyncGenerator
+        let lastAssistantMessage: SdkResponseMessage | undefined;
+        let resultText: string | undefined;
+        let resultUsage: SdkUsage | undefined;
+
+        const runQuery = async () => {
+          for await (const message of query({ prompt: converted.prompt, options: sdkOptions })) {
+            // Check for error results
+            throwOnSdkError(message);
+
+            // Capture assistant messages (BetaMessage shape)
+            if (isAssistantMessage(message)) {
+              lastAssistantMessage = extractAssistantMessage(message);
+            }
+
+            // Capture result event (has authoritative usage totals)
+            if (
+              typeof message === "object" &&
+              message !== null &&
+              "type" in message &&
+              (message as { type: string }).type === "result"
+            ) {
+              const resultMsg = message as { result?: string; usage?: SdkUsage };
+              if (typeof resultMsg.result === "string") {
+                resultText = resultMsg.result;
+              }
+              if (resultMsg.usage) {
+                resultUsage = resultMsg.usage;
+              }
+            }
+          }
+        };
+
+        // Apply timeout
+        const timeoutMs = options.timeout ?? 120_000;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          const timer = setTimeout(
+            () => reject(new Error(`Claude Agent SDK query timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+          // Allow Node to exit even if timeout is pending
+          if (typeof timer === "object" && "unref" in timer) timer.unref();
+        });
+
+        await Promise.race([runQuery(), timeoutPromise]);
+
+        // Parse the assistant response, preferring result-level usage
+        if (lastAssistantMessage) {
+          if (resultUsage) {
+            lastAssistantMessage = { ...lastAssistantMessage, usage: resultUsage };
+          }
+          return parseSdkResponse(lastAssistantMessage);
+        }
+
+        // Fallback: if we only got a result string, wrap in AIMessage
+        if (resultText !== undefined) {
+          const msg = new AIMessage({ content: resultText });
+          if (resultUsage) {
+            const usageMeta = parseUsageMetadata(resultUsage);
+            if (usageMeta) {
+              (msg as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMeta;
+            }
+          }
+          return msg;
+        }
+
+        throw new Error("Claude Agent SDK query returned no assistant message");
+      },
+
+      bindTools(tools: StructuredToolInterface[]): ModelAdapter {
+        return buildAdapter(tools);
+      },
+    };
+  }
+
+  return buildAdapter();
+}

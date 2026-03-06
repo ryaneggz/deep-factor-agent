@@ -60,6 +60,20 @@
 - Tool adapter utilities in `packages/deep-factor-agent/src/tool-adapter.ts` (createLangChainTool, findToolByName, toolArrayToMap)
 - Tests in `packages/deep-factor-agent/__tests__/*.test.ts`
 
+### Provider Codebase Patterns
+
+- Providers live in `packages/deep-factor-agent/src/providers/` and implement `ModelAdapter` (invoke + optional bindTools)
+- Each provider has a factory function (`createXxxProvider()`) returning `ModelAdapter`
+- `claude-cli.ts` — shells out to the `claude` CLI binary, mutable `bindTools()` (returns `this`)
+- `codex-cli.ts` — shells out to the `codex` CLI binary, mutable `bindTools()` (returns `this`)
+- `claude-agent-sdk.ts` — uses `@anthropic-ai/claude-agent-sdk` query() AsyncGenerator, immutable `bindTools()` via `buildAdapter(tools)`
+- Claude Agent SDK is an optional peer dependency; dynamically imported via `import(variable)` pattern to avoid TS module resolution at compile time
+- SDK response types (`SdkResponseMessage`, `SdkContentBlock`, etc.) are defined locally in `claude-agent-sdk.ts` to avoid hard dependency
+- Message conversion (LangChain → SDK): `convertMessages()` splits SystemMessages into `systemPrompt` and serializes the rest as structured text
+- Response parsing (SDK → LangChain): `parseSdkResponse()` maps BetaMessage content blocks to AIMessage with text, tool_calls, and usage_metadata
+- Tool schemas injected into SDK `systemPrompt` via `formatToolDefinitions()` using `toJSONSchema` from zod
+- Tests split by concern: `claude-agent-sdk-messages.test.ts`, `claude-agent-sdk-response.test.ts`, `claude-agent-sdk-invoke.test.ts`, `claude-agent-sdk-bind-tools.test.ts`, `claude-agent-sdk-e2e.test.ts`
+
 ### CLI Codebase Patterns
 
 - Entry point: `packages/deep-factor-cli/src/cli.tsx` (meow + ink render)

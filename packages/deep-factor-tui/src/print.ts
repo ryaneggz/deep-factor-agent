@@ -1,22 +1,31 @@
-import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
+import {
+  createDeepFactorAgent,
+  maxIterations,
+  createClaudeAgentSdkProvider,
+} from "deep-factor-agent";
 import type { AgentResult, PendingResult } from "deep-factor-agent";
 import { bashTool } from "./tools/bash.js";
+import type { ProviderType } from "./types.js";
 
 export interface PrintModeOptions {
   prompt: string;
   model: string;
   maxIter: number;
   sandbox: boolean;
+  provider: ProviderType;
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<void> {
-  const { prompt, model, maxIter, sandbox } = options;
+  const { prompt, model, maxIter, sandbox, provider } = options;
 
   try {
     const tools = sandbox ? [bashTool] : [];
 
+    const resolvedModel =
+      provider === "claude-sdk" ? createClaudeAgentSdkProvider({ model }) : model;
+
     const agent = createDeepFactorAgent({
-      model,
+      model: resolvedModel,
       tools,
       stopWhen: [maxIterations(maxIter)],
       interruptOn: [],

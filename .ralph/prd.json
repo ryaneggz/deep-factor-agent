@@ -1,0 +1,144 @@
+{
+  "project": "deep-factor-agent",
+  "branchName": "feat/13-claude-agent-sdk",
+  "description": "Add Claude Agent SDK (@anthropic-ai/claude-agent-sdk) as a model provider implementing ModelAdapter interface",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create provider options type and factory scaffold",
+      "description": "As a developer, I need the ClaudeAgentSdkProviderOptions type and createClaudeAgentSdkProvider factory function scaffold so the provider structure exists.",
+      "acceptanceCriteria": [
+        "ClaudeAgentSdkProviderOptions interface defined with model, permissionMode, cwd, maxTurns, thinking, effort, mcpServers, allowedTools, disallowedTools, systemPrompt, persistSession, timeout fields",
+        "createClaudeAgentSdkProvider() function exported returning ModelAdapter",
+        "Provider re-exported from packages/deep-factor-agent/src/index.ts",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Follow existing pattern from claude-cli.ts"
+    },
+    {
+      "id": "US-002",
+      "title": "Implement message conversion (LangChain → SDK)",
+      "description": "As a developer, I need LangChain messages (HumanMessage, SystemMessage, ToolMessage, AIMessage) converted to SDK-compatible format for the query() prompt.",
+      "acceptanceCriteria": [
+        "HumanMessage content maps to SDK user message text",
+        "SystemMessage extracted and passed as systemPrompt option",
+        "AIMessage with tool_calls serialized correctly for context",
+        "ToolMessage results included in conversation context",
+        "Unit tests for each message type conversion",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "SDK query() takes a prompt string or AsyncIterable<SDKUserMessage>"
+    },
+    {
+      "id": "US-003",
+      "title": "Implement response parsing (SDK → LangChain)",
+      "description": "As a developer, I need SDKAssistantMessage and SDKResultMessage parsed into LangChain AIMessage with content and tool_calls.",
+      "acceptanceCriteria": [
+        "Text content blocks from BetaMessage map to AIMessage.content string",
+        "tool_use content blocks map to AIMessage.tool_calls array",
+        "usage_metadata populated from SDK usage data (input_tokens, output_tokens)",
+        "Error results (rate_limit, auth_failed) throw meaningful errors",
+        "Unit tests for text-only, tool-call, mixed, and error responses",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "BetaMessage.content is array of {type:'text',text:string} | {type:'tool_use',id,name,input}"
+    },
+    {
+      "id": "US-004",
+      "title": "Implement invoke() with SDK query()",
+      "description": "As a developer, I need the full invoke() method that calls SDK query(), collects messages, and returns AIMessage.",
+      "acceptanceCriteria": [
+        "invoke() calls query() with converted messages and provider options",
+        "maxTurns defaults to 1 for single-turn operation",
+        "Collects SDKAssistantMessage from the AsyncGenerator",
+        "Returns parsed AIMessage with content and tool_calls",
+        "Timeout option respected",
+        "Integration test with mocked SDK query()",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "query() returns AsyncGenerator<SDKMessage, void>"
+    },
+    {
+      "id": "US-005",
+      "title": "Implement bindTools()",
+      "description": "As a developer, I need bindTools() to return a new ModelAdapter with SDK tools configured.",
+      "acceptanceCriteria": [
+        "bindTools() returns new adapter instance with tools",
+        "LangChain StructuredToolInterface mapped to SDK allowedTools or MCP tool definitions",
+        "Original adapter unchanged (immutable pattern)",
+        "Unit test for bindTools creating new adapter with tools",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "SDK has its own tool system; may need to create SDK MCP tools from LangChain tools"
+    },
+    {
+      "id": "US-006",
+      "title": "Add @anthropic-ai/claude-agent-sdk as optional dependency",
+      "description": "As a developer, I need the SDK available as an optional/peer dependency so users can opt-in.",
+      "acceptanceCriteria": [
+        "Package added as optional peerDependency in packages/deep-factor-agent/package.json",
+        "Dynamic import in provider (lazy-load, graceful error if not installed)",
+        "pnpm install succeeds with and without the SDK installed",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Use dynamic import() to avoid hard dependency"
+    },
+    {
+      "id": "US-007",
+      "title": "End-to-end test with mocked SDK",
+      "description": "As a developer, I need an integration test proving the full round-trip: createDeepFactorAgent → invoke → tool calls → result.",
+      "acceptanceCriteria": [
+        "Test creates agent with claude-agent-sdk provider",
+        "Mocked SDK returns assistant message with tool call",
+        "Agent loop processes tool call and re-invokes",
+        "Final result collected successfully",
+        "All existing 290+ tests still pass",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Mock the SDK query() function, not the actual process"
+    },
+    {
+      "id": "US-008",
+      "title": "Update documentation and exports",
+      "description": "As a user, I need documentation on how to use the Claude Agent SDK provider.",
+      "acceptanceCriteria": [
+        "README.md updated with Claude Agent SDK provider usage example",
+        "Provider exported from package index",
+        "AGENTS.md updated with provider codebase patterns",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Push all changes for code review",
+      "description": "As a developer, I need all changes committed and pushed to the feature branch for PR review.",
+      "acceptanceCriteria": [
+        "All changes committed with descriptive commit messages",
+        "Branch pushed to origin",
+        "Draft PR updated with implementation summary",
+        "CI checks pass (if configured)",
+        "All tests pass"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Final step - ensure everything is pushed and visible"
+    }
+  ]
+}

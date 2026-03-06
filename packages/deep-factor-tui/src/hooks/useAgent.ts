@@ -48,6 +48,12 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           parallelGroup: event.parallelGroup,
         });
         break;
+      case "error":
+        messages.push({
+          role: "tool_result",
+          content: `Error: ${event.error}`,
+        });
+        break;
     }
   }
   return messages;
@@ -145,6 +151,17 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     [handleResult, handleError],
   );
 
+  const resetThread = useCallback(() => {
+    threadRef.current = null;
+    pendingRef.current = null;
+    setMessages([]);
+    setStatus("idle");
+    setUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+    setIterations(0);
+    setError(null);
+    setHumanInputRequest(null);
+  }, []);
+
   return {
     messages,
     status,
@@ -154,5 +171,6 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     sendPrompt,
     submitHumanInput,
     humanInputRequest,
+    resetThread,
   };
 }
