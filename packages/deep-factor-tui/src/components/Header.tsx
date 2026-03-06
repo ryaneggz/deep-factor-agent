@@ -1,8 +1,9 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { AgentStatus } from "../types.js";
+import type { AgentStatus, ProviderType } from "../types.js";
 
 interface HeaderProps {
+  provider: ProviderType;
   model: string;
   status: AgentStatus;
 }
@@ -15,7 +16,7 @@ const STATUS_COLORS: Record<AgentStatus, string> = {
   pending_input: "magenta",
 };
 
-export function Header({ model, status }: HeaderProps) {
+export function Header({ provider, model, status }: HeaderProps) {
   return (
     <Box
       flexShrink={0}
@@ -29,7 +30,9 @@ export function Header({ model, status }: HeaderProps) {
     >
       <Text bold>Deep Factor TUI</Text>
       <Box gap={2}>
-        <Text dimColor>Model: {model}</Text>
+        <Text dimColor>
+          Provider: {provider} | Model: {model}
+        </Text>
         <Text color={STATUS_COLORS[status]}>● {status}</Text>
       </Box>
     </Box>

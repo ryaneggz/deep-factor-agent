@@ -299,14 +299,42 @@ export function parseSdkResponse(response: SdkResponseMessage): AIMessage {
 
 /** Check if a yielded SDK message looks like an assistant response (BetaMessage shape). */
 function isAssistantMessage(msg: unknown): msg is SdkResponseMessage {
-  return (
-    typeof msg === "object" &&
-    msg !== null &&
+  if (typeof msg !== "object" || msg === null) return false;
+
+  // Direct shape: { role: "assistant", content: [...] }
+  if (
     "role" in msg &&
     (msg as { role: unknown }).role === "assistant" &&
     "content" in msg &&
     Array.isArray((msg as { content: unknown }).content)
-  );
+  ) {
+    return true;
+  }
+
+  // Wrapped shape: { type: "assistant", message: { role: "assistant", content: [...] } }
+  if ("type" in msg && (msg as { type: unknown }).type === "assistant" && "message" in msg) {
+    const inner = (msg as { message: unknown }).message;
+    return isAssistantMessage(inner);
+  }
+
+  return false;
+}
+
+/** Extract the inner BetaMessage from a possibly-wrapped SDK message. */
+function extractAssistantMessage(msg: unknown): SdkResponseMessage {
+  if (typeof msg === "object" && msg !== null && "message" in msg) {
+    const inner = (msg as { message: unknown }).message;
+    if (
+      typeof inner === "object" &&
+      inner !== null &&
+      "role" in inner &&
+      (inner as { role: unknown }).role === "assistant" &&
+      "content" in inner
+    ) {
+      return inner as SdkResponseMessage;
+    }
+  }
+  return msg as SdkResponseMessage;
 }
 
 // --- Tool schema formatting ---
@@ -427,7 +455,7 @@ export function createClaudeAgentSdkProvider(opts?: ClaudeAgentSdkProviderOption
 
             // Capture assistant messages (BetaMessage shape)
             if (isAssistantMessage(message)) {
-              lastAssistantMessage = message;
+              lastAssistantMessage = extractAssistantMessage(message);
             }
 
             // Capture result text as fallback

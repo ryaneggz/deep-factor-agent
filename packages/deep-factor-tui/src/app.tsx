@@ -1,15 +1,40 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Box } from "ink";
+import { createClaudeAgentSdkProvider } from "deep-factor-agent";
+import type { ModelAdapter } from "deep-factor-agent";
 import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
 import { Content } from "./components/Content.js";
 import { Footer } from "./components/Footer.js";
 import { bashTool } from "./tools/bash.js";
-import type { TuiAppProps } from "./types.js";
+import type { TuiAppProps, ProviderType } from "./types.js";
 import type { AgentTools } from "./types.js";
+import { DEFAULT_MODELS } from "./types.js";
 
-export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }: TuiAppProps) {
+function resolveModel(provider: ProviderType, modelId: string): string | ModelAdapter {
+  if (provider === "claude-sdk") {
+    return createClaudeAgentSdkProvider({ model: modelId });
+  }
+  return modelId;
+}
+
+export function TuiApp({
+  prompt,
+  model,
+  maxIter,
+  enableBash,
+  parallelToolCalls,
+  provider,
+}: TuiAppProps) {
   const hasRun = useRef(false);
+
+  const [activeProvider, setActiveProvider] = useState<ProviderType>(provider);
+  const [activeModel, setActiveModel] = useState<string>(model);
+
+  const resolvedModel = useMemo(
+    () => resolveModel(activeProvider, activeModel),
+    [activeProvider, activeModel],
+  );
 
   const tools: AgentTools = enableBash ? [bashTool] : [];
 
@@ -22,7 +47,8 @@ export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }
     sendPrompt,
     submitHumanInput,
     humanInputRequest,
-  } = useAgent({ model, maxIter, tools, parallelToolCalls });
+    resetThread,
+  } = useAgent({ model: resolvedModel, maxIter, tools, parallelToolCalls });
 
   // Send initial prompt on mount if provided
   useEffect(() => {
@@ -35,14 +61,30 @@ export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }
   const handleSubmit = (value: string) => {
     if (status === "pending_input") {
       submitHumanInput(value);
-    } else {
-      sendPrompt(value);
+      return;
     }
+
+    // Parse /provider slash command
+    const providerMatch = value.match(/^\/provider\s+(\S+)(?:\s+--model\s+(\S+))?$/);
+    if (providerMatch) {
+      const newProvider = providerMatch[1] as string;
+      if (newProvider !== "langchain" && newProvider !== "claude-sdk") {
+        // Invalid provider — ignore silently
+        return;
+      }
+      const newModel = providerMatch[2] ?? DEFAULT_MODELS[newProvider];
+      setActiveProvider(newProvider);
+      setActiveModel(newModel);
+      resetThread();
+      return;
+    }
+
+    sendPrompt(value);
   };
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Header model={model} status={status} />
+      <Header provider={activeProvider} model={activeModel} status={status} />
       <Content
         messages={messages}
         status={status}

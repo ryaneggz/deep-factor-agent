@@ -9,6 +9,11 @@ const { mockLoop, mockCreateAgent } = vi.hoisted(() => {
 vi.mock("deep-factor-agent", () => ({
   createDeepFactorAgent: mockCreateAgent,
   maxIterations: vi.fn((n: number) => ({ name: "maxIterations", maxIter: n })),
+  createClaudeAgentSdkProvider: vi.fn((opts: any) => ({
+    invoke: vi.fn(),
+    bindTools: vi.fn(),
+    _model: opts?.model,
+  })),
 }));
 
 vi.mock("../src/tools/bash.js", () => ({
@@ -42,6 +47,7 @@ describe("runPrintMode", () => {
     model: "gpt-4.1-mini",
     maxIter: 10,
     sandbox: false,
+    provider: "langchain" as const,
   };
 
   it("writes response to stdout on success", async () => {

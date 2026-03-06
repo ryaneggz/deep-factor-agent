@@ -17,19 +17,28 @@ const zeroUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 
 // ---------------------------------------------------------------------------
 describe("Header", () => {
   it("renders the title", () => {
-    const { lastFrame } = render(<Header model="gpt-4" status="idle" />);
+    const { lastFrame } = render(<Header provider="langchain" model="gpt-4" status="idle" />);
     expect(lastFrame()).toContain("Deep Factor TUI");
   });
 
   it("renders the model name", () => {
-    const { lastFrame } = render(<Header model="claude-sonnet" status="idle" />);
+    const { lastFrame } = render(
+      <Header provider="langchain" model="claude-sonnet" status="idle" />,
+    );
     expect(lastFrame()).toContain("claude-sonnet");
+  });
+
+  it("renders the provider name", () => {
+    const { lastFrame } = render(
+      <Header provider="claude-sdk" model="claude-sonnet-4-6" status="idle" />,
+    );
+    expect(lastFrame()).toContain("claude-sdk");
   });
 
   const statuses: AgentStatus[] = ["idle", "running", "done", "error", "pending_input"];
   for (const status of statuses) {
     it(`renders status "${status}"`, () => {
-      const { lastFrame } = render(<Header model="gpt-4" status={status} />);
+      const { lastFrame } = render(<Header provider="langchain" model="gpt-4" status={status} />);
       expect(lastFrame()).toContain(status);
     });
   }
