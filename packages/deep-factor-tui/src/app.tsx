@@ -4,14 +4,14 @@ import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
 import { Content } from "./components/Content.js";
 import { Footer } from "./components/Footer.js";
-import { bashTool } from "./tools/bash.js";
+import { createBashTool } from "./tools/bash.js";
 import type { TuiAppProps } from "./types.js";
 import type { AgentTools } from "./types.js";
 
-export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }: TuiAppProps) {
+export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls }: TuiAppProps) {
   const hasRun = useRef(false);
 
-  const tools: AgentTools = enableBash ? [bashTool] : [];
+  const tools: AgentTools = [createBashTool(sandbox)];
 
   const {
     messages,

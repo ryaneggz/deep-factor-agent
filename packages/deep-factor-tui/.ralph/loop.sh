@@ -1,3 +1,3 @@
 #!/bin/bash
 
-while :; do cat PROMPT.md | npx deep-factor-tui -p --sandbox; done
+while :; do cat PROMPT.md | npx deepfactor -p; done

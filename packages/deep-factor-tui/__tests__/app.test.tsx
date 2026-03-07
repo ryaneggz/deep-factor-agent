@@ -27,6 +27,7 @@ vi.mock("../src/hooks/useAgent.js", () => ({
 }));
 
 vi.mock("../src/tools/bash.js", () => ({
+  createBashTool: () => ({ name: "bash", description: "mock", invoke: vi.fn() }),
   bashTool: { name: "bash", description: "mock", invoke: vi.fn() },
 }));
 
@@ -40,7 +41,7 @@ function renderApp(overrides?: Partial<UseAgentReturn>) {
   }
   return render(
     <Box height={24} width={80}>
-      <TuiApp model="gpt-4" maxIter={10} enableBash={false} />
+      <TuiApp model="gpt-4" maxIter={10} sandbox="workspace" />
     </Box>,
   );
 }

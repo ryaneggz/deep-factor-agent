@@ -40,6 +40,6 @@ export interface TuiAppProps {
   prompt?: string;
   model: string;
   maxIter: number;
-  enableBash: boolean;
+  sandbox: import("./tools/bash.js").SandboxMode;
   parallelToolCalls?: boolean;
 }

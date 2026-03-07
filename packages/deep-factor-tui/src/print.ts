@@ -1,19 +1,19 @@
 import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 import type { AgentResult, PendingResult } from "deep-factor-agent";
-import { bashTool } from "./tools/bash.js";
+import { createBashTool, type SandboxMode } from "./tools/bash.js";
 
 export interface PrintModeOptions {
   prompt: string;
   model: string;
   maxIter: number;
-  sandbox: boolean;
+  sandbox: SandboxMode;
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<void> {
   const { prompt, model, maxIter, sandbox } = options;
 
   try {
-    const tools = sandbox ? [bashTool] : [];
+    const tools = [createBashTool(sandbox)];
 
     const agent = createDeepFactorAgent({
       model,

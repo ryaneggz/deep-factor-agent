@@ -10,21 +10,21 @@ config();
 const cli = meow(
   `
   Usage
-    $ deep-factor-tui [prompt]
+    $ deepfactor [prompt]
 
   Options
     --model, -m      Model identifier (default: gpt-4.1-mini)
     --max-iter, -i   Maximum agent iterations (default: 10)
-    --bash           Enable bash execution tool
+    --sandbox, -s    Sandbox mode: workspace (default), local, docker
     --print, -p      Non-interactive print mode (output answer to stdout)
-    --sandbox        Enable bash tool in print mode
 
   Examples
-    $ deep-factor-tui
-    $ deep-factor-tui "Explain how React hooks work"
-    $ deep-factor-tui -p "What is 2+2?"
-    $ deep-factor-tui -p --sandbox "List files in the current directory"
-    $ cat PROMPT.md | deep-factor-tui -p --sandbox
+    $ deepfactor
+    $ deepfactor "Explain how React hooks work"
+    $ deepfactor -p "What is 2+2?"
+    $ deepfactor -p "List files in the current directory"
+    $ deepfactor -s local "Run system commands"
+    $ cat PROMPT.md | deepfactor -p
 `,
   {
     importMeta: import.meta,
@@ -39,22 +39,30 @@ const cli = meow(
         shortFlag: "i",
         default: 10,
       },
-      bash: {
-        type: "boolean",
-        default: false,
+      sandbox: {
+        type: "string",
+        shortFlag: "s",
+        default: "workspace",
       },
       print: {
         type: "boolean",
         shortFlag: "p",
         default: false,
       },
-      sandbox: {
-        type: "boolean",
-        default: false,
-      },
     },
   },
 );
+
+import type { SandboxMode } from "./tools/bash.js";
+
+const validSandboxModes = ["workspace", "local", "docker"] as const;
+const sandboxMode = cli.flags.sandbox as SandboxMode;
+if (!validSandboxModes.includes(sandboxMode)) {
+  process.stderr.write(
+    `Error: Invalid sandbox mode "${cli.flags.sandbox}". Use: workspace, local, docker\n`,
+  );
+  process.exit(1);
+}
 
 let prompt = cli.input.join(" ") || undefined;
 
@@ -79,7 +87,7 @@ if (cli.flags.print) {
     prompt,
     model: cli.flags.model,
     maxIter: cli.flags.maxIter,
-    sandbox: cli.flags.sandbox,
+    sandbox: sandboxMode,
   });
 } else {
   // TUI mode: fullscreen interactive
@@ -92,7 +100,7 @@ if (cli.flags.print) {
       prompt,
       model: cli.flags.model,
       maxIter: cli.flags.maxIter,
-      enableBash: cli.flags.bash,
+      sandbox: sandboxMode,
       parallelToolCalls: true,
     }),
   );

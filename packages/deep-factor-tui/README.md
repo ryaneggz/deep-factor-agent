@@ -73,31 +73,30 @@ node dist/cli.js --bash "List all TypeScript files in this directory"
 Options
   --model, -m      Model identifier (default: gpt-4.1-mini)
   --max-iter, -i   Maximum agent iterations (default: 10)
-  --bash           Enable bash execution tool
+  --sandbox, -s    Sandbox mode: workspace (default), local, docker
   --print, -p      Non-interactive print mode (output answer to stdout)
-  --sandbox        Enable bash tool in print mode
 ```
 
 ### Examples
 
 ```bash
 # Use a different model with more iterations
-node dist/cli.js -m gpt-4.1 -i 20 "Summarize this project"
+deepfactor -m gpt-4.1 -i 20 "Summarize this project"
 
-# Bash tool for coding tasks
-node dist/cli.js --bash "What OS is this?"
+# Local sandbox (full system access)
+deepfactor -s local "What OS is this?"
 
 # Launch with no prompt — type interactively in the TUI
-node dist/cli.js
+deepfactor
 
 # Print mode — non-interactive, outputs answer to stdout
-node dist/cli.js -p "What is 2+2?"
+deepfactor -p "What is 2+2?"
 
-# Print mode with bash tool
-node dist/cli.js -p --sandbox "List files in the current directory"
+# Print mode with local sandbox
+deepfactor -p -s local "List files in the current directory"
 
 # Pipe stdin in print mode
-cat PROMPT.md | node dist/cli.js -p --sandbox
+cat PROMPT.md | deepfactor -p
 ```
 
 ## Architecture
