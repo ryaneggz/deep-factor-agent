@@ -20,12 +20,14 @@ function makeJsonOutput(
     input_tokens: 12,
     output_tokens: 8,
   },
+  extra: Record<string, unknown> = {},
 ) {
   return JSON.stringify({
     result,
     stop_reason: "end_turn",
     session_id: "session_123",
     usage,
+    ...extra,
   });
 }
 
@@ -36,9 +38,9 @@ function simulateExecFile(stdout: string) {
   });
 }
 
-function simulateExecFileError(message: string) {
+function simulateExecFileError(message: string, stderr = "") {
   mockExecFile.mockImplementation((_file: any, _args: any, _opts: any, cb: any) => {
-    cb(new Error(message), "", "");
+    cb(new Error(message), "", stderr);
     return {} as any;
   });
 }
@@ -167,7 +169,16 @@ describe("createClaudeCliProvider", () => {
     const provider = createClaudeCliProvider();
 
     await expect(provider.invoke([new HumanMessage("Hi")])).rejects.toThrow(
-      "CLI process exited with code 1",
+      "Claude CLI invocation failed (claude --print --output-format json --tools  --permission-mode bypassPermissions): CLI process exited with code 1",
+    );
+  });
+
+  it("includes Claude stderr in provider failures", async () => {
+    simulateExecFileError("CLI process exited with code 1", "Permission denied by policy");
+    const provider = createClaudeCliProvider();
+
+    await expect(provider.invoke([new HumanMessage("Hi")])).rejects.toThrow(
+      "Permission denied by policy",
     );
   });
 
@@ -223,6 +234,33 @@ describe("createClaudeCliProvider", () => {
       input_tokens: 21,
       output_tokens: 9,
       total_tokens: 30,
+    });
+  });
+
+  it("attaches Claude response metadata from the JSON envelope", async () => {
+    simulateExecFile(
+      makeJsonOutput(
+        "The answer is 42.",
+        {
+          input_tokens: 21,
+          output_tokens: 9,
+        },
+        {
+          model: "claude-sonnet-4-20250514",
+          permission_denials: [{ tool: "Bash", reason: "blocked" }],
+        },
+      ),
+    );
+    const provider = createClaudeCliProvider({ permissionMode: "plan", model: "sonnet" });
+
+    const result = await provider.invoke([new HumanMessage("What is the meaning of life?")]);
+
+    expect((result as AIMessage & { response_metadata?: unknown }).response_metadata).toEqual({
+      session_id: "session_123",
+      stop_reason: "end_turn",
+      permission_mode: "plan",
+      model: "claude-sonnet-4-20250514",
+      permission_denials: [{ tool: "Bash", reason: "blocked" }],
     });
   });
 

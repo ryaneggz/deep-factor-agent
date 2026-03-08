@@ -146,6 +146,7 @@ describe("TuiApp integration", () => {
     expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
       model: "sonnet",
       permissionMode: "bypassPermissions",
+      disableBuiltInTools: true,
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -164,6 +165,19 @@ describe("TuiApp integration", () => {
     expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
       model: "sonnet",
       permissionMode: "acceptEdits",
+      disableBuiltInTools: true,
+    });
+  });
+
+  it("maps plan mode to Claude plan permission mode", () => {
+    render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+    );
+
+    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "plan",
+      disableBuiltInTools: true,
     });
   });
 });

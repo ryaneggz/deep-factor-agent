@@ -32,6 +32,7 @@ export function resolveProviderModel(args: {
     ? createClaudeCliProvider({
         model,
         permissionMode: resolveClaudePermissionMode(mode),
+        disableBuiltInTools: true,
       })
     : model;
 }

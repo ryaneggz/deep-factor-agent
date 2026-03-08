@@ -217,6 +217,7 @@ describe("runPrintMode", () => {
     expect(mockCreateClaudeCliProvider).toHaveBeenCalledWith({
       model: "sonnet",
       permissionMode: "bypassPermissions",
+      disableBuiltInTools: true,
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({ model: mockClaudeCliProvider }),
@@ -243,6 +244,31 @@ describe("runPrintMode", () => {
     expect(mockCreateClaudeCliProvider).toHaveBeenCalledWith({
       model: "sonnet",
       permissionMode: "plan",
+      disableBuiltInTools: true,
+    });
+  });
+
+  it("maps approve mode to Claude acceptEdits permission mode", async () => {
+    mockLoop.mockResolvedValueOnce({
+      response: "Approved",
+      stopReason: "completed",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      iterations: 1,
+    });
+
+    await expect(
+      runPrintMode({
+        ...baseOptions,
+        provider: "claude",
+        model: "sonnet",
+        mode: "approve",
+      }),
+    ).rejects.toThrow("process.exit called");
+
+    expect(mockCreateClaudeCliProvider).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "acceptEdits",
+      disableBuiltInTools: true,
     });
   });
 

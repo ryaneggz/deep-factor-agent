@@ -58,4 +58,20 @@ describe.skipIf(!hasClaudeAuth())("Claude CLI smoke", () => {
     expect(result.code).not.toBe(0);
     expect(result.stderr.toLowerCase()).toContain("coming soon");
   });
+
+  it("completes tool-requesting prompts without depending on Claude built-in tools", async () => {
+    const result = await run(
+      [
+        "--provider",
+        "claude",
+        "-p",
+        "Use the bash tool to run git status and summarize the result.",
+      ],
+      45_000,
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim().length).toBeGreaterThan(0);
+    expect(result.stderr).toBe("");
+  }, 45_000);
 });

@@ -31,10 +31,20 @@ interface ClaudeCliJsonResponse {
   result: string;
   stop_reason?: string | null;
   session_id?: string | null;
+  model?: string | null;
+  permission_denials?: unknown;
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
   };
+}
+
+interface ClaudeCliMessageMetadata extends Record<string, unknown> {
+  session_id?: string;
+  stop_reason?: string;
+  permission_mode: NonNullable<ClaudeCliProviderOptions["permissionMode"]>;
+  model?: string;
+  permission_denials?: unknown;
 }
 
 /** Prompt-engineered instruction telling the CLI model how to format tool calls. */
@@ -98,6 +108,20 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
     return parsed as ClaudeCliJsonResponse;
   }
 
+  function attachClaudeMetadata(
+    message: AIMessage,
+    usageMetadata: {
+      input_tokens: number;
+      output_tokens: number;
+      total_tokens: number;
+    },
+    responseMetadata: ClaudeCliMessageMetadata,
+  ): AIMessage {
+    (message as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMetadata;
+    (message as AIMessage & { response_metadata?: unknown }).response_metadata = responseMetadata;
+    return message;
+  }
+
   function buildAdapter(): ModelAdapter {
     return {
       async invoke(messages: BaseMessage[]): Promise<AIMessage> {
@@ -131,10 +155,18 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
         }
         args.push(prompt);
 
-        const stdout = await execFileAsync(cliPath, args, {
-          timeout,
-          maxBuffer,
-        });
+        const commandPreview = [cliPath, ...args.slice(0, -1)].join(" ");
+        let stdout: string;
+
+        try {
+          stdout = await execFileAsync(cliPath, args, {
+            timeout,
+            maxBuffer,
+          });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          throw new Error(`Claude CLI invocation failed (${commandPreview}): ${detail}`);
+        }
 
         const response = parseJsonOutput(stdout.trim());
         const text = response.result.trim();
@@ -146,21 +178,42 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
           output_tokens: outputTokens,
           total_tokens: inputTokens + outputTokens,
         };
+        const responseMetadata: ClaudeCliMessageMetadata = {
+          permission_mode: permissionMode,
+        };
+
+        if (response.session_id) {
+          responseMetadata.session_id = response.session_id;
+        }
+        if (response.stop_reason) {
+          responseMetadata.stop_reason = response.stop_reason;
+        }
+        const resolvedModel = response.model ?? model;
+        if (resolvedModel) {
+          responseMetadata.model = resolvedModel;
+        }
+        if (response.permission_denials !== undefined) {
+          responseMetadata.permission_denials = response.permission_denials;
+        }
 
         if (toolCalls.length > 0) {
           // Extract any text outside the JSON block as content
           const contentOutsideJson = text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
-          const message = new AIMessage({
-            content: contentOutsideJson || "",
-            tool_calls: toolCalls,
-          });
-          (message as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMetadata;
-          return message;
+          return attachClaudeMetadata(
+            new AIMessage({
+              content: contentOutsideJson || "",
+              tool_calls: toolCalls,
+            }),
+            usageMetadata,
+            responseMetadata,
+          );
         }
 
-        const message = new AIMessage({ content: text, tool_calls: [] });
-        (message as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMetadata;
-        return message;
+        return attachClaudeMetadata(
+          new AIMessage({ content: text, tool_calls: [] }),
+          usageMetadata,
+          responseMetadata,
+        );
       },
 
       bindTools(tools: StructuredToolInterface[]): ModelAdapter {
