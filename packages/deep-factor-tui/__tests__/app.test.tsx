@@ -21,8 +21,8 @@ let mockUseAgent: UseAgentReturn = {
   submitPendingInput: vi.fn(),
   pendingUiState: null,
 };
-const mockClaudeSdkProvider = { invoke: vi.fn(), bindTools: vi.fn() };
-const createClaudeAgentSdkProviderMock = vi.fn(() => mockClaudeSdkProvider);
+const mockClaudeCliProvider = { invoke: vi.fn(), bindTools: vi.fn() };
+const createClaudeCliProviderMock = vi.fn(() => mockClaudeCliProvider);
 const useAgentMock = vi.fn(() => mockUseAgent);
 
 vi.mock("../src/hooks/useAgent.js", () => ({
@@ -35,7 +35,7 @@ vi.mock("../src/tools/bash.js", () => ({
 }));
 
 vi.mock("deep-factor-agent", () => ({
-  createClaudeAgentSdkProvider: createClaudeAgentSdkProviderMock,
+  createClaudeCliProvider: createClaudeCliProviderMock,
 }));
 
 const appendSessionMock = vi.fn();
@@ -73,7 +73,7 @@ describe("TuiApp integration", () => {
     };
     appendSessionMock.mockReset();
     useAgentMock.mockClear();
-    createClaudeAgentSdkProviderMock.mockClear();
+    createClaudeCliProviderMock.mockClear();
   });
 
   it("renders live section in idle state", () => {
@@ -140,19 +140,17 @@ describe("TuiApp integration", () => {
     );
   });
 
-  it("resolves the Claude SDK provider once at startup", () => {
-    render(
-      <TuiApp provider="claude-sdk" model="claude-sonnet-4-6" maxIter={10} sandbox="workspace" />,
-    );
+  it("resolves the Claude CLI provider once at startup", () => {
+    render(<TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" />);
 
-    expect(createClaudeAgentSdkProviderMock).toHaveBeenCalledWith({
-      model: "claude-sonnet-4-6",
+    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
+      model: "sonnet",
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        provider: "claude-sdk",
-        model: mockClaudeSdkProvider,
-        modelLabel: "claude-sonnet-4-6",
+        provider: "claude",
+        model: mockClaudeCliProvider,
+        modelLabel: "sonnet",
       }),
     );
   });

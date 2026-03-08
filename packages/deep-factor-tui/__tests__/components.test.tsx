@@ -27,9 +27,9 @@ describe("Header", () => {
   });
 
   it("renders the provider and model", () => {
-    const { lastFrame } = render(<Header provider="claude-sdk" model="claude-sonnet" />);
-    expect(lastFrame()).toContain("claude-sdk");
-    expect(lastFrame()).toContain("claude-sonnet");
+    const { lastFrame } = render(<Header provider="claude" model="sonnet" />);
+    expect(lastFrame()).toContain("claude");
+    expect(lastFrame()).toContain("sonnet");
   });
 });
 

@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockLoop, mockCreateAgent, mockClaudeSdkProvider, mockCreateClaudeAgentSdkProvider } =
+const { mockLoop, mockCreateAgent, mockClaudeCliProvider, mockCreateClaudeCliProvider } =
   vi.hoisted(() => {
     const mockLoop = vi.fn();
     const mockCreateAgent = vi.fn().mockReturnValue({ loop: mockLoop });
-    const mockClaudeSdkProvider = { invoke: vi.fn(), bindTools: vi.fn() };
-    const mockCreateClaudeAgentSdkProvider = vi.fn(() => mockClaudeSdkProvider);
+    const mockClaudeCliProvider = { invoke: vi.fn(), bindTools: vi.fn() };
+    const mockCreateClaudeCliProvider = vi.fn(() => mockClaudeCliProvider);
     return {
       mockLoop,
       mockCreateAgent,
-      mockClaudeSdkProvider,
-      mockCreateClaudeAgentSdkProvider,
+      mockClaudeCliProvider,
+      mockCreateClaudeCliProvider,
     };
   });
 
 vi.mock("deep-factor-agent", () => ({
   createDeepFactorAgent: mockCreateAgent,
-  createClaudeAgentSdkProvider: mockCreateClaudeAgentSdkProvider,
+  createClaudeCliProvider: mockCreateClaudeCliProvider,
   maxIterations: vi.fn((n: number) => ({ name: "maxIterations", maxIter: n })),
   isPlanResult: vi.fn((result: { mode?: string }) => result.mode === "plan"),
   isPendingResult: vi.fn(
@@ -198,7 +198,7 @@ describe("runPrintMode", () => {
     expect(mockCreateAgent).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4.1" }));
   });
 
-  it("resolves the Claude SDK provider before creating the agent", async () => {
+  it("resolves the Claude CLI provider before creating the agent", async () => {
     mockLoop.mockResolvedValueOnce({
       response: "4",
       stopReason: "completed",
@@ -209,16 +209,16 @@ describe("runPrintMode", () => {
     await expect(
       runPrintMode({
         ...baseOptions,
-        provider: "claude-sdk",
-        model: "claude-sonnet-4-6",
+        provider: "claude",
+        model: "sonnet",
       }),
     ).rejects.toThrow("process.exit called");
 
-    expect(mockCreateClaudeAgentSdkProvider).toHaveBeenCalledWith({
-      model: "claude-sonnet-4-6",
+    expect(mockCreateClaudeCliProvider).toHaveBeenCalledWith({
+      model: "sonnet",
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ model: mockClaudeSdkProvider }),
+      expect.objectContaining({ model: mockClaudeCliProvider }),
     );
   });
 

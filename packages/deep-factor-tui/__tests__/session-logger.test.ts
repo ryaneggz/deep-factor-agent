@@ -12,15 +12,15 @@ describe("resolveSessionSettings", () => {
             role: "user",
             content: "Hello",
             provider: "claude-sdk",
-            model: "claude-sonnet-4-6",
+            model: "sonnet",
           },
         ],
         hasProviderFlag: false,
         hasModelFlag: false,
       }),
     ).toEqual({
-      provider: "claude-sdk",
-      model: "claude-sonnet-4-6",
+      provider: "claude",
+      model: "sonnet",
     });
   });
 
@@ -55,7 +55,7 @@ describe("resolveSessionSettings", () => {
             role: "user",
             content: "Hello",
             provider: "claude-sdk",
-            model: "claude-sonnet-4-6",
+            model: "sonnet",
           },
         ],
         hasProviderFlag: true,

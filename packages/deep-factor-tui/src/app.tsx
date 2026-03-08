@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Static } from "ink";
-import { createClaudeAgentSdkProvider } from "deep-factor-agent";
 import type { DeepFactorAgentSettings } from "deep-factor-agent";
 import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
 import { LiveSection } from "./components/LiveSection.js";
 import { TranscriptTurn } from "./components/TranscriptTurn.js";
 import { createBashTool } from "./tools/bash.js";
+import { resolveProviderModel } from "./provider-resolution.js";
 import type { TuiAppProps } from "./types.js";
 import type {
   AgentTools,
@@ -45,7 +45,7 @@ export function TuiApp({
 
   const tools: AgentTools = [createBashTool(sandbox)];
   const resolvedModel = useMemo<DeepFactorAgentSettings["model"]>(
-    () => (provider === "claude-sdk" ? createClaudeAgentSdkProvider({ model }) : model),
+    () => resolveProviderModel({ provider, model }),
     [provider, model],
   );
 

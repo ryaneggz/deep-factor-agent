@@ -23,6 +23,16 @@ export interface ClaudeCliProviderOptions {
   inputEncoding?: "xml" | "text";
 }
 
+interface ClaudeCliJsonResponse {
+  result: string;
+  stop_reason?: string | null;
+  session_id?: string | null;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+}
+
 /** Prompt-engineered instruction telling the CLI model how to format tool calls. */
 const TOOL_CALL_FORMAT = `When you need to call a tool, respond with ONLY a JSON block in this exact format:
 
@@ -43,7 +53,7 @@ If you do not need to call any tools, respond with plain text (no JSON block).`;
 /**
  * Create a Claude CLI model adapter.
  *
- * Shells out to `claude -p <prompt> --no-input` for each invocation.
+ * Shells out to `claude --print --output-format json <prompt>` for each invocation.
  * Tool calling is handled via prompt engineering: tool definitions are injected
  * into the prompt when `bindTools()` is called, and tool calls are parsed from
  * JSON code blocks in the response.
@@ -59,6 +69,28 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
   const inputEncoding = opts?.inputEncoding ?? "xml";
 
   let boundToolDefs: StructuredToolInterface[] = [];
+
+  function parseJsonOutput(stdout: string): ClaudeCliJsonResponse {
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(stdout);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Claude CLI returned invalid JSON output: ${detail}`);
+    }
+
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !("result" in parsed) ||
+      typeof parsed.result !== "string"
+    ) {
+      throw new Error("Claude CLI JSON output did not include a string result field");
+    }
+
+    return parsed as ClaudeCliJsonResponse;
+  }
 
   function buildAdapter(): ModelAdapter {
     return {
@@ -83,7 +115,7 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
         // Serialize messages using the configured encoding
         prompt += inputEncoding === "xml" ? messagesToXml(messages) : messagesToPrompt(messages);
 
-        const args = ["-p", prompt, "--no-input"];
+        const args = ["--print", "--output-format", "json", prompt];
         if (model) {
           args.push("--model", model);
         }
@@ -93,19 +125,31 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
           maxBuffer,
         });
 
-        const text = stdout.trim();
+        const response = parseJsonOutput(stdout.trim());
+        const text = response.result.trim();
         const toolCalls = parseToolCalls(text);
+        const inputTokens = response.usage?.input_tokens ?? 0;
+        const outputTokens = response.usage?.output_tokens ?? 0;
+        const usageMetadata = {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          total_tokens: inputTokens + outputTokens,
+        };
 
         if (toolCalls.length > 0) {
           // Extract any text outside the JSON block as content
           const contentOutsideJson = text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
-          return new AIMessage({
+          const message = new AIMessage({
             content: contentOutsideJson || "",
             tool_calls: toolCalls,
           });
+          (message as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMetadata;
+          return message;
         }
 
-        return new AIMessage({ content: text, tool_calls: [] });
+        const message = new AIMessage({ content: text, tool_calls: [] });
+        (message as AIMessage & { usage_metadata?: unknown }).usage_metadata = usageMetadata;
+        return message;
       },
 
       bindTools(tools: StructuredToolInterface[]): ModelAdapter {

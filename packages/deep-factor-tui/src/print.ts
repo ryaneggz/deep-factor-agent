@@ -1,12 +1,12 @@
 import {
   createDeepFactorAgent,
-  createClaudeAgentSdkProvider,
   maxIterations,
   isPlanResult,
   isPendingResult,
 } from "deep-factor-agent";
 import type { AgentResult, PendingResult, PlanResult, AgentMode } from "deep-factor-agent";
 import { createBashTool, type SandboxMode } from "./tools/bash.js";
+import { resolveProviderModel } from "./provider-resolution.js";
 import type { ProviderType } from "./types.js";
 
 export interface PrintModeOptions {
@@ -23,8 +23,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
 
   try {
     const tools = [createBashTool(sandbox)];
-    const resolvedModel =
-      provider === "claude-sdk" ? createClaudeAgentSdkProvider({ model }) : model;
+    const resolvedModel = resolveProviderModel({ provider, model });
 
     const agent = createDeepFactorAgent({
       model: resolvedModel,

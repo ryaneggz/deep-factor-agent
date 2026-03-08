@@ -71,6 +71,7 @@ node dist/cli.js --bash "List all TypeScript files in this directory"
 
 ```
 Options
+  --provider       Provider: langchain, claude (default: langchain)
   --model, -m      Model identifier (default: gpt-4.1-mini)
   --max-iter, -i   Maximum agent iterations (default: 10)
   --mode           Execution mode: plan, approve, yolo (default: yolo)
@@ -98,6 +99,9 @@ deepfactor
 
 # Print mode — non-interactive, outputs answer to stdout
 deepfactor -p "What is 2+2?"
+
+# Claude CLI provider using existing CLI auth
+deepfactor --provider claude -p "Reply with exactly: hello"
 
 # Print mode with local sandbox
 deepfactor -p -s local "List files in the current directory"
@@ -169,7 +173,8 @@ Test suite:
 | `components.test.tsx` | Unit        | Header, StatusLine, LiveSection, MessageBubble, ToolCallBlock, InputBar                  |
 | `app.test.tsx`        | Integration | TuiApp with mocked useAgent — verifies inline rendering, messages display, status states |
 | `print.test.ts`       | Unit        | Print mode headless agent output                                                         |
-| `cli-e2e.test.ts`     | E2E         | Binary startup smoke test, flag parsing, print mode errors                               |
+| `cli-e2e.test.ts`     | E2E         | Binary startup smoke test, provider parsing, print mode errors                           |
+| `claude-cli.smoke.ts` | Smoke       | Built CLI wrapper validation against local `claude` auth                                 |
 
 ## Development
 

@@ -17,6 +17,7 @@
     "build": "tsc && node scripts/postbuild.js",
     "dev": "tsc --watch",
     "test": "vitest run",
+    "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "coverage": "vitest run --coverage"

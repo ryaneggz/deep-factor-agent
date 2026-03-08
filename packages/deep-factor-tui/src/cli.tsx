@@ -3,9 +3,15 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import meow from "meow";
 
-// Load env: ~/.deepfactor/.env first (global), then local .env (overrides)
-config({ path: join(homedir(), ".deepfactor", ".env") });
-config();
+let didLoadEnv = false;
+
+function loadEnv(): void {
+  if (didLoadEnv) return;
+  didLoadEnv = true;
+  // Load env: ~/.deepfactor/.env first (global), then local .env (overrides)
+  config({ path: join(homedir(), ".deepfactor", ".env") });
+  config();
+}
 
 const cli = meow(
   `
@@ -13,7 +19,7 @@ const cli = meow(
     $ deepfactor [prompt]
 
   Options
-    --provider       Provider: langchain, claude-sdk (default: langchain)
+    --provider       Provider: langchain, claude (default: langchain)
     --model, -m      Model identifier (default depends on provider)
     --max-iter, -i   Maximum agent iterations (default: 10)
     --mode           Execution mode: plan, approve, yolo (default: yolo)
@@ -24,9 +30,9 @@ const cli = meow(
   Examples
     $ deepfactor
     $ deepfactor "Explain how React hooks work"
-    $ deepfactor --provider claude-sdk
+    $ deepfactor --provider claude
     $ deepfactor -p "What is 2+2?"
-    $ deepfactor --provider claude-sdk -p "What is 2+2?"
+    $ deepfactor --provider claude -p "What is 2+2?"
     $ deepfactor -p "List files in the current directory"
     $ deepfactor -s local "Run system commands"
     $ cat PROMPT.md | deepfactor -p
@@ -72,7 +78,7 @@ const cli = meow(
 
 import type { SandboxMode } from "./tools/bash.js";
 import type { AgentMode } from "deep-factor-agent";
-import { DEFAULT_MODELS, DEFAULT_PROVIDER, isProviderType, type ProviderType } from "./types.js";
+import { DEFAULT_MODELS, DEFAULT_PROVIDER, normalizeProvider } from "./types.js";
 
 const validSandboxModes = ["workspace", "local", "docker"] as const;
 const sandboxMode = cli.flags.sandbox as SandboxMode;
@@ -88,16 +94,18 @@ if (!validModes.includes(mode)) {
   process.stderr.write(`Error: Invalid mode "${cli.flags.mode}". Use: plan, approve, yolo\n`);
   process.exit(1);
 }
-if (cli.flags.provider && !isProviderType(cli.flags.provider)) {
-  process.stderr.write(
-    `Error: Invalid provider "${cli.flags.provider}". Use: langchain, claude-sdk\n`,
-  );
+if (cli.flags.provider === "codex") {
+  process.stderr.write('Error: Provider "codex" is not supported yet. Coming soon.\n');
+  process.exit(1);
+}
+const providerFlag = normalizeProvider(cli.flags.provider);
+if (cli.flags.provider && !providerFlag) {
+  process.stderr.write(`Error: Invalid provider "${cli.flags.provider}". Use: langchain, claude\n`);
   process.exit(1);
 }
 
 const hasProviderFlag = process.argv.includes("--provider");
 const hasModelFlag = process.argv.includes("--model") || process.argv.includes("-m");
-const providerFlag = cli.flags.provider as ProviderType | undefined;
 let provider = providerFlag ?? DEFAULT_PROVIDER;
 let model = cli.flags.model ?? DEFAULT_MODELS[provider];
 
@@ -117,6 +125,10 @@ if (cli.flags.print) {
   if (!prompt) {
     process.stderr.write("Error: Print mode requires a prompt argument or piped stdin.\n");
     process.exit(1);
+  }
+
+  if (provider === "langchain") {
+    loadEnv();
   }
 
   const { runPrintMode } = await import("./print.js");
@@ -178,6 +190,10 @@ if (cli.flags.print) {
       modelFlag: cli.flags.model,
     }));
     process.stderr.write(`Resuming session: ${resumeId}\n`);
+  }
+
+  if (provider === "langchain") {
+    loadEnv();
   }
 
   const instance = render(

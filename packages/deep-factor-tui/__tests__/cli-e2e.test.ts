@@ -41,11 +41,12 @@ describe("CLI e2e", () => {
     expect(result.stderr).toContain("requires a prompt");
   });
 
-  it("--help outputs usage text with --print and --sandbox, no --parallel", async () => {
+  it("--help outputs usage text with --print, --sandbox, and claude provider help", async () => {
     const result = await run(["--help"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("--print");
     expect(output).toContain("--sandbox");
+    expect(output).toContain("langchain, claude");
     expect(output).not.toContain("--parallel");
   });
 
@@ -53,5 +54,18 @@ describe("CLI e2e", () => {
     // -p without prompt should give the print-mode error, confirming -p maps to --print
     const result = await run(["-p"]);
     expect(result.stderr).toContain("requires a prompt");
+  });
+
+  it("--provider codex fails fast with the coming-soon error", async () => {
+    const result = await run(["--provider", "codex", "-p", "test"]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('Provider "codex" is not supported yet. Coming soon.');
+  });
+
+  it("--provider claude-sdk remains accepted as a compatibility alias", async () => {
+    const result = await run(["--provider", "claude-sdk", "-p"]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain("requires a prompt");
+    expect(result.stderr).not.toContain('Invalid provider "claude-sdk"');
   });
 });

@@ -10,8 +10,8 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type { AgentThread, AgentEvent } from "deep-factor-agent";
-import { DEFAULT_MODELS, DEFAULT_PROVIDER, isProviderType } from "./types.js";
-import type { ProviderType } from "./types.js";
+import { DEFAULT_MODELS, DEFAULT_PROVIDER, normalizeProvider } from "./types.js";
+import type { ProviderType, ProviderInput } from "./types.js";
 
 const SESSIONS_DIR = join(homedir(), ".deepfactor", "sessions");
 
@@ -26,7 +26,7 @@ export interface SessionEntry {
   toolArgs?: Record<string, unknown>;
   toolCallId?: string;
   model?: string;
-  provider?: ProviderType;
+  provider?: ProviderInput;
 }
 
 export interface ResolvedSessionSettings {
@@ -76,9 +76,9 @@ export function resolveSessionSettings(args: {
 
   const latestProviderEntry = [...entries]
     .reverse()
-    .find((entry) => entry.provider && isProviderType(entry.provider));
+    .find((entry) => normalizeProvider(entry.provider));
 
-  const sessionProvider = latestProviderEntry?.provider;
+  const sessionProvider = normalizeProvider(latestProviderEntry?.provider);
   const sessionModel = sessionProvider
     ? (latestProviderEntry?.model ?? DEFAULT_MODELS[sessionProvider])
     : undefined;
