@@ -10,6 +10,8 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type { AgentThread, AgentEvent } from "deep-factor-agent";
+import { DEFAULT_MODELS, DEFAULT_PROVIDER, isProviderType } from "./types.js";
+import type { ProviderType } from "./types.js";
 
 const SESSIONS_DIR = join(homedir(), ".deepfactor", "sessions");
 
@@ -24,6 +26,12 @@ export interface SessionEntry {
   toolArgs?: Record<string, unknown>;
   toolCallId?: string;
   model?: string;
+  provider?: ProviderType;
+}
+
+export interface ResolvedSessionSettings {
+  provider: ProviderType;
+  model: string;
 }
 
 function ensureSessionsDir(): void {
@@ -55,6 +63,36 @@ export function loadSession(id: string): SessionEntry[] {
   if (!existsSync(filePath)) return [];
   const lines = readFileSync(filePath, "utf-8").trim().split("\n");
   return lines.filter(Boolean).map((line) => JSON.parse(line) as SessionEntry);
+}
+
+export function resolveSessionSettings(args: {
+  entries: SessionEntry[];
+  hasProviderFlag: boolean;
+  providerFlag?: ProviderType;
+  hasModelFlag: boolean;
+  modelFlag?: string;
+}): ResolvedSessionSettings {
+  const { entries, hasProviderFlag, providerFlag, hasModelFlag, modelFlag } = args;
+
+  const latestProviderEntry = [...entries]
+    .reverse()
+    .find((entry) => entry.provider && isProviderType(entry.provider));
+
+  const sessionProvider = latestProviderEntry?.provider;
+  const sessionModel = sessionProvider
+    ? (latestProviderEntry?.model ?? DEFAULT_MODELS[sessionProvider])
+    : undefined;
+
+  const provider = hasProviderFlag
+    ? (providerFlag ?? DEFAULT_PROVIDER)
+    : (sessionProvider ?? DEFAULT_PROVIDER);
+  const model = hasModelFlag
+    ? (modelFlag ?? DEFAULT_MODELS[provider])
+    : hasProviderFlag
+      ? DEFAULT_MODELS[provider]
+      : (sessionModel ?? DEFAULT_MODELS[provider]);
+
+  return { provider, model };
 }
 
 export function getLatestSessionId(): string | undefined {

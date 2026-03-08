@@ -9,6 +9,18 @@ import type {
 export type AgentTools = NonNullable<DeepFactorAgentSettings["tools"]>;
 
 export type AgentStatus = "idle" | "running" | "done" | "error" | "pending_input";
+export type ProviderType = "langchain" | "claude-sdk";
+
+export const DEFAULT_PROVIDER: ProviderType = "langchain";
+
+export const DEFAULT_MODELS: Record<ProviderType, string> = {
+  langchain: "gpt-4.1-mini",
+  "claude-sdk": "claude-sonnet-4-6",
+};
+
+export function isProviderType(value: string): value is ProviderType {
+  return value === "langchain" || value === "claude-sdk";
+}
 
 export interface ChatMessage {
   id: string;
@@ -42,11 +54,13 @@ export interface TranscriptTurn {
 }
 
 export interface UseAgentOptions {
-  model: string;
+  model: DeepFactorAgentSettings["model"];
+  modelLabel: string;
   maxIter: number;
   tools?: AgentTools;
   parallelToolCalls?: boolean;
   mode?: AgentMode;
+  provider: ProviderType;
   initialMessages?: ChatMessage[];
   initialThread?: AgentThread;
 }
@@ -101,6 +115,7 @@ export interface UseAgentReturn {
 
 export interface TuiAppProps {
   prompt?: string;
+  provider: ProviderType;
   model: string;
   maxIter: number;
   sandbox: import("./tools/bash.js").SandboxMode;

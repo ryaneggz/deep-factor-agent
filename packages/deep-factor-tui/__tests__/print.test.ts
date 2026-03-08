@@ -1,13 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockLoop, mockCreateAgent } = vi.hoisted(() => {
-  const mockLoop = vi.fn();
-  const mockCreateAgent = vi.fn().mockReturnValue({ loop: mockLoop });
-  return { mockLoop, mockCreateAgent };
-});
+const { mockLoop, mockCreateAgent, mockClaudeSdkProvider, mockCreateClaudeAgentSdkProvider } =
+  vi.hoisted(() => {
+    const mockLoop = vi.fn();
+    const mockCreateAgent = vi.fn().mockReturnValue({ loop: mockLoop });
+    const mockClaudeSdkProvider = { invoke: vi.fn(), bindTools: vi.fn() };
+    const mockCreateClaudeAgentSdkProvider = vi.fn(() => mockClaudeSdkProvider);
+    return {
+      mockLoop,
+      mockCreateAgent,
+      mockClaudeSdkProvider,
+      mockCreateClaudeAgentSdkProvider,
+    };
+  });
 
 vi.mock("deep-factor-agent", () => ({
   createDeepFactorAgent: mockCreateAgent,
+  createClaudeAgentSdkProvider: mockCreateClaudeAgentSdkProvider,
   maxIterations: vi.fn((n: number) => ({ name: "maxIterations", maxIter: n })),
   isPlanResult: vi.fn((result: { mode?: string }) => result.mode === "plan"),
   isPendingResult: vi.fn(
@@ -44,6 +53,7 @@ describe("runPrintMode", () => {
 
   const baseOptions = {
     prompt: "What is 2+2?",
+    provider: "langchain" as const,
     model: "gpt-4.1-mini",
     maxIter: 10,
     sandbox: "workspace" as const,
@@ -186,6 +196,54 @@ describe("runPrintMode", () => {
     );
 
     expect(mockCreateAgent).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4.1" }));
+  });
+
+  it("resolves the Claude SDK provider before creating the agent", async () => {
+    mockLoop.mockResolvedValueOnce({
+      response: "4",
+      stopReason: "completed",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      iterations: 1,
+    });
+
+    await expect(
+      runPrintMode({
+        ...baseOptions,
+        provider: "claude-sdk",
+        model: "claude-sonnet-4-6",
+      }),
+    ).rejects.toThrow("process.exit called");
+
+    expect(mockCreateClaudeAgentSdkProvider).toHaveBeenCalledWith({
+      model: "claude-sonnet-4-6",
+    });
+    expect(mockCreateAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ model: mockClaudeSdkProvider }),
+    );
+  });
+
+  it("auto-approves plan mode pending results in print mode", async () => {
+    const resume = vi.fn().mockResolvedValue({
+      mode: "plan",
+      plan: "# Plan",
+      stopReason: "plan_completed",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      iterations: 1,
+    });
+    mockLoop.mockResolvedValueOnce({
+      response: "",
+      stopReason: "human_input_needed",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      iterations: 1,
+      resume,
+    });
+
+    await expect(runPrintMode({ ...baseOptions, mode: "plan" })).rejects.toThrow(
+      "process.exit called",
+    );
+
+    expect(resume).toHaveBeenCalledWith({ decision: "approve" });
+    expect(stdoutSpy).toHaveBeenCalledWith("# Plan");
   });
 
   it("handles thrown errors gracefully", async () => {
