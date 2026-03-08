@@ -38,7 +38,7 @@
 - Messages use LangChain classes: `HumanMessage`, `AIMessage`, `SystemMessage`, `ToolMessage`
 - Agent loop manually handles tool calling (bind tools, invoke, check tool_calls, execute, loop)
 - Token usage from `response.usage_metadata` (`input_tokens`, `output_tokens`, `total_tokens`)
-- TUI uses fullscreen-ink (alternate screen buffer) with Ink + meow
+- TUI uses Ink (inline rendering via <Static> + React) with meow
 
 ### Agent Codebase Patterns
 
@@ -54,11 +54,11 @@
 
 ### TUI Codebase Patterns
 
-- Entry point: `packages/deep-factor-tui/src/cli.tsx` (meow + withFullScreen)
-- App shell: `packages/deep-factor-tui/src/app.tsx` (flex-based Header/Content/Footer layout; FullScreenBox handles terminal dimensions)
+- Entry point: `packages/deep-factor-tui/src/cli.tsx` (meow + ink.render)
+- App shell: `packages/deep-factor-tui/src/app.tsx` (<Static> for header/messages scrollback + <LiveSection> for active UI)
 - Agent hook: `packages/deep-factor-tui/src/hooks/useAgent.ts` (React state bridge)
 - Text input hook: `packages/deep-factor-tui/src/hooks/useTextInput.ts` (cursor input handling)
-- Components: `packages/deep-factor-tui/src/components/` (Header, Content, Footer, MessageList, MessageBubble, ToolCallBlock, InputBar, StatusLine)
+- Components: `packages/deep-factor-tui/src/components/` (Header, LiveSection, MessageBubble, ToolCallBlock, InputBar, StatusLine)
 - Bash tool: `packages/deep-factor-tui/src/tools/bash.ts` (createBashTool factory, --sandbox flag: workspace|local|docker)
 - TUI types: `packages/deep-factor-tui/src/types.ts` (TuiAppProps, ChatMessage, AgentStatus)
 - Tests: `packages/deep-factor-tui/__tests__/` (components, integration, e2e)

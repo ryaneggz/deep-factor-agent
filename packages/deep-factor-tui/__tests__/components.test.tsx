@@ -98,6 +98,58 @@ describe("MessageBubble", () => {
 });
 
 // ---------------------------------------------------------------------------
+// InputBar
+// ---------------------------------------------------------------------------
+describe("InputBar", () => {
+  it("renders with a border", () => {
+    const { lastFrame } = render(
+      <LiveSection
+        status="idle"
+        error={null}
+        plan={null}
+        humanInputRequest={null}
+        usage={zeroUsage}
+        iterations={0}
+        onSubmit={() => {}}
+      />,
+    );
+    const frame = lastFrame()!;
+    // round border uses ╭ and ╮ characters
+    expect(frame).toMatch(/[╭╮╰╯│─]/);
+  });
+
+  it("shows Alt+Enter hint", () => {
+    const { lastFrame } = render(
+      <LiveSection
+        status="idle"
+        error={null}
+        plan={null}
+        humanInputRequest={null}
+        usage={zeroUsage}
+        iterations={0}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(lastFrame()).toContain("Alt+Enter for newline");
+  });
+
+  it("shows Ctrl+/ shortcut hint", () => {
+    const { lastFrame } = render(
+      <LiveSection
+        status="idle"
+        error={null}
+        plan={null}
+        humanInputRequest={null}
+        usage={zeroUsage}
+        iterations={0}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(lastFrame()).toContain("Ctrl+/ for shortcuts");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LiveSection
 // ---------------------------------------------------------------------------
 describe("LiveSection", () => {

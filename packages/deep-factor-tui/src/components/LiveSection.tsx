@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { Box, Text } from "ink";
 import { StatusLine } from "./StatusLine.js";
 import { InputBar } from "./InputBar.js";
+import { HotkeyMenu } from "./HotkeyMenu.js";
 import type { TokenUsage, HumanInputRequestedEvent } from "deep-factor-agent";
 import type { AgentStatus } from "../types.js";
 
@@ -25,6 +26,15 @@ export function LiveSection({
   onSubmit,
 }: LiveSectionProps) {
   const showInput = status === "idle" || status === "done" || status === "pending_input";
+  const [showHotkeyMenu, setShowHotkeyMenu] = useState(false);
+
+  const handleHotkeyMenu = useCallback(() => {
+    setShowHotkeyMenu((prev) => !prev);
+  }, []);
+
+  const handleEscape = useCallback(() => {
+    setShowHotkeyMenu(false);
+  }, []);
 
   return (
     <Box flexDirection="column">
@@ -83,8 +93,15 @@ export function LiveSection({
 
       {error && <Text color="red">Error: {error.message}</Text>}
 
+      {showInput && showHotkeyMenu && <HotkeyMenu />}
+      {showInput && (
+        <InputBar
+          onSubmit={onSubmit}
+          onHotkeyMenu={handleHotkeyMenu}
+          onEscape={showHotkeyMenu ? handleEscape : undefined}
+        />
+      )}
       <StatusLine usage={usage} iterations={iterations} status={status} />
-      {showInput && <InputBar onSubmit={onSubmit} />}
     </Box>
   );
 }
