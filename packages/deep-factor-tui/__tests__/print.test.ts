@@ -9,9 +9,14 @@ const { mockLoop, mockCreateAgent } = vi.hoisted(() => {
 vi.mock("deep-factor-agent", () => ({
   createDeepFactorAgent: mockCreateAgent,
   maxIterations: vi.fn((n: number) => ({ name: "maxIterations", maxIter: n })),
+  isPlanResult: vi.fn((result: { mode?: string }) => result.mode === "plan"),
+  isPendingResult: vi.fn(
+    (result: { stopReason?: string }) => result.stopReason === "human_input_needed",
+  ),
 }));
 
 vi.mock("../src/tools/bash.js", () => ({
+  createBashTool: () => ({ name: "bash", description: "mock bash tool" }),
   bashTool: { name: "bash", description: "mock bash tool" },
 }));
 
@@ -41,7 +46,8 @@ describe("runPrintMode", () => {
     prompt: "What is 2+2?",
     model: "gpt-4.1-mini",
     maxIter: 10,
-    sandbox: false,
+    sandbox: "workspace" as const,
+    mode: "yolo" as const,
   };
 
   it("writes response to stdout on success", async () => {
@@ -101,7 +107,7 @@ describe("runPrintMode", () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it("creates agent with no tools when sandbox is false", async () => {
+  it("creates agent with bash tool using workspace sandbox by default", async () => {
     mockLoop.mockResolvedValueOnce({
       response: "ok",
       stopReason: "completed",
@@ -109,28 +115,32 @@ describe("runPrintMode", () => {
       iterations: 1,
     });
 
-    await expect(runPrintMode({ ...baseOptions, sandbox: false })).rejects.toThrow(
-      "process.exit called",
-    );
-
-    expect(mockCreateAgent).toHaveBeenCalledWith(expect.objectContaining({ tools: [] }));
-  });
-
-  it("creates agent with bash tool when sandbox is true", async () => {
-    mockLoop.mockResolvedValueOnce({
-      response: "ok",
-      stopReason: "completed",
-      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-      iterations: 1,
-    });
-
-    await expect(runPrintMode({ ...baseOptions, sandbox: true })).rejects.toThrow(
+    await expect(runPrintMode({ ...baseOptions, sandbox: "workspace" })).rejects.toThrow(
       "process.exit called",
     );
 
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({
-        tools: [{ name: "bash", description: "mock bash tool" }],
+        tools: expect.arrayContaining([expect.objectContaining({ name: "bash" })]),
+      }),
+    );
+  });
+
+  it("creates agent with bash tool using local sandbox", async () => {
+    mockLoop.mockResolvedValueOnce({
+      response: "ok",
+      stopReason: "completed",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      iterations: 1,
+    });
+
+    await expect(runPrintMode({ ...baseOptions, sandbox: "local" })).rejects.toThrow(
+      "process.exit called",
+    );
+
+    expect(mockCreateAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.arrayContaining([expect.objectContaining({ name: "bash" })]),
       }),
     );
   });

@@ -3,12 +3,14 @@ export type {
   AgentEventType,
   BaseEvent,
   ToolCallEvent,
+  ApprovalEvent,
   ToolResultEvent,
   ErrorEvent,
   HumanInputRequestedEvent,
   HumanInputReceivedEvent,
   MessageEvent,
   CompletionEvent,
+  PlanEvent,
   SummaryEvent,
   AgentEvent,
   AgentThread,
@@ -22,12 +24,18 @@ export type {
   ContextManagementConfig,
   MiddlewareContext,
   AgentMiddleware,
+  AgentToolMetadata,
+  AgentMode,
+  ApprovalDecision,
+  HumanInputKind,
   DeepFactorAgentSettings,
   AgentResult,
+  PlanResult,
   PendingResult,
+  ResumeInput,
 } from "./types.js";
 
-export { isPendingResult } from "./types.js";
+export { isPendingResult, isPlanResult } from "./types.js";
 
 // Stop conditions
 export {
@@ -68,7 +76,12 @@ export {
 } from "./human-in-the-loop.js";
 
 // Tool adapter utilities
-export { createLangChainTool, toolArrayToMap, findToolByName } from "./tool-adapter.js";
+export {
+  createLangChainTool,
+  toolArrayToMap,
+  findToolByName,
+  getToolMetadata,
+} from "./tool-adapter.js";
 
 // XML thread serializer
 export { serializeThreadToXml, escapeXml } from "./xml-serializer.js";

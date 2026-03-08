@@ -5,6 +5,7 @@ import type { ModelAdapter } from "./providers/types.js";
 // --- Event Types ---
 
 export type AgentEventType =
+  | "approval"
   | "tool_call"
   | "tool_result"
   | "error"
@@ -12,7 +13,12 @@ export type AgentEventType =
   | "human_input_received"
   | "message"
   | "completion"
+  | "plan"
   | "summary";
+
+export type AgentMode = "plan" | "approve" | "yolo";
+export type ApprovalDecision = "approve" | "reject" | "edit";
+export type HumanInputKind = "question" | "approval" | "plan_review";
 
 export interface BaseEvent {
   type: AgentEventType;
@@ -25,6 +31,14 @@ export interface ToolCallEvent extends BaseEvent {
   toolName: string;
   toolCallId: string;
   args: Record<string, unknown>;
+}
+
+export interface ApprovalEvent extends BaseEvent {
+  type: "approval";
+  toolName: string;
+  toolCallId: string;
+  decision: ApprovalDecision;
+  response?: string;
 }
 
 export interface ToolResultEvent extends BaseEvent {
@@ -46,16 +60,24 @@ export interface ErrorEvent extends BaseEvent {
 
 export interface HumanInputRequestedEvent extends BaseEvent {
   type: "human_input_requested";
+  kind?: HumanInputKind;
   question: string;
   context?: string;
   urgency?: "low" | "medium" | "high";
   format?: "free_text" | "yes_no" | "multiple_choice";
   choices?: string[];
+  approvalRequest?: {
+    toolName: string;
+    toolCallId: string;
+    args: Record<string, unknown>;
+    reason: string;
+  };
 }
 
 export interface HumanInputReceivedEvent extends BaseEvent {
   type: "human_input_received";
   response: string;
+  decision?: ApprovalDecision;
 }
 
 export interface MessageEvent extends BaseEvent {
@@ -70,6 +92,11 @@ export interface CompletionEvent extends BaseEvent {
   verified: boolean;
 }
 
+export interface PlanEvent extends BaseEvent {
+  type: "plan";
+  content: string;
+}
+
 export interface SummaryEvent extends BaseEvent {
   type: "summary";
   summarizedIterations: number[];
@@ -77,6 +104,7 @@ export interface SummaryEvent extends BaseEvent {
 }
 
 export type AgentEvent =
+  | ApprovalEvent
   | ToolCallEvent
   | ToolResultEvent
   | ErrorEvent
@@ -84,6 +112,7 @@ export type AgentEvent =
   | HumanInputReceivedEvent
   | MessageEvent
   | CompletionEvent
+  | PlanEvent
   | SummaryEvent;
 
 // --- Thread ---
@@ -155,6 +184,15 @@ export interface MiddlewareContext {
   settings: DeepFactorAgentSettings;
 }
 
+export interface AgentToolMetadata {
+  mutatesState?: boolean;
+  modeAvailability?: "all" | "plan_only" | "approve_only" | "yolo_only";
+}
+
+export interface AgentTool extends StructuredToolInterface {
+  metadata?: AgentToolMetadata;
+}
+
 export interface AgentMiddleware {
   name: string;
   tools?: StructuredToolInterface[];
@@ -181,6 +219,8 @@ export interface DeepFactorAgentSettings<
   contextMode?: "standard" | "xml";
   /** When true, independent tool calls execute concurrently via Promise.all. HITL and interruptOn tools are excluded from parallel batches. Default: false. */
   parallelToolCalls?: boolean;
+  /** Execution mode: "plan" denies mutating tools and expects a plan output, "approve" gates mutating tools on approval, and "yolo" executes normally. Default: "yolo". */
+  mode?: AgentMode;
   onIterationStart?: (iteration: number) => void;
   onIterationEnd?: (iteration: number, result: unknown) => void;
 }
@@ -196,6 +236,21 @@ export interface AgentResult {
   stopDetail?: string;
 }
 
+export interface PlanResult {
+  mode: "plan";
+  plan: string;
+  thread: AgentThread;
+  usage: TokenUsage;
+  iterations: number;
+  stopReason: "plan_completed" | "human_input_needed" | "stop_condition" | "max_errors";
+  stopDetail?: string;
+}
+
+export interface ResumeInput {
+  decision?: ApprovalDecision;
+  response?: string;
+}
+
 export interface PendingResult {
   response: string;
   thread: AgentThread;
@@ -203,9 +258,13 @@ export interface PendingResult {
   iterations: number;
   stopReason: "human_input_needed";
   stopDetail?: string;
-  resume: (humanResponse: string) => Promise<AgentResult | PendingResult>;
+  resume: (input: string | ResumeInput) => Promise<AgentResult | PendingResult | PlanResult>;
 }
 
-export function isPendingResult(r: AgentResult | PendingResult): r is PendingResult {
+export function isPendingResult(r: AgentResult | PendingResult | PlanResult): r is PendingResult {
   return r.stopReason === "human_input_needed";
+}
+
+export function isPlanResult(r: AgentResult | PendingResult | PlanResult): r is PlanResult {
+  return "mode" in r && r.mode === "plan";
 }

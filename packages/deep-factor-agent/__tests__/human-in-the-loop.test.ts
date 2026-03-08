@@ -317,8 +317,9 @@ describe("human-in-the-loop: interruptOn", () => {
 
     await pendingResult.resume("approved");
 
-    // The third invoke call is the resume — capture messages sent to the model
-    const resumeCallMessages = mockModel.invoke.mock.calls[2][0];
+    // Capture the resume call messages. The exact invoke count is an
+    // implementation detail; we only need the final call after resume.
+    const resumeCallMessages = mockModel.invoke.mock.calls.at(-1)![0];
 
     // Validate: for every AIMessage with tool_calls, there must be a
     // subsequent ToolMessage with the matching tool_call_id before the

@@ -1,22 +1,19 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { ToolCallBlock } from "./ToolCallBlock.js";
+import { formatToolResultPreview } from "../transcript.js";
 import type { ChatMessage } from "../types.js";
 
 interface MessageBubbleProps {
   message: ChatMessage;
 }
 
-const MAX_TOOL_RESULT_LENGTH = 200;
-
 export function MessageBubble({ message }: MessageBubbleProps) {
   switch (message.role) {
     case "user":
       return (
         <Box>
-          <Text color="blue" bold>
-            You:{" "}
-          </Text>
+          <Text bold>You: </Text>
           <Text>{message.content}</Text>
         </Box>
       );
@@ -24,9 +21,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     case "assistant":
       return (
         <Box>
-          <Text color="green" bold>
-            AI:{" "}
-          </Text>
+          <Text bold>AI: </Text>
           <Text>{message.content}</Text>
         </Box>
       );
@@ -37,18 +32,27 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       );
 
     case "tool_result": {
-      const content =
-        message.content.length > MAX_TOOL_RESULT_LENGTH
-          ? message.content.slice(0, MAX_TOOL_RESULT_LENGTH) + "..."
-          : message.content;
-      const timing = message.durationMs != null ? ` (${message.durationMs}ms)` : "";
-      const parallel = message.parallelGroup ? " [parallel]" : "";
+      const preview = formatToolResultPreview(message.content);
+      const metadata = [
+        message.durationMs != null ? `${message.durationMs}ms` : null,
+        message.parallelGroup ? "[parallel]" : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
       return (
-        <Box>
-          <Text color="cyan" dimColor>
-            Result{timing}
-            {parallel}: {content}
-          </Text>
+        <Box flexDirection="column">
+          {preview.lines.map((line, index) => (
+            <Box key={`${message.id}-${index}`}>
+              <Text dimColor>{index === 0 ? "Result" : "      "}</Text>
+              <Text>
+                {index === 0 && metadata ? ` ${metadata}: ` : index === 0 ? ": " : "  "}
+                {line}
+              </Text>
+            </Box>
+          ))}
+          {preview.overflowLineCount > 0 && (
+            <Text dimColor> ... +{preview.overflowLineCount} more lines</Text>
+          )}
         </Box>
       );
     }

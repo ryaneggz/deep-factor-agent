@@ -1,17 +1,46 @@
-import React, { useEffect, useRef } from "react";
-import { Box } from "ink";
+import React, { useEffect, useRef, useMemo } from "react";
+import { Static } from "ink";
 import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
-import { Content } from "./components/Content.js";
-import { Footer } from "./components/Footer.js";
-import { bashTool } from "./tools/bash.js";
+import { LiveSection } from "./components/LiveSection.js";
+import { TranscriptTurn } from "./components/TranscriptTurn.js";
+import { createBashTool } from "./tools/bash.js";
 import type { TuiAppProps } from "./types.js";
-import type { AgentTools } from "./types.js";
+import type {
+  AgentTools,
+  TranscriptTurn as TranscriptTurnData,
+  PendingSubmission,
+} from "./types.js";
+import { appendSession } from "./session-logger.js";
+import { groupMessagesIntoTurns } from "./transcript.js";
 
-export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }: TuiAppProps) {
+function formatPendingSubmission(submission: PendingSubmission): string {
+  switch (submission.kind) {
+    case "approve":
+      return "approve";
+    case "reject":
+      return "reject";
+    case "edit":
+      return submission.feedback;
+    case "choice":
+    case "text":
+      return submission.value;
+  }
+}
+
+export function TuiApp({
+  prompt,
+  model,
+  maxIter,
+  sandbox,
+  parallelToolCalls,
+  mode,
+  resumeMessages,
+  resumeThread,
+}: TuiAppProps) {
   const hasRun = useRef(false);
 
-  const tools: AgentTools = enableBash ? [bashTool] : [];
+  const tools: AgentTools = [createBashTool(sandbox)];
 
   const {
     messages,
@@ -19,10 +48,19 @@ export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }
     usage,
     iterations,
     error,
+    plan,
     sendPrompt,
-    submitHumanInput,
-    humanInputRequest,
-  } = useAgent({ model, maxIter, tools, parallelToolCalls });
+    submitPendingInput,
+    pendingUiState,
+  } = useAgent({
+    model,
+    maxIter,
+    tools,
+    parallelToolCalls,
+    mode,
+    initialMessages: resumeMessages,
+    initialThread: resumeThread,
+  });
 
   // Send initial prompt on mount if provided
   useEffect(() => {
@@ -33,23 +71,48 @@ export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }
   }, [prompt, sendPrompt]);
 
   const handleSubmit = (value: string) => {
-    if (status === "pending_input") {
-      submitHumanInput(value);
-    } else {
-      sendPrompt(value);
-    }
+    appendSession({
+      timestamp: new Date().toISOString(),
+      role: "user",
+      content: value,
+      model,
+    });
+    sendPrompt(value);
   };
 
+  const handlePendingSubmit = (submission: PendingSubmission) => {
+    appendSession({
+      timestamp: new Date().toISOString(),
+      role: "user",
+      content: formatPendingSubmission(submission),
+      model,
+    });
+    submitPendingInput(submission);
+  };
+
+  const transcriptTurns: TranscriptTurnData[] = useMemo(
+    () => groupMessagesIntoTurns(messages),
+    [messages],
+  );
+  const staticTurns = useMemo(() => transcriptTurns.slice(0, -1), [transcriptTurns]);
+  const activeTurn =
+    transcriptTurns.length > 0 ? transcriptTurns[transcriptTurns.length - 1] : null;
+
   return (
-    <Box flexDirection="column" flexGrow={1}>
-      <Header model={model} status={status} />
-      <Content
-        messages={messages}
+    <>
+      <Header model={model} />
+      <Static items={staticTurns}>{(turn) => <TranscriptTurn key={turn.id} turn={turn} />}</Static>
+      {activeTurn && <TranscriptTurn turn={activeTurn} />}
+      <LiveSection
         status={status}
         error={error}
-        humanInputRequest={humanInputRequest}
+        plan={plan}
+        pendingUiState={pendingUiState}
+        usage={usage}
+        iterations={iterations}
+        onPromptSubmit={handleSubmit}
+        onPendingSubmit={handlePendingSubmit}
       />
-      <Footer usage={usage} iterations={iterations} status={status} onSubmit={handleSubmit} />
-    </Box>
+    </>
   );
 }

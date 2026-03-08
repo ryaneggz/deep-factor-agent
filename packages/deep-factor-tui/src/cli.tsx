@@ -3,28 +3,32 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import meow from "meow";
 
-// Load env: ~/.deep-factor/.env first (global), then local .env (overrides)
-config({ path: join(homedir(), ".deep-factor", ".env") });
+// Load env: ~/.deepfactor/.env first (global), then local .env (overrides)
+config({ path: join(homedir(), ".deepfactor", ".env") });
 config();
 
 const cli = meow(
   `
   Usage
-    $ deep-factor-tui [prompt]
+    $ deepfactor [prompt]
 
   Options
     --model, -m      Model identifier (default: gpt-4.1-mini)
     --max-iter, -i   Maximum agent iterations (default: 10)
-    --bash           Enable bash execution tool
+    --mode           Execution mode: plan, approve, yolo (default: yolo)
+    --sandbox, -s    Sandbox mode: workspace (default), local, docker
     --print, -p      Non-interactive print mode (output answer to stdout)
-    --sandbox        Enable bash tool in print mode
+    --resume, -r     Resume a previous session (optionally pass session ID)
 
   Examples
-    $ deep-factor-tui
-    $ deep-factor-tui "Explain how React hooks work"
-    $ deep-factor-tui -p "What is 2+2?"
-    $ deep-factor-tui -p --sandbox "List files in the current directory"
-    $ cat PROMPT.md | deep-factor-tui -p --sandbox
+    $ deepfactor
+    $ deepfactor "Explain how React hooks work"
+    $ deepfactor -p "What is 2+2?"
+    $ deepfactor -p "List files in the current directory"
+    $ deepfactor -s local "Run system commands"
+    $ cat PROMPT.md | deepfactor -p
+    $ deepfactor --resume
+    $ deepfactor --resume <session-id>
 `,
   {
     importMeta: import.meta,
@@ -39,22 +43,45 @@ const cli = meow(
         shortFlag: "i",
         default: 10,
       },
-      bash: {
-        type: "boolean",
-        default: false,
+      mode: {
+        type: "string",
+        default: "yolo",
+      },
+      sandbox: {
+        type: "string",
+        shortFlag: "s",
+        default: "workspace",
       },
       print: {
         type: "boolean",
         shortFlag: "p",
         default: false,
       },
-      sandbox: {
-        type: "boolean",
-        default: false,
+      resume: {
+        type: "string",
+        shortFlag: "r",
       },
     },
   },
 );
+
+import type { SandboxMode } from "./tools/bash.js";
+import type { AgentMode } from "deep-factor-agent";
+
+const validSandboxModes = ["workspace", "local", "docker"] as const;
+const sandboxMode = cli.flags.sandbox as SandboxMode;
+const validModes = ["plan", "approve", "yolo"] as const;
+const mode = cli.flags.mode as AgentMode;
+if (!validSandboxModes.includes(sandboxMode)) {
+  process.stderr.write(
+    `Error: Invalid sandbox mode "${cli.flags.sandbox}". Use: workspace, local, docker\n`,
+  );
+  process.exit(1);
+}
+if (!validModes.includes(mode)) {
+  process.stderr.write(`Error: Invalid mode "${cli.flags.mode}". Use: plan, approve, yolo\n`);
+  process.exit(1);
+}
 
 let prompt = cli.input.join(" ") || undefined;
 
@@ -79,24 +106,64 @@ if (cli.flags.print) {
     prompt,
     model: cli.flags.model,
     maxIter: cli.flags.maxIter,
-    sandbox: cli.flags.sandbox,
+    sandbox: sandboxMode,
+    mode,
   });
 } else {
-  // TUI mode: fullscreen interactive
+  // TUI mode: inline interactive
   const React = await import("react");
-  const { withFullScreen } = await import("fullscreen-ink");
+  const { render } = await import("ink");
   const { TuiApp } = await import("./app.js");
+  const { getSessionId, loadSession, getLatestSessionId, buildThreadFromSession } =
+    await import("./session-logger.js");
 
-  const ink = withFullScreen(
+  // Handle --resume flag: bare --resume or -r means "last", otherwise use provided ID
+  const hasResumeFlag = process.argv.includes("--resume") || process.argv.includes("-r");
+  let resumeMessages: import("./types.js").ChatMessage[] | undefined;
+  let resumeThread: import("deep-factor-agent").AgentThread | undefined;
+  if (hasResumeFlag) {
+    let resumeId = cli.flags.resume; // will be the session ID if provided
+    if (!resumeId) {
+      // bare --resume with no ID → use latest session
+      const latestId = getLatestSessionId();
+      if (!latestId) {
+        process.stderr.write("Error: No previous sessions found.\n");
+        process.exit(1);
+      }
+      resumeId = latestId;
+    }
+    const entries = loadSession(resumeId);
+    if (entries.length === 0) {
+      process.stderr.write(`Error: Session "${resumeId}" not found or empty.\n`);
+      process.exit(1);
+    }
+    resumeMessages = entries.map((entry, i) => ({
+      id: `resume-${i}`,
+      role: entry.role,
+      content: entry.content,
+      ...(entry.toolName ? { toolName: entry.toolName } : {}),
+      ...(entry.toolArgs ? { toolArgs: entry.toolArgs } : {}),
+      ...(entry.toolCallId ? { toolCallId: entry.toolCallId } : {}),
+    }));
+    resumeThread = buildThreadFromSession(entries);
+    process.stderr.write(`Resuming session: ${resumeId}\n`);
+  }
+
+  const instance = render(
     React.createElement(TuiApp, {
       prompt,
       model: cli.flags.model,
       maxIter: cli.flags.maxIter,
-      enableBash: cli.flags.bash,
+      sandbox: sandboxMode,
       parallelToolCalls: true,
+      mode,
+      resumeMessages,
+      resumeThread,
     }),
   );
 
-  await ink.start();
-  await ink.waitUntilExit();
+  await instance.waitUntilExit();
+
+  const sessionId = getSessionId();
+  process.stderr.write(`\ndeepfactor --resume ${sessionId}\n`);
 }
