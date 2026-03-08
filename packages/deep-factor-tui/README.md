@@ -12,11 +12,11 @@ Unlike the streaming [CLI](../deep-factor-cli), the TUI renders messages inline 
 
 ## Setup
 
-Create `~/.deep-factor/.env` with your API key. This is the global config directory shared across projects:
+Create `~/.deepfactor/.env` with your API key. This is the global config directory shared across projects:
 
 ```bash
-mkdir -p ~/.deep-factor
-echo "OPENAI_API_KEY=sk-..." > ~/.deep-factor/.env
+mkdir -p ~/.deepfactor
+echo "OPENAI_API_KEY=sk-..." > ~/.deepfactor/.env
 ```
 
 A local `.env` in the working directory is also supported and takes precedence over the global one. You can also export directly in your shell:

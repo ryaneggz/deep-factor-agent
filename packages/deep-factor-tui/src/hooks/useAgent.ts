@@ -24,6 +24,7 @@ import type {
   UseAgentReturn,
   AgentTools,
 } from "../types.js";
+import { appendSession } from "../session-logger.js";
 
 export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
@@ -57,6 +58,7 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           content: event.toolName,
           toolName: event.toolName,
           toolArgs: event.args,
+          toolCallId: event.toolCallId,
         });
         break;
       case "tool_result":
@@ -65,6 +67,7 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           id: `msg-${messages.length}`,
           role: "tool_result",
           content: String(event.result),
+          toolCallId: event.toolCallId,
           durationMs: event.durationMs,
           parallelGroup: event.parallelGroup,
         });
@@ -75,7 +78,7 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
 }
 
 export function useAgent(options: UseAgentOptions): UseAgentReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(options.initialMessages ?? []);
   const [status, setStatus] = useState<AgentStatus>("idle");
   const [usage, setUsage] = useState<TokenUsage>({
     inputTokens: 0,
@@ -88,14 +91,41 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   const [plan, setPlan] = useState<string | null>(null);
 
   const pendingRef = useRef<PendingResult | null>(null);
-  const threadRef = useRef<AgentThread | null>(null);
+  const threadRef = useRef<AgentThread | null>(options.initialThread ?? null);
+  const resumedMessagesRef = useRef<ChatMessage[]>(options.initialMessages ?? []);
+  // Track how many chat messages have already been persisted to the session log.
+  // Starts at the count of initial/resumed messages so we don't re-log them.
+  const loggedMessageCountRef = useRef<number>(options.initialMessages?.length ?? 0);
 
   const handleResult = useCallback((result: AgentResult | PendingResult | PlanResult) => {
     threadRef.current = result.thread;
     const newMessages = eventsToChatMessages(result.thread.events);
-    setMessages(newMessages);
+    // Prepend resumed display messages so they stay visible, but skip the
+    // events that came from the seeded thread (they'll be in newMessages too).
+    const resumedCount = resumedMessagesRef.current.length;
+    setMessages(
+      resumedCount > 0
+        ? [...resumedMessagesRef.current, ...newMessages.slice(resumedCount)]
+        : newMessages,
+    );
     setUsage((prev) => addUsage(prev, result.usage));
     setIterations(result.iterations);
+
+    // Persist only NEW messages to session log (skip already-logged ones)
+    const alreadyLogged = loggedMessageCountRef.current;
+    const messagesToLog = newMessages.slice(alreadyLogged);
+    loggedMessageCountRef.current = newMessages.length;
+    for (const msg of messagesToLog) {
+      if (msg.role === "user") continue; // user messages logged at submit time
+      appendSession({
+        timestamp: new Date().toISOString(),
+        role: msg.role,
+        content: msg.content,
+        ...(msg.toolName ? { toolName: msg.toolName } : {}),
+        ...(msg.toolArgs ? { toolArgs: msg.toolArgs } : {}),
+        ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
+      });
+    }
 
     if (isPlanResult(result)) {
       setPlan(result.plan);

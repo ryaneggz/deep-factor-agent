@@ -3,6 +3,7 @@ import type {
   HumanInputRequestedEvent,
   DeepFactorAgentSettings,
   AgentMode,
+  AgentThread,
 } from "deep-factor-agent";
 
 /** Extract tool array type from agent settings to avoid direct @langchain/core import */
@@ -16,6 +17,7 @@ export interface ChatMessage {
   content: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
+  toolCallId?: string;
   durationMs?: number;
   parallelGroup?: string;
 }
@@ -26,6 +28,8 @@ export interface UseAgentOptions {
   tools?: AgentTools;
   parallelToolCalls?: boolean;
   mode?: AgentMode;
+  initialMessages?: ChatMessage[];
+  initialThread?: AgentThread;
 }
 
 export interface UseAgentReturn {
@@ -49,4 +53,6 @@ export interface TuiAppProps {
   sandbox: import("./tools/bash.js").SandboxMode;
   parallelToolCalls?: boolean;
   mode?: AgentMode;
+  resumeMessages?: ChatMessage[];
+  resumeThread?: AgentThread;
 }

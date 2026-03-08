@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import meow from "meow";
 
-// Load env: ~/.deep-factor/.env first (global), then local .env (overrides)
-config({ path: join(homedir(), ".deep-factor", ".env") });
+// Load env: ~/.deepfactor/.env first (global), then local .env (overrides)
+config({ path: join(homedir(), ".deepfactor", ".env") });
 config();
 
 const cli = meow(
@@ -18,6 +18,7 @@ const cli = meow(
     --mode           Execution mode: plan, approve, yolo (default: yolo)
     --sandbox, -s    Sandbox mode: workspace (default), local, docker
     --print, -p      Non-interactive print mode (output answer to stdout)
+    --resume, -r     Resume a previous session (optionally pass session ID)
 
   Examples
     $ deepfactor
@@ -26,6 +27,8 @@ const cli = meow(
     $ deepfactor -p "List files in the current directory"
     $ deepfactor -s local "Run system commands"
     $ cat PROMPT.md | deepfactor -p
+    $ deepfactor --resume
+    $ deepfactor --resume <session-id>
 `,
   {
     importMeta: import.meta,
@@ -53,6 +56,10 @@ const cli = meow(
         type: "boolean",
         shortFlag: "p",
         default: false,
+      },
+      resume: {
+        type: "string",
+        shortFlag: "r",
       },
     },
   },
@@ -107,6 +114,40 @@ if (cli.flags.print) {
   const React = await import("react");
   const { render } = await import("ink");
   const { TuiApp } = await import("./app.js");
+  const { getSessionId, loadSession, getLatestSessionId, buildThreadFromSession } =
+    await import("./session-logger.js");
+
+  // Handle --resume flag: bare --resume or -r means "last", otherwise use provided ID
+  const hasResumeFlag = process.argv.includes("--resume") || process.argv.includes("-r");
+  let resumeMessages: import("./types.js").ChatMessage[] | undefined;
+  let resumeThread: import("deep-factor-agent").AgentThread | undefined;
+  if (hasResumeFlag) {
+    let resumeId = cli.flags.resume; // will be the session ID if provided
+    if (!resumeId) {
+      // bare --resume with no ID → use latest session
+      const latestId = getLatestSessionId();
+      if (!latestId) {
+        process.stderr.write("Error: No previous sessions found.\n");
+        process.exit(1);
+      }
+      resumeId = latestId;
+    }
+    const entries = loadSession(resumeId);
+    if (entries.length === 0) {
+      process.stderr.write(`Error: Session "${resumeId}" not found or empty.\n`);
+      process.exit(1);
+    }
+    resumeMessages = entries.map((entry, i) => ({
+      id: `resume-${i}`,
+      role: entry.role,
+      content: entry.content,
+      ...(entry.toolName ? { toolName: entry.toolName } : {}),
+      ...(entry.toolArgs ? { toolArgs: entry.toolArgs } : {}),
+      ...(entry.toolCallId ? { toolCallId: entry.toolCallId } : {}),
+    }));
+    resumeThread = buildThreadFromSession(entries);
+    process.stderr.write(`Resuming session: ${resumeId}\n`);
+  }
 
   const instance = render(
     React.createElement(TuiApp, {
@@ -116,8 +157,13 @@ if (cli.flags.print) {
       sandbox: sandboxMode,
       parallelToolCalls: true,
       mode,
+      resumeMessages,
+      resumeThread,
     }),
   );
 
   await instance.waitUntilExit();
+
+  const sessionId = getSessionId();
+  process.stderr.write(`\ndeepfactor --resume ${sessionId}\n`);
 }

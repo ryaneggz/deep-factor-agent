@@ -264,8 +264,10 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       messages.push(new SystemMessage(system));
     }
 
-    // Convert thread events to messages
-    for (const event of thread.events) {
+    // Convert thread events to messages, batching consecutive tool_calls
+    const events = thread.events;
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
       switch (event.type) {
         case "message": {
           if (event.role === "user") {
@@ -286,16 +288,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
           break;
         }
         case "tool_call": {
+          // Batch consecutive tool_call events into a single AIMessage
+          const toolCalls = [{ id: event.toolCallId, name: event.toolName, args: event.args }];
+          while (i + 1 < events.length && events[i + 1].type === "tool_call") {
+            i++;
+            const next = events[i] as ToolCallEvent;
+            toolCalls.push({ id: next.toolCallId, name: next.toolName, args: next.args });
+          }
           messages.push(
             new AIMessage({
               content: "",
-              tool_calls: [
-                {
-                  id: event.toolCallId,
-                  name: event.toolName,
-                  args: event.args,
-                },
-              ],
+              tool_calls: toolCalls,
             }),
           );
           break;

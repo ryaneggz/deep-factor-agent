@@ -6,12 +6,22 @@ import { MessageBubble } from "./components/MessageBubble.js";
 import { createBashTool } from "./tools/bash.js";
 import type { TuiAppProps } from "./types.js";
 import type { AgentTools, ChatMessage } from "./types.js";
+import { appendSession } from "./session-logger.js";
 
 type StaticItem =
   | { type: "header"; id: string; model: string }
   | { type: "message"; id: string; message: ChatMessage };
 
-export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls, mode }: TuiAppProps) {
+export function TuiApp({
+  prompt,
+  model,
+  maxIter,
+  sandbox,
+  parallelToolCalls,
+  mode,
+  resumeMessages,
+  resumeThread,
+}: TuiAppProps) {
   const hasRun = useRef(false);
 
   const tools: AgentTools = [createBashTool(sandbox)];
@@ -26,7 +36,15 @@ export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls, mod
     sendPrompt,
     submitHumanInput,
     humanInputRequest,
-  } = useAgent({ model, maxIter, tools, parallelToolCalls, mode });
+  } = useAgent({
+    model,
+    maxIter,
+    tools,
+    parallelToolCalls,
+    mode,
+    initialMessages: resumeMessages,
+    initialThread: resumeThread,
+  });
 
   // Send initial prompt on mount if provided
   useEffect(() => {
@@ -37,6 +55,12 @@ export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls, mod
   }, [prompt, sendPrompt]);
 
   const handleSubmit = (value: string) => {
+    appendSession({
+      timestamp: new Date().toISOString(),
+      role: "user",
+      content: value,
+      model,
+    });
     if (status === "pending_input") {
       submitHumanInput(value);
     } else {
