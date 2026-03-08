@@ -31,3 +31,4 @@ archive/
 !specs/.gitkeep
 specs/*.md
 specs/*.png
+!specs/grouped-assistant-turns-inline-tui.md

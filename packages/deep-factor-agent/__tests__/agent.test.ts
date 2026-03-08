@@ -1358,6 +1358,13 @@ describe("DeepFactorAgent", () => {
       const result = await agent.loop("Plan the work");
       expect(isPendingResult(result)).toBe(true);
       if (isPendingResult(result)) {
+        const request = result.thread.events.find((e) => e.type === "human_input_requested");
+        expect(request?.type).toBe("human_input_requested");
+        if (request?.type === "human_input_requested") {
+          expect(request.kind).toBe("plan_review");
+          expect(request.format).toBe("multiple_choice");
+          expect(request.choices).toEqual(["approve", "reject", "edit"]);
+        }
         const approved = await result.resume({ decision: "approve" });
         expect(isPlanResult(approved)).toBe(true);
         if (isPlanResult(approved)) {

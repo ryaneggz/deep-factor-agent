@@ -1,10 +1,21 @@
 import { useState, useRef } from "react";
 import { useInput } from "ink";
 
+interface TextInputKey {
+  return?: boolean;
+  meta?: boolean;
+  escape?: boolean;
+  backspace?: boolean;
+  delete?: boolean;
+  ctrl?: boolean;
+}
+
 interface UseTextInputOptions {
   onSubmit: (value: string) => void;
   onHotkeyMenu?: () => void;
   onEscape?: () => void;
+  isActive?: boolean;
+  onKeyPress?: (inputChar: string, key: TextInputKey, currentValue: string) => boolean | void;
 }
 
 interface UseTextInputReturn {
@@ -22,11 +33,19 @@ export function useTextInput({
   onSubmit,
   onHotkeyMenu,
   onEscape,
+  isActive = true,
+  onKeyPress,
 }: UseTextInputOptions): UseTextInputReturn {
   const [input, setInput] = useState("");
   const inputRef = useRef("");
 
   useInput((inputChar, key) => {
+    if (!isActive) {
+      return;
+    }
+    if (onKeyPress?.(inputChar, key, inputRef.current)) {
+      return;
+    }
     // Ctrl+/ sends \x1f (Unit Separator) in most terminals
     if (inputChar === "\x1f" && onHotkeyMenu) {
       onHotkeyMenu();

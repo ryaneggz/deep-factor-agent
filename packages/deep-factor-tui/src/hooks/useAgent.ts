@@ -16,6 +16,7 @@ import type {
   HumanInputRequestedEvent,
   AgentEvent,
   AgentThread,
+  HumanInputReceivedEvent,
 } from "deep-factor-agent";
 import type {
   ChatMessage,
@@ -23,8 +24,95 @@ import type {
   UseAgentOptions,
   UseAgentReturn,
   AgentTools,
+  PendingUiState,
+  PendingSubmission,
+  PendingAction,
 } from "../types.js";
 import { appendSession } from "../session-logger.js";
+
+function isPendingAction(value: string): value is PendingAction {
+  return value === "approve" || value === "reject" || value === "edit";
+}
+
+function normalizeActions(choices?: string[]): PendingAction[] {
+  const actions = (choices ?? []).filter(isPendingAction);
+  return actions.length > 0 ? actions : ["approve", "reject", "edit"];
+}
+
+function isSyntheticUserMessage(content: string): boolean {
+  return (
+    content.includes("Plan mode requires exactly one") ||
+    content === "Approved. Continue." ||
+    content.startsWith("Rejected.") ||
+    content.startsWith("Edit required:") ||
+    content.startsWith("Please revise the plan based on this feedback:\n")
+  );
+}
+
+function formatHumanInputReceived(event: HumanInputReceivedEvent): string {
+  if (event.decision === "approve") {
+    return "approve";
+  }
+  if (event.decision === "reject") {
+    return event.response ? `reject: ${event.response}` : "reject";
+  }
+  if (event.decision === "edit") {
+    return event.response?.trim() ? event.response : "edit";
+  }
+  return event.response?.trim() ?? "";
+}
+
+export function buildPendingUiState(
+  request: HumanInputRequestedEvent | null,
+  plan: string | null,
+): PendingUiState | null {
+  if (!request) {
+    return null;
+  }
+
+  if (request.kind === "plan_review") {
+    if (plan) {
+      return {
+        kind: "plan_review",
+        title: "Plan Review",
+        question: request.question,
+        plan,
+        actions: normalizeActions(request.choices),
+      };
+    }
+
+    return {
+      kind: "question",
+      title: "Plan Review",
+      question: request.question,
+      format: request.format ?? "free_text",
+      choices: request.choices,
+      urgency: request.urgency,
+    };
+  }
+
+  if (request.kind === "approval") {
+    return {
+      kind: "approval",
+      title: "Approval Required",
+      question: request.question,
+      toolName: request.approvalRequest?.toolName ?? "Unknown tool",
+      toolArgs: request.approvalRequest?.args,
+      reason: request.approvalRequest?.reason,
+      actions: normalizeActions(request.choices),
+    };
+  }
+
+  return {
+    kind: "question",
+    title: "Input Requested",
+    question: request.question,
+    context: request.context,
+    urgency: request.urgency,
+    format: request.format ?? "free_text",
+    choices: request.choices,
+  };
+}
 
 export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
@@ -43,13 +131,18 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   for (const event of events) {
     switch (event.type) {
       case "message":
-        if (event.role === "user" && event.content.includes("Plan mode requires exactly one")) {
-          break; // skip plan-mode retry prompts
-        }
+        if (event.role === "user" && isSyntheticUserMessage(event.content)) break;
         if (event.role === "user" || event.role === "assistant") {
           messages.push({ id: `msg-${messages.length}`, role: event.role, content: event.content });
         }
         break;
+      case "human_input_received": {
+        const content = formatHumanInputReceived(event);
+        if (content.length > 0) {
+          messages.push({ id: `msg-${messages.length}`, role: "user", content });
+        }
+        break;
+      }
       case "tool_call":
         if (blockedToolCallIds.has(event.toolCallId)) break;
         messages.push({
@@ -87,7 +180,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   });
   const [iterations, setIterations] = useState(0);
   const [error, setError] = useState<Error | null>(null);
-  const [humanInputRequest, setHumanInputRequest] = useState<HumanInputRequestedEvent | null>(null);
+  const [pendingUiState, setPendingUiState] = useState<PendingUiState | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
 
   const pendingRef = useRef<PendingResult | null>(null);
@@ -129,38 +222,27 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
     if (isPlanResult(result)) {
       setPlan(result.plan);
+      setPendingUiState(null);
       setStatus("done");
-    } else if (
-      isPendingResult(result) &&
-      result.thread.events.some(
-        (e) => e.type === "human_input_requested" && e.kind === "plan_review",
-      )
-    ) {
-      // Plan review pending — extract plan content from the plan event
-      const planEvent = result.thread.events.find((e) => e.type === "plan");
-      if (planEvent?.type === "plan") {
-        setPlan(planEvent.content);
-      }
-      pendingRef.current = result;
-      const req =
-        result.thread.events
-          .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
-          .pop() ?? null;
-      setHumanInputRequest(req);
-      setStatus("pending_input");
     } else if (isPendingResult(result)) {
-      pendingRef.current = result;
+      const planEvent = [...result.thread.events].reverse().find((e) => e.type === "plan");
+      const nextPlan = planEvent?.type === "plan" ? planEvent.content : null;
       const req =
         result.thread.events
           .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
           .pop() ?? null;
-      setHumanInputRequest(req);
+
+      setPlan(req?.kind === "plan_review" ? nextPlan : null);
+      pendingRef.current = result;
+      setPendingUiState(buildPendingUiState(req, req?.kind === "plan_review" ? nextPlan : null));
       setStatus("pending_input");
     } else if (result.stopReason === "max_errors") {
       const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
       setError(new Error(detail));
+      setPendingUiState(null);
       setStatus("error");
     } else {
+      setPendingUiState(null);
       setStatus("done");
     }
   }, []);
@@ -175,7 +257,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       setStatus("running");
       setError(null);
       setPlan(null);
-      setHumanInputRequest(null);
+      setPendingUiState(null);
       pendingRef.current = null;
 
       const tools: AgentTools = [...(options.tools ?? []), requestHumanInput];
@@ -207,30 +289,30 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     ],
   );
 
-  const submitHumanInput = useCallback(
-    (input: string | { decision?: "approve" | "reject" | "edit"; response?: string }) => {
+  const submitPendingInput = useCallback(
+    (submission: PendingSubmission) => {
       const pending = pendingRef.current;
       if (!pending) return;
 
       setStatus("running");
-      setHumanInputRequest(null);
+      setPendingUiState(null);
       pendingRef.current = null;
 
-      // Translate plain-string input for plan_review
-      const currentReq = pending.thread.events
-        .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
-        .pop();
-      let resumeInput: string | { decision?: "approve" | "reject" | "edit"; response?: string } =
-        input;
-      if (currentReq?.kind === "plan_review" && typeof input === "string") {
-        const lower = input.trim().toLowerCase();
-        if (lower === "approve") {
+      let resumeInput: string | { decision?: "approve" | "reject" | "edit"; response?: string };
+      switch (submission.kind) {
+        case "approve":
           resumeInput = { decision: "approve" };
-        } else if (lower === "reject") {
+          break;
+        case "reject":
           resumeInput = { decision: "reject" };
-        } else {
-          resumeInput = { decision: "edit", response: input };
-        }
+          break;
+        case "edit":
+          resumeInput = { decision: "edit", response: submission.feedback };
+          break;
+        case "choice":
+        case "text":
+          resumeInput = submission.value;
+          break;
       }
 
       pending.resume(resumeInput).then(handleResult).catch(handleError);
@@ -246,7 +328,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     error,
     plan,
     sendPrompt,
-    submitHumanInput,
-    humanInputRequest,
+    submitPendingInput,
+    pendingUiState,
   };
 }

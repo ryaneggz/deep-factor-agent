@@ -500,6 +500,8 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       kind: "plan_review",
       question:
         "Review the proposed plan. Type 'approve' to accept, 'reject' to cancel, or provide feedback to revise.",
+      format: "multiple_choice",
+      choices: ["approve", "reject", "edit"],
       timestamp: Date.now(),
       iteration: iterations,
     };

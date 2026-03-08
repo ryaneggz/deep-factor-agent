@@ -18,8 +18,8 @@ let mockUseAgent: UseAgentReturn = {
   error: null,
   plan: null,
   sendPrompt: vi.fn(),
-  submitHumanInput: vi.fn(),
-  humanInputRequest: null,
+  submitPendingInput: vi.fn(),
+  pendingUiState: null,
 };
 
 vi.mock("../src/hooks/useAgent.js", () => ({
@@ -29,6 +29,11 @@ vi.mock("../src/hooks/useAgent.js", () => ({
 vi.mock("../src/tools/bash.js", () => ({
   createBashTool: () => ({ name: "bash", description: "mock", invoke: vi.fn() }),
   bashTool: { name: "bash", description: "mock", invoke: vi.fn() },
+}));
+
+const appendSessionMock = vi.fn();
+vi.mock("../src/session-logger.js", () => ({
+  appendSession: appendSessionMock,
 }));
 
 // Import after mocks are set up
@@ -56,9 +61,10 @@ describe("TuiApp integration", () => {
       error: null,
       plan: null,
       sendPrompt: vi.fn(),
-      submitHumanInput: vi.fn(),
-      humanInputRequest: null,
+      submitPendingInput: vi.fn(),
+      pendingUiState: null,
     };
+    appendSessionMock.mockReset();
   });
 
   it("renders live section in idle state", () => {
@@ -81,5 +87,30 @@ describe("TuiApp integration", () => {
       error: new Error("API rate limit exceeded"),
     });
     expect(lastFrame()).toContain("API rate limit exceeded");
+  });
+
+  it("routes pending actions through submitPendingInput", () => {
+    const submitPendingInput = vi.fn();
+    const { stdin } = renderApp({
+      status: "pending_input",
+      submitPendingInput,
+      pendingUiState: {
+        kind: "plan_review",
+        title: "Plan Review",
+        question: "Review this plan",
+        plan: "# Plan\n\nShip it.",
+        actions: ["approve", "reject", "edit"],
+      },
+    });
+
+    stdin.write("a");
+
+    expect(submitPendingInput).toHaveBeenCalledWith({ kind: "approve" });
+    expect(appendSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "user",
+        content: "approve",
+      }),
+    );
   });
 });

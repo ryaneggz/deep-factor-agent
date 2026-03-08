@@ -3,29 +3,32 @@ import { Box, Text } from "ink";
 import { StatusLine } from "./StatusLine.js";
 import { InputBar } from "./InputBar.js";
 import { HotkeyMenu } from "./HotkeyMenu.js";
-import type { TokenUsage, HumanInputRequestedEvent } from "deep-factor-agent";
-import type { AgentStatus } from "../types.js";
+import { PendingInputPanel } from "./PendingInputPanel.js";
+import type { TokenUsage } from "deep-factor-agent";
+import type { AgentStatus, PendingSubmission, PendingUiState } from "../types.js";
 
 interface LiveSectionProps {
   status: AgentStatus;
   error: Error | null;
   plan: string | null;
-  humanInputRequest: HumanInputRequestedEvent | null;
+  pendingUiState: PendingUiState | null;
   usage: TokenUsage;
   iterations: number;
-  onSubmit: (value: string) => void;
+  onPromptSubmit: (value: string) => void;
+  onPendingSubmit: (submission: PendingSubmission) => void;
 }
 
 export function LiveSection({
   status,
   error,
   plan,
-  humanInputRequest,
+  pendingUiState,
   usage,
   iterations,
-  onSubmit,
+  onPromptSubmit,
+  onPendingSubmit,
 }: LiveSectionProps) {
-  const showInput = status === "idle" || status === "done" || status === "pending_input";
+  const showInput = (status === "idle" || status === "done") && pendingUiState == null;
   const [showHotkeyMenu, setShowHotkeyMenu] = useState(false);
 
   const handleHotkeyMenu = useCallback(() => {
@@ -44,43 +47,15 @@ export function LiveSection({
         </Text>
       )}
 
-      {status === "pending_input" && humanInputRequest?.kind === "plan_review" && plan && (
-        <Box flexDirection="column">
-          <Text color="cyan" bold>
-            Proposed plan:
-          </Text>
-          <Text>{plan}</Text>
-          <Text color="magenta" bold>
-            {"\n"}Review:
-          </Text>
-          <Text color="magenta">
-            Type &quot;approve&quot; to accept, &quot;reject&quot; to cancel, or provide feedback to
-            revise.
-          </Text>
-        </Box>
+      {status === "pending_input" && pendingUiState && (
+        <PendingInputPanel
+          pending={pendingUiState}
+          onSubmit={onPendingSubmit}
+          hotkeysVisible={showHotkeyMenu}
+          onToggleHotkeys={handleHotkeyMenu}
+          onCloseHotkeys={handleEscape}
+        />
       )}
-
-      {status === "pending_input" &&
-        humanInputRequest &&
-        humanInputRequest.kind !== "plan_review" && (
-          <Box flexDirection="column">
-            <Text color="magenta" bold>
-              {humanInputRequest.kind === "approval"
-                ? "Approval required:"
-                : "Agent requests input:"}
-            </Text>
-            <Text color="magenta">{humanInputRequest.question}</Text>
-            {humanInputRequest.choices && humanInputRequest.choices.length > 0 && (
-              <Box flexDirection="column" marginLeft={2}>
-                {humanInputRequest.choices.map((choice, i) => (
-                  <Text key={i} dimColor>
-                    {i + 1}. {choice}
-                  </Text>
-                ))}
-              </Box>
-            )}
-          </Box>
-        )}
 
       {status === "done" && plan && (
         <Box flexDirection="column">
@@ -96,11 +71,12 @@ export function LiveSection({
       {showInput && showHotkeyMenu && <HotkeyMenu />}
       {showInput && (
         <InputBar
-          onSubmit={onSubmit}
+          onSubmit={onPromptSubmit}
           onHotkeyMenu={handleHotkeyMenu}
           onEscape={showHotkeyMenu ? handleEscape : undefined}
         />
       )}
+      {!showInput && showHotkeyMenu && <HotkeyMenu />}
       <StatusLine usage={usage} iterations={iterations} status={status} />
     </Box>
   );
