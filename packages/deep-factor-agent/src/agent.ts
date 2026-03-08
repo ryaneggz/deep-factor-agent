@@ -19,6 +19,8 @@ import { getToolMetadata, toolArrayToMap } from "./tool-adapter.js";
 import { performance } from "node:perf_hooks";
 import type {
   AgentMode,
+  AgentEvent,
+  AgentExecutionUpdate,
   AgentThread,
   AgentResult,
   PlanResult,
@@ -29,7 +31,6 @@ import type {
   DeepFactorAgentSettings,
   ToolCallEvent,
   ToolResultEvent,
-  MessageEvent as AgentMessageEvent,
   ErrorEvent,
   CompletionEvent,
   HumanInputRequestedEvent,
@@ -37,7 +38,7 @@ import type {
   AgentMiddleware,
   MiddlewareContext,
 } from "./types.js";
-import type { ModelAdapter } from "./providers/types.js";
+import type { ModelAdapter, ModelInvocationUpdate } from "./providers/types.js";
 import { isModelAdapter } from "./providers/types.js";
 
 let threadCounter = 0;
@@ -179,6 +180,30 @@ function createThread(): AgentThread {
   };
 }
 
+function createZeroUsage(): TokenUsage {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+  };
+}
+
+function maxUsageSnapshot(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return {
+    inputTokens: Math.max(a.inputTokens, b.inputTokens),
+    outputTokens: Math.max(a.outputTokens, b.outputTokens),
+    totalTokens: Math.max(a.totalTokens, b.totalTokens),
+    cacheReadTokens:
+      a.cacheReadTokens !== undefined || b.cacheReadTokens !== undefined
+        ? Math.max(a.cacheReadTokens ?? 0, b.cacheReadTokens ?? 0)
+        : undefined,
+    cacheWriteTokens:
+      a.cacheWriteTokens !== undefined || b.cacheWriteTokens !== undefined
+        ? Math.max(a.cacheWriteTokens ?? 0, b.cacheWriteTokens ?? 0)
+        : undefined,
+  };
+}
+
 export class DeepFactorAgent<TTools extends StructuredToolInterface[] = StructuredToolInterface[]> {
   private modelOrString: BaseChatModel | ModelAdapter | string;
   private resolvedModel: BaseChatModel | ModelAdapter | null = null;
@@ -196,6 +221,8 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
   private contextMode: "standard" | "xml";
   private parallelToolCalls: boolean;
   private mode: AgentMode;
+  private streamMode: "final" | "updates";
+  private onUpdate?: (update: AgentExecutionUpdate) => void;
 
   constructor(settings: DeepFactorAgentSettings<TTools>) {
     this.modelOrString = settings.model;
@@ -218,6 +245,8 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     this.contextMode = settings.contextMode ?? "standard";
     this.parallelToolCalls = settings.parallelToolCalls ?? false;
     this.mode = settings.mode ?? "yolo";
+    this.streamMode = settings.streamMode ?? "final";
+    this.onUpdate = settings.onUpdate;
 
     // Normalize stopWhen
     if (!settings.stopWhen) {
@@ -234,6 +263,62 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
     // Context management
     this.contextManager = new ContextManager(settings.contextManagement);
+  }
+
+  private emitUpdate(update: AgentExecutionUpdate): void {
+    if (this.streamMode !== "updates" || !this.onUpdate) return;
+
+    try {
+      this.onUpdate({
+        thread: {
+          ...update.thread,
+          events: [...update.thread.events],
+          metadata: { ...update.thread.metadata },
+        },
+        usage: { ...update.usage },
+        iterations: update.iterations,
+        status: update.status,
+        lastEvent: update.lastEvent,
+        stopReason: update.stopReason,
+      });
+    } catch {
+      // Ignore subscriber failures so UI bugs cannot abort agent execution.
+    }
+  }
+
+  private appendEvent(
+    thread: AgentThread,
+    event: AgentEvent,
+    update: Omit<AgentExecutionUpdate, "thread" | "lastEvent">,
+    emit = true,
+  ): void {
+    thread.events.push(event);
+    thread.updatedAt = event.timestamp;
+
+    if (!emit) return;
+
+    this.emitUpdate({
+      thread,
+      usage: update.usage,
+      iterations: update.iterations,
+      status: update.status,
+      stopReason: update.stopReason,
+      lastEvent: event,
+    });
+  }
+
+  private emitUsageUpdate(
+    thread: AgentThread,
+    usage: TokenUsage,
+    iterations: number,
+    status: AgentExecutionUpdate["status"],
+  ): void {
+    this.emitUpdate({
+      thread,
+      usage,
+      iterations,
+      status,
+    });
   }
 
   private async ensureModel(): Promise<BaseChatModel | ModelAdapter> {
@@ -438,6 +523,14 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     prompt: string,
     detail: string,
   ): PendingResult {
+    this.emitUpdate({
+      thread,
+      usage,
+      iterations,
+      status: "pending_input",
+      stopReason: "human_input_needed",
+    });
+
     return {
       response,
       thread,
@@ -447,27 +540,36 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       stopDetail: detail,
       resume: async (input: string | ResumeInput) => {
         const normalized = normalizeResumeInput(input);
-        thread.events.push({
-          type: "human_input_received",
-          response: normalized.response,
-          decision: normalized.decision,
-          timestamp: Date.now(),
-          iteration: iterations,
-        });
+        this.appendEvent(
+          thread,
+          {
+            type: "human_input_received",
+            response: normalized.response,
+            decision: normalized.decision,
+            timestamp: Date.now(),
+            iteration: iterations,
+          },
+          { usage, iterations, status: "running" },
+        );
         if (normalized.decision) {
           const toolCallEvent = [...thread.events]
             .reverse()
             .find((event) => event.type === "tool_call" && event.iteration === iterations);
           if (toolCallEvent?.type === "tool_call") {
-            thread.events.push({
-              type: "approval",
-              toolName: toolCallEvent.toolName,
-              toolCallId: toolCallEvent.toolCallId,
-              decision: normalized.decision,
-              response: normalized.response || undefined,
-              timestamp: Date.now(),
-              iteration: iterations,
-            });
+            this.appendEvent(
+              thread,
+              {
+                type: "approval",
+                toolName: toolCallEvent.toolName,
+                toolCallId: toolCallEvent.toolCallId,
+                decision: normalized.decision,
+                response: normalized.response || undefined,
+                timestamp: Date.now(),
+                iteration: iterations,
+              },
+              { usage, iterations, status: "running" },
+              false,
+            );
           }
           const feedback =
             normalized.decision === "approve"
@@ -475,13 +577,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
               : normalized.decision === "reject"
                 ? `Rejected. ${normalized.response}`.trim()
                 : `Edit required: ${normalized.response}`.trim();
-          thread.events.push({
-            type: "message",
-            role: "user",
-            content: feedback,
-            timestamp: Date.now(),
-            iteration: iterations,
-          });
+          this.appendEvent(
+            thread,
+            {
+              type: "message",
+              role: "user",
+              content: feedback,
+              timestamp: Date.now(),
+              iteration: iterations,
+            },
+            { usage, iterations, status: "running" },
+          );
         }
         return this.runLoop(thread, prompt, iterations + 1);
       },
@@ -505,7 +611,15 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       timestamp: Date.now(),
       iteration: iterations,
     };
-    thread.events.push(hirEvent);
+    this.appendEvent(thread, hirEvent, { usage, iterations, status: "pending_input" });
+
+    this.emitUpdate({
+      thread,
+      usage,
+      iterations,
+      status: "pending_input",
+      stopReason: "human_input_needed",
+    });
 
     return {
       response: planContent,
@@ -518,14 +632,26 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         const normalized = normalizeResumeInput(input);
         const decision = normalized.decision ?? normalized.response;
 
-        thread.events.push({
-          type: "human_input_received",
-          response: typeof decision === "string" ? decision : normalized.response,
-          timestamp: Date.now(),
-          iteration: iterations,
-        });
+        this.appendEvent(
+          thread,
+          {
+            type: "human_input_received",
+            response: typeof decision === "string" ? decision : normalized.response,
+            timestamp: Date.now(),
+            iteration: iterations,
+          },
+          { usage, iterations, status: "running" },
+        );
 
         if (decision === "approve") {
+          this.emitUpdate({
+            thread,
+            usage,
+            iterations,
+            status: "done",
+            stopReason: "plan_completed",
+          });
+
           return {
             mode: "plan" as const,
             plan: planContent,
@@ -537,6 +663,14 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         }
 
         if (decision === "reject") {
+          this.emitUpdate({
+            thread,
+            usage,
+            iterations,
+            status: "done",
+            stopReason: "completed",
+          });
+
           return {
             response: planContent,
             thread,
@@ -549,13 +683,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
         // Revision: inject feedback and re-run the loop
         const feedback = normalized.response || (typeof decision === "string" ? decision : "");
-        thread.events.push({
-          type: "message",
-          role: "user",
-          content: `Please revise the plan based on this feedback:\n${feedback}`,
-          timestamp: Date.now(),
-          iteration: iterations,
-        });
+        this.appendEvent(
+          thread,
+          {
+            type: "message",
+            role: "user",
+            content: `Please revise the plan based on this feedback:\n${feedback}`,
+            timestamp: Date.now(),
+            iteration: iterations,
+          },
+          { usage, iterations, status: "running" },
+        );
         return this.runLoop(thread, prompt, iterations + 1);
       },
     };
@@ -566,6 +704,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     foundTool: StructuredToolInterface | undefined,
     thread: AgentThread,
     iteration: number,
+    usage: TokenUsage,
   ): Promise<ToolOutcome> {
     const toolCallId = tc.id ?? `call_${iteration}_${tc.name}`;
     const now = Date.now();
@@ -590,7 +729,12 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         timestamp: now,
         iteration,
       };
-      thread.events.push(hirEvent, resultEvent);
+      this.appendEvent(thread, hirEvent, { usage, iterations: iteration, status: "pending_input" });
+      this.appendEvent(thread, resultEvent, {
+        usage,
+        iterations: iteration,
+        status: "pending_input",
+      });
       return {
         kind: "pending",
         resultEvent,
@@ -626,7 +770,8 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         timestamp: now,
         iteration,
       };
-      thread.events.push(resultEvent, hirEvent);
+      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
+      this.appendEvent(thread, hirEvent, { usage, iterations: iteration, status: "pending_input" });
       return {
         kind: "pending",
         resultEvent,
@@ -650,7 +795,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         timestamp: now,
         iteration,
       };
-      thread.events.push(resultEvent);
+      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
       return {
         kind: "continue",
         resultEvent,
@@ -681,7 +826,8 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         timestamp: now,
         iteration,
       };
-      thread.events.push(resultEvent, hirEvent);
+      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
+      this.appendEvent(thread, hirEvent, { usage, iterations: iteration, status: "pending_input" });
       return {
         kind: "pending",
         resultEvent,
@@ -705,7 +851,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         timestamp: now,
         iteration,
       };
-      thread.events.push(resultEvent);
+      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
       return {
         kind: "continue",
         resultEvent,
@@ -729,7 +875,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         iteration,
         durationMs,
       };
-      thread.events.push(resultEvent);
+      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
       return {
         kind: "continue",
         resultEvent,
@@ -744,7 +890,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         iteration,
         durationMs: Math.round(performance.now() - start),
       };
-      thread.events.push(resultEvent);
+      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
       return {
         kind: "continue",
         resultEvent,
@@ -784,14 +930,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     prompt: string,
   ): Promise<AgentResult | PendingResult | PlanResult> {
     const nextIteration = thread.events.reduce((max, e) => Math.max(max, e.iteration), 0) + 1;
-    thread.events.push({
-      type: "message",
-      role: "user",
-      content: prompt,
-      timestamp: Date.now(),
-      iteration: nextIteration,
-    });
-    thread.updatedAt = Date.now();
+    this.appendEvent(
+      thread,
+      {
+        type: "message",
+        role: "user",
+        content: prompt,
+        timestamp: Date.now(),
+        iteration: nextIteration,
+      },
+      { usage: createZeroUsage(), iterations: nextIteration, status: "running" },
+    );
     return this.runLoop(thread, prompt, nextIteration);
   }
 
@@ -804,20 +953,20 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
     // Push initial user message (only if this is the first call, not a resume)
     if (startIteration === 1) {
-      thread.events.push({
-        type: "message",
-        role: "user",
-        content: prompt,
-        timestamp: Date.now(),
-        iteration: 0,
-      });
+      this.appendEvent(
+        thread,
+        {
+          type: "message",
+          role: "user",
+          content: prompt,
+          timestamp: Date.now(),
+          iteration: 0,
+        },
+        { usage: createZeroUsage(), iterations: startIteration, status: "running" },
+      );
     }
 
-    let totalUsage: TokenUsage = {
-      inputTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0,
-    };
+    let totalUsage: TokenUsage = createZeroUsage();
     let iteration = startIteration;
     let consecutiveErrors = 0;
     let lastResponse = "";
@@ -853,6 +1002,88 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       const messages =
         this.contextMode === "xml" ? this.buildXmlMessages(thread) : this.buildMessages(thread);
 
+      let liveErrorMessage: string | null = null;
+      let iterationUsage: TokenUsage = createZeroUsage();
+      let currentStepUsage: TokenUsage = createZeroUsage();
+      let stepCount = 0;
+      const emittedToolCallIds = new Set<string>();
+      const emittedAssistantContents = new Set<string>();
+      const emittedPlanContents = new Set<string>();
+
+      const currentUsageSnapshot = (): TokenUsage =>
+        addUsage(totalUsage, addUsage(iterationUsage, currentStepUsage));
+
+      const appendAssistantOrPlanEvent = (
+        content: string,
+        emitStatus: AgentExecutionUpdate["status"] = "running",
+      ): void => {
+        const normalized = content.trim();
+        if (!normalized) {
+          return;
+        }
+
+        if (this.mode === "plan") {
+          const streamedPlan = parsePlanBlock(normalized);
+          if (streamedPlan) {
+            if (emittedPlanContents.has(streamedPlan.content)) {
+              return;
+            }
+            emittedPlanContents.add(streamedPlan.content);
+            this.appendEvent(
+              thread,
+              {
+                type: "plan",
+                content: streamedPlan.content,
+                timestamp: Date.now(),
+                iteration,
+              },
+              { usage: currentUsageSnapshot(), iterations: iteration, status: emitStatus },
+            );
+            return;
+          }
+        }
+
+        if (emittedAssistantContents.has(normalized)) {
+          return;
+        }
+
+        emittedAssistantContents.add(normalized);
+        this.appendEvent(
+          thread,
+          {
+            type: "message",
+            role: "assistant",
+            content: normalized,
+            timestamp: Date.now(),
+            iteration,
+          },
+          { usage: currentUsageSnapshot(), iterations: iteration, status: emitStatus },
+        );
+      };
+
+      const appendToolCallIfNew = (
+        tc: { name: string; args?: Record<string, unknown>; id?: string },
+        timestamp = Date.now(),
+      ): void => {
+        const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+        if (emittedToolCallIds.has(toolCallId)) {
+          return;
+        }
+        emittedToolCallIds.add(toolCallId);
+        this.appendEvent(
+          thread,
+          {
+            type: "tool_call",
+            toolName: tc.name,
+            toolCallId,
+            args: (tc.args ?? {}) as Record<string, unknown>,
+            timestamp,
+            iteration,
+          },
+          { usage: currentUsageSnapshot(), iterations: iteration, status: "running" },
+        );
+      };
+
       try {
         // Bind tools and run inner tool-calling loop
         const modelWithTools =
@@ -860,23 +1091,72 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
             ? model.bindTools(allTools)
             : model;
 
-        let stepCount = 0;
-        let iterationUsage: TokenUsage = {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
-        };
         let pendingRequest: PendingHumanRequest | null = null;
         let lastAIResponse: AIMessage | null = null;
 
         while (stepCount < this.maxToolCallsPerIteration) {
-          const response = (await modelWithTools.invoke(messages)) as AIMessage;
+          currentStepUsage = createZeroUsage();
+
+          const response =
+            isModelAdapter(modelWithTools) &&
+            this.streamMode === "updates" &&
+            typeof modelWithTools.invokeWithUpdates === "function"
+              ? await modelWithTools.invokeWithUpdates(
+                  messages,
+                  (update: ModelInvocationUpdate) => {
+                    switch (update.type) {
+                      case "tool_call":
+                        appendToolCallIfNew(update.toolCall, Date.now());
+                        break;
+                      case "assistant_message":
+                        appendAssistantOrPlanEvent(update.content);
+                        break;
+                      case "usage":
+                        currentStepUsage = maxUsageSnapshot(currentStepUsage, update.usage);
+                        this.emitUsageUpdate(thread, currentUsageSnapshot(), iteration, "running");
+                        break;
+                      case "final":
+                        if (update.usage) {
+                          currentStepUsage = maxUsageSnapshot(currentStepUsage, update.usage);
+                          this.emitUsageUpdate(
+                            thread,
+                            currentUsageSnapshot(),
+                            iteration,
+                            "running",
+                          );
+                        }
+                        break;
+                      case "error": {
+                        liveErrorMessage = update.error;
+                        const recoverable = consecutiveErrors + 1 < 3;
+                        this.appendEvent(
+                          thread,
+                          {
+                            type: "error",
+                            error: update.error,
+                            recoverable,
+                            timestamp: Date.now(),
+                            iteration,
+                          },
+                          {
+                            usage: currentUsageSnapshot(),
+                            iterations: iteration,
+                            status: recoverable ? "running" : "error",
+                            stopReason: recoverable ? undefined : "max_errors",
+                          },
+                        );
+                        break;
+                      }
+                    }
+                  },
+                )
+              : ((await modelWithTools.invoke(messages)) as AIMessage);
           messages.push(response);
           lastAIResponse = response;
 
           // Accumulate usage from this step
           const stepUsage = extractUsage(response);
-          iterationUsage = addUsage(iterationUsage, stepUsage);
+          currentStepUsage = maxUsageSnapshot(currentStepUsage, stepUsage);
 
           const toolCalls = response.tool_calls ?? [];
           if (toolCalls.length === 0) break;
@@ -909,15 +1189,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
             // Record ToolCallEvents for parallel batch upfront
             for (const tc of parallelBatch) {
-              const toolCallEvent: ToolCallEvent = {
-                type: "tool_call",
-                toolName: tc.name,
-                toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
-                args: (tc.args ?? {}) as Record<string, unknown>,
-                timestamp: now,
-                iteration,
-              };
-              thread.events.push(toolCallEvent);
+              appendToolCallIfNew(tc, now);
             }
 
             // Execute parallel batch via Promise.all with per-tool timing
@@ -959,7 +1231,11 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
                 durationMs: pr.durationMs,
                 parallelGroup: groupId,
               };
-              thread.events.push(toolResultEvent);
+              this.appendEvent(thread, toolResultEvent, {
+                usage: currentUsageSnapshot(),
+                iterations: iteration,
+                status: "running",
+              });
               messages.push(
                 new ToolMessage({
                   tool_call_id: pr.toolCallId,
@@ -970,16 +1246,14 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
             // Handle sequential tools (HITL / interruptOn) after parallel batch
             for (const tc of sequentialBatch) {
-              const toolCallEvent: ToolCallEvent = {
-                type: "tool_call",
-                toolName: tc.name,
-                toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
-                args: (tc.args ?? {}) as Record<string, unknown>,
-                timestamp: Date.now(),
+              appendToolCallIfNew(tc, Date.now());
+              const outcome = await this.executeToolCall(
+                tc,
+                toolMap[tc.name],
+                thread,
                 iteration,
-              };
-              thread.events.push(toolCallEvent);
-              const outcome = await this.executeToolCall(tc, toolMap[tc.name], thread, iteration);
+                currentUsageSnapshot(),
+              );
               messages.push(outcome.toolMessage);
               if (outcome.kind === "pending") {
                 pendingRequest = outcome.pending ?? null;
@@ -989,17 +1263,14 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
           } else {
             // --- Sequential execution path (original logic) ---
             for (const tc of toolCalls) {
-              // Record tool call event
-              const toolCallEvent: ToolCallEvent = {
-                type: "tool_call",
-                toolName: tc.name,
-                toolCallId: tc.id ?? `call_${stepCount}_${tc.name}`,
-                args: (tc.args ?? {}) as Record<string, unknown>,
-                timestamp: now,
+              appendToolCallIfNew(tc, now);
+              const outcome = await this.executeToolCall(
+                tc,
+                toolMap[tc.name],
+                thread,
                 iteration,
-              };
-              thread.events.push(toolCallEvent);
-              const outcome = await this.executeToolCall(tc, toolMap[tc.name], thread, iteration);
+                currentUsageSnapshot(),
+              );
               messages.push(outcome.toolMessage);
               if (outcome.kind === "pending") {
                 pendingRequest = outcome.pending ?? null;
@@ -1009,6 +1280,8 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
           }
 
           if (pendingRequest) break;
+          iterationUsage = addUsage(iterationUsage, currentStepUsage);
+          currentStepUsage = createZeroUsage();
           stepCount++;
         }
 
@@ -1019,20 +1292,31 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
         const parsedPlan = this.mode === "plan" ? parsePlanBlock(lastResponse) : null;
 
-        // Record assistant message
-        if (lastResponse && !(this.mode === "plan" && parsedPlan)) {
-          const messageEvent: AgentMessageEvent = {
-            type: "message",
-            role: "assistant",
-            content: lastResponse,
-            timestamp: Date.now(),
-            iteration,
-          };
-          thread.events.push(messageEvent);
+        if (lastResponse) {
+          if (this.mode === "plan" && parsedPlan) {
+            if (!emittedPlanContents.has(parsedPlan.content)) {
+              emittedPlanContents.add(parsedPlan.content);
+              this.appendEvent(
+                thread,
+                {
+                  type: "plan",
+                  content: parsedPlan.content,
+                  timestamp: Date.now(),
+                  iteration,
+                },
+                { usage: currentUsageSnapshot(), iterations: iteration, status: "running" },
+              );
+            }
+          } else {
+            appendAssistantOrPlanEvent(lastResponse);
+          }
         }
 
         // Accumulate usage
+        iterationUsage = addUsage(iterationUsage, currentStepUsage);
+        currentStepUsage = createZeroUsage();
         totalUsage = addUsage(totalUsage, iterationUsage);
+        this.emitUsageUpdate(thread, totalUsage, iteration, "running");
 
         // Reset consecutive errors on success
         consecutiveErrors = 0;
@@ -1052,6 +1336,13 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         });
 
         if (stopResult) {
+          this.emitUpdate({
+            thread,
+            usage: totalUsage,
+            iterations: iteration,
+            status: "done",
+            stopReason: "stop_condition",
+          });
           return {
             response: lastResponse,
             thread,
@@ -1093,7 +1384,20 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
               timestamp: Date.now(),
               iteration,
             };
-            thread.events.push(completionEvent);
+            this.appendEvent(thread, completionEvent, {
+              usage: totalUsage,
+              iterations: iteration,
+              status: "done",
+              stopReason: "completed",
+            });
+
+            this.emitUpdate({
+              thread,
+              usage: totalUsage,
+              iterations: iteration,
+              status: "done",
+              stopReason: "completed",
+            });
 
             return {
               response: lastResponse,
@@ -1106,13 +1410,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
           // Verification failed - inject feedback and continue
           if (verifyResult.reason) {
-            thread.events.push({
-              type: "message",
-              role: "user",
-              content: `Verification failed: ${verifyResult.reason}. Please try again.`,
-              timestamp: Date.now(),
-              iteration,
-            });
+            this.appendEvent(
+              thread,
+              {
+                type: "message",
+                role: "user",
+                content: `Verification failed: ${verifyResult.reason}. Please try again.`,
+                timestamp: Date.now(),
+                iteration,
+              },
+              { usage: totalUsage, iterations: iteration, status: "running" },
+            );
           }
         } else {
           // No verification function - single iteration mode
@@ -1123,27 +1431,43 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
             timestamp: Date.now(),
             iteration,
           };
-          thread.events.push(completionEvent);
+          this.appendEvent(thread, completionEvent, {
+            usage: totalUsage,
+            iterations: iteration,
+            status: this.mode === "plan" ? "running" : "done",
+            stopReason: this.mode === "plan" ? undefined : "completed",
+          });
 
           if (this.mode === "plan") {
             if (!parsedPlan) {
-              thread.events.push({
-                type: "message",
-                role: "user",
-                content:
-                  "Plan mode requires exactly one <proposed_plan>...</proposed_plan> block. Try again.",
-                timestamp: Date.now(),
-                iteration,
-              });
+              this.appendEvent(
+                thread,
+                {
+                  type: "message",
+                  role: "user",
+                  content:
+                    "Plan mode requires exactly one <proposed_plan>...</proposed_plan> block. Try again.",
+                  timestamp: Date.now(),
+                  iteration,
+                },
+                { usage: totalUsage, iterations: iteration, status: "running" },
+              );
               iteration++;
               continue;
             }
-            thread.events.push({
-              type: "plan",
-              content: parsedPlan.content,
-              timestamp: Date.now(),
-              iteration,
-            });
+            if (!emittedPlanContents.has(parsedPlan.content)) {
+              emittedPlanContents.add(parsedPlan.content);
+              this.appendEvent(
+                thread,
+                {
+                  type: "plan",
+                  content: parsedPlan.content,
+                  timestamp: Date.now(),
+                  iteration,
+                },
+                { usage: totalUsage, iterations: iteration, status: "running" },
+              );
+            }
             return this.createPlanPendingResult(
               thread,
               totalUsage,
@@ -1152,6 +1476,14 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
               prompt,
             );
           }
+
+          this.emitUpdate({
+            thread,
+            usage: totalUsage,
+            iterations: iteration,
+            status: "done",
+            stopReason: "completed",
+          });
 
           return {
             response: lastResponse,
@@ -1164,15 +1496,28 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       } catch (error) {
         consecutiveErrors++;
         const isRecoverable = consecutiveErrors < 3;
+        const currentError = compactError(error);
+        const compactLiveError = liveErrorMessage
+          ? compactError(new Error(liveErrorMessage))
+          : null;
+        const errorUsage = addUsage(iterationUsage, currentStepUsage);
+        totalUsage = addUsage(totalUsage, errorUsage);
 
-        const errorEvent: ErrorEvent = {
-          type: "error",
-          error: compactError(error),
-          recoverable: isRecoverable,
-          timestamp: Date.now(),
-          iteration,
-        };
-        thread.events.push(errorEvent);
+        if (compactLiveError !== currentError) {
+          const errorEvent: ErrorEvent = {
+            type: "error",
+            error: currentError,
+            recoverable: isRecoverable,
+            timestamp: Date.now(),
+            iteration,
+          };
+          this.appendEvent(thread, errorEvent, {
+            usage: totalUsage,
+            iterations: iteration,
+            status: isRecoverable ? "running" : "error",
+            stopReason: isRecoverable ? undefined : "max_errors",
+          });
+        }
 
         // Middleware: afterIteration (even on error)
         await this.composedMiddleware.afterIteration(middlewareCtx, error);
@@ -1181,13 +1526,20 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         this.onIterationEnd?.(iteration, error);
 
         if (!isRecoverable) {
+          this.emitUpdate({
+            thread,
+            usage: totalUsage,
+            iterations: iteration,
+            status: "error",
+            stopReason: "max_errors",
+          });
           return {
             response: lastResponse,
             thread,
             usage: totalUsage,
             iterations: iteration,
             stopReason: "max_errors",
-            stopDetail: `${consecutiveErrors} consecutive errors: ${errorEvent.error}`,
+            stopDetail: `${consecutiveErrors} consecutive errors: ${liveErrorMessage ?? currentError}`,
           };
         }
 

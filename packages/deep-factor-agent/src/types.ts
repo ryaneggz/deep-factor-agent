@@ -135,6 +135,15 @@ export interface TokenUsage {
   cacheWriteTokens?: number;
 }
 
+export interface AgentExecutionUpdate {
+  thread: AgentThread;
+  usage: TokenUsage;
+  iterations: number;
+  status: "running" | "pending_input" | "done" | "error";
+  lastEvent?: AgentEvent;
+  stopReason?: AgentResult["stopReason"] | PlanResult["stopReason"] | PendingResult["stopReason"];
+}
+
 // --- Stop Conditions ---
 
 export interface StopConditionContext {
@@ -221,6 +230,8 @@ export interface DeepFactorAgentSettings<
   parallelToolCalls?: boolean;
   /** Execution mode: "plan" denies mutating tools and expects a plan output, "approve" gates mutating tools on approval, and "yolo" executes normally. Default: "yolo". */
   mode?: AgentMode;
+  streamMode?: "final" | "updates";
+  onUpdate?: (update: AgentExecutionUpdate) => void;
   onIterationStart?: (iteration: number) => void;
   onIterationEnd?: (iteration: number, result: unknown) => void;
 }

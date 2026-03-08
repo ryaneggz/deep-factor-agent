@@ -140,6 +140,18 @@ describe("TuiApp integration", () => {
     );
   });
 
+  it("does not resolve the Claude CLI provider for langchain runs", () => {
+    render(<TuiApp provider="langchain" model="gpt-4" maxIter={10} sandbox="workspace" />);
+
+    expect(createClaudeCliProviderMock).not.toHaveBeenCalled();
+    expect(useAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "langchain",
+        modelLabel: "gpt-4",
+      }),
+    );
+  });
+
   it("resolves the Claude CLI provider once at startup", () => {
     render(<TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" />);
 
@@ -147,6 +159,9 @@ describe("TuiApp integration", () => {
       model: "sonnet",
       permissionMode: "bypassPermissions",
       disableBuiltInTools: true,
+      outputFormat: "stream-json",
+      verbose: true,
+      includePartialMessages: true,
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -166,6 +181,9 @@ describe("TuiApp integration", () => {
       model: "sonnet",
       permissionMode: "acceptEdits",
       disableBuiltInTools: true,
+      outputFormat: "stream-json",
+      verbose: true,
+      includePartialMessages: true,
     });
   });
 
@@ -178,6 +196,9 @@ describe("TuiApp integration", () => {
       model: "sonnet",
       permissionMode: "plan",
       disableBuiltInTools: true,
+      outputFormat: "stream-json",
+      verbose: true,
+      includePartialMessages: true,
     });
   });
 });

@@ -26,13 +26,21 @@ export function resolveProviderModel(args: {
   provider: ProviderType;
   model: string;
   mode?: AgentMode;
+  liveUpdates?: boolean;
 }): DeepFactorAgentSettings["model"] {
-  const { provider, model, mode } = args;
+  const { provider, model, mode, liveUpdates = false } = args;
   return provider === "claude"
     ? createClaudeCliProvider({
         model,
         permissionMode: resolveClaudePermissionMode(mode),
         disableBuiltInTools: true,
+        ...(liveUpdates
+          ? {
+              outputFormat: "stream-json" as const,
+              verbose: true,
+              includePartialMessages: true,
+            }
+          : {}),
       })
     : model;
 }

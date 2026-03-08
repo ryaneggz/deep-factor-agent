@@ -10,6 +10,7 @@ import {
 } from "deep-factor-agent";
 import type {
   AgentResult,
+  AgentExecutionUpdate,
   PendingResult,
   PlanResult,
   TokenUsage,
@@ -178,6 +179,19 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   return messages;
 }
 
+function findLatestPlan(events: AgentEvent[]): string | null {
+  const event = [...events].reverse().find((item) => item.type === "plan");
+  return event?.type === "plan" ? event.content : null;
+}
+
+function findLatestHumanInputRequest(events: AgentEvent[]): HumanInputRequestedEvent | null {
+  return (
+    events
+      .filter((event): event is HumanInputRequestedEvent => event.type === "human_input_requested")
+      .pop() ?? null
+  );
+}
+
 export function useAgent(options: UseAgentOptions): UseAgentReturn {
   const [messages, setMessages] = useState<ChatMessage[]>(options.initialMessages ?? []);
   const [status, setStatus] = useState<AgentStatus>("idle");
@@ -197,20 +211,62 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   // Track how many chat messages have already been persisted to the session log.
   // Starts at the count of initial/resumed messages so we don't re-log them.
   const loggedMessageCountRef = useRef<number>(options.initialMessages?.length ?? 0);
+  const usageBaseRef = useRef<TokenUsage>({
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+  });
+
+  const applyThreadSnapshot = useCallback((thread: AgentThread): ChatMessage[] => {
+    threadRef.current = thread;
+    const newMessages = eventsToChatMessages(thread.events);
+    const resumedCount = resumedMessagesRef.current.length;
+    setMessages(
+      resumedCount > 0
+        ? [...resumedMessagesRef.current, ...newMessages.slice(resumedCount)]
+        : newMessages,
+    );
+    return newMessages;
+  }, []);
+
+  const handleUpdate = useCallback(
+    (update: AgentExecutionUpdate) => {
+      applyThreadSnapshot(update.thread);
+      setUsage(addUsage(usageBaseRef.current, update.usage));
+      setIterations(update.iterations);
+      setStatus(update.status);
+
+      if (update.lastEvent?.type === "plan") {
+        setPlan(update.lastEvent.content);
+      }
+
+      const latestPlan = findLatestPlan(update.thread.events);
+      const latestRequest = findLatestHumanInputRequest(update.thread.events);
+
+      if (update.status === "pending_input" && latestRequest) {
+        const nextPlan = latestRequest.kind === "plan_review" ? latestPlan : null;
+        setPlan(nextPlan);
+        setPendingUiState(buildPendingUiState(latestRequest, nextPlan));
+      } else {
+        setPendingUiState(null);
+      }
+
+      if (update.lastEvent?.type === "error") {
+        setError(new Error(update.lastEvent.error));
+        return;
+      }
+
+      if (update.status !== "error") {
+        setError(null);
+      }
+    },
+    [applyThreadSnapshot],
+  );
 
   const handleResult = useCallback(
     (result: AgentResult | PendingResult | PlanResult) => {
-      threadRef.current = result.thread;
-      const newMessages = eventsToChatMessages(result.thread.events);
-      // Prepend resumed display messages so they stay visible, but skip the
-      // events that came from the seeded thread (they'll be in newMessages too).
-      const resumedCount = resumedMessagesRef.current.length;
-      setMessages(
-        resumedCount > 0
-          ? [...resumedMessagesRef.current, ...newMessages.slice(resumedCount)]
-          : newMessages,
-      );
-      setUsage((prev) => addUsage(prev, result.usage));
+      const newMessages = applyThreadSnapshot(result.thread);
+      setUsage(addUsage(usageBaseRef.current, result.usage));
       setIterations(result.iterations);
 
       // Persist only NEW messages to session log (skip already-logged ones)
@@ -232,16 +288,13 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       }
 
       if (isPlanResult(result)) {
+        setError(null);
         setPlan(result.plan);
         setPendingUiState(null);
         setStatus("done");
       } else if (isPendingResult(result)) {
-        const planEvent = [...result.thread.events].reverse().find((e) => e.type === "plan");
-        const nextPlan = planEvent?.type === "plan" ? planEvent.content : null;
-        const req =
-          result.thread.events
-            .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
-            .pop() ?? null;
+        const nextPlan = findLatestPlan(result.thread.events);
+        const req = findLatestHumanInputRequest(result.thread.events);
 
         setPlan(req?.kind === "plan_review" ? nextPlan : null);
         pendingRef.current = result;
@@ -253,17 +306,20 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         setPendingUiState(null);
         setStatus("error");
       } else {
+        setError(null);
         setPendingUiState(null);
         setStatus("done");
       }
     },
-    [options.modelLabel, options.provider],
+    [applyThreadSnapshot, options.modelLabel, options.provider],
   );
 
   const handleError = useCallback((err: unknown) => {
     setError(err instanceof Error ? err : new Error(String(err)));
     setStatus("error");
   }, []);
+
+  const shouldStreamUpdates = options.provider === "langchain" || options.provider === "claude";
 
   const sendPrompt = useCallback(
     (prompt: string) => {
@@ -272,6 +328,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       setPlan(null);
       setPendingUiState(null);
       pendingRef.current = null;
+      usageBaseRef.current = usage;
 
       const tools: AgentTools = [...(options.tools ?? []), requestHumanInput];
 
@@ -282,6 +339,8 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
         parallelToolCalls: options.parallelToolCalls ?? true,
         mode: options.mode ?? "yolo",
+        streamMode: shouldStreamUpdates ? "updates" : "final",
+        onUpdate: shouldStreamUpdates ? handleUpdate : undefined,
       });
 
       const existingThread = threadRef.current;
@@ -297,8 +356,11 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       options.tools,
       options.parallelToolCalls,
       options.mode,
+      shouldStreamUpdates,
       handleResult,
       handleError,
+      handleUpdate,
+      usage,
     ],
   );
 
@@ -310,6 +372,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       setStatus("running");
       setPendingUiState(null);
       pendingRef.current = null;
+      usageBaseRef.current = usage;
 
       let resumeInput: string | { decision?: "approve" | "reject" | "edit"; response?: string };
       switch (submission.kind) {
@@ -330,7 +393,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
       pending.resume(resumeInput).then(handleResult).catch(handleError);
     },
-    [handleResult, handleError],
+    [handleResult, handleError, usage],
   );
 
   return {

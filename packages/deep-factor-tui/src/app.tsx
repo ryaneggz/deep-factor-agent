@@ -45,7 +45,7 @@ export function TuiApp({
 
   const tools: AgentTools = [createBashTool(sandbox)];
   const resolvedModel = useMemo<DeepFactorAgentSettings["model"]>(
-    () => resolveProviderModel({ provider, model, mode }),
+    () => resolveProviderModel({ provider, model, mode, liveUpdates: true }),
     [provider, model, mode],
   );
 

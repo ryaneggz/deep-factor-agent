@@ -15,6 +15,7 @@ export type {
   AgentEvent,
   AgentThread,
   TokenUsage,
+  AgentExecutionUpdate,
   StopConditionContext,
   StopConditionResult,
   StopCondition,
@@ -88,7 +89,7 @@ export { serializeThreadToXml, escapeXml } from "./xml-serializer.js";
 export type { XmlSerializerOptions } from "./xml-serializer.js";
 
 // Providers
-export type { ModelAdapter } from "./providers/types.js";
+export type { ModelAdapter, ModelInvocationUpdate } from "./providers/types.js";
 export { isModelAdapter } from "./providers/types.js";
 export { createClaudeCliProvider } from "./providers/claude-cli.js";
 export type { ClaudeCliProviderOptions } from "./providers/claude-cli.js";

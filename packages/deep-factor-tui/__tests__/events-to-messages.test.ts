@@ -40,4 +40,36 @@ describe("eventsToChatMessages", () => {
       content: "Error: Authentication failed: invalid API key",
     });
   });
+
+  it("preserves parallel tool metadata on tool results", () => {
+    const events: AgentEvent[] = [
+      {
+        type: "tool_call",
+        toolName: "read_file",
+        toolCallId: "tool-1",
+        args: { path: "a.txt" },
+        timestamp: 1,
+        iteration: 1,
+      },
+      {
+        type: "tool_result",
+        toolCallId: "tool-1",
+        result: "A",
+        parallelGroup: "pg-1",
+        durationMs: 12,
+        timestamp: 2,
+        iteration: 1,
+      },
+    ];
+
+    const messages = eventsToChatMessages(events);
+
+    expect(messages[1]).toMatchObject({
+      role: "tool_result",
+      content: "A",
+      toolCallId: "tool-1",
+      parallelGroup: "pg-1",
+      durationMs: 12,
+    });
+  });
 });
