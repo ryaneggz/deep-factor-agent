@@ -145,6 +145,7 @@ describe("TuiApp integration", () => {
 
     expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
       model: "sonnet",
+      permissionMode: "bypassPermissions",
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -153,5 +154,16 @@ describe("TuiApp integration", () => {
         modelLabel: "sonnet",
       }),
     );
+  });
+
+  it("maps approve mode to Claude acceptEdits permission mode", () => {
+    render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="approve" />,
+    );
+
+    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "acceptEdits",
+    });
   });
 });

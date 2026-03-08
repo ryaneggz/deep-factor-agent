@@ -69,6 +69,10 @@ describe("createClaudeCliProvider", () => {
       "--print",
       "--output-format",
       "json",
+      "--tools",
+      "",
+      "--permission-mode",
+      "bypassPermissions",
       '<thread>\n  <event type="human" id="0" iteration="0">Hi</event>\n</thread>',
     ]);
 
@@ -84,7 +88,7 @@ describe("createClaudeCliProvider", () => {
     await provider.invoke([new HumanMessage("Hi")]);
 
     const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
-    const prompt = args[3];
+    const prompt = args[7];
     expect(prompt).toContain("<thread>");
     expect(prompt).toContain('<event type="human"');
     expect(prompt).not.toContain("[User]");
@@ -97,7 +101,7 @@ describe("createClaudeCliProvider", () => {
     await provider.invoke([new SystemMessage("Be concise."), new HumanMessage("What is 2+2?")]);
 
     const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
-    const prompt = args[3];
+    const prompt = args[7];
     expect(prompt).toContain("[System]");
     expect(prompt).toContain("[User]");
     expect(prompt).not.toContain("<thread>");
@@ -114,10 +118,36 @@ describe("createClaudeCliProvider", () => {
       "--print",
       "--output-format",
       "json",
-      '<thread>\n  <event type="human" id="0" iteration="0">Hi</event>\n</thread>',
+      "--tools",
+      "",
+      "--permission-mode",
+      "bypassPermissions",
       "--model",
       "sonnet",
+      '<thread>\n  <event type="human" id="0" iteration="0">Hi</event>\n</thread>',
     ]);
+  });
+
+  it("passes the configured Claude permission mode", async () => {
+    simulateExecFile(makeJsonOutput("Response"));
+    const provider = createClaudeCliProvider({ permissionMode: "plan" });
+
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    expect(args).toContain("--permission-mode");
+    expect(args).toContain("plan");
+  });
+
+  it("disables built-in Claude tools by default", async () => {
+    simulateExecFile(makeJsonOutput("Response"));
+    const provider = createClaudeCliProvider();
+
+    await provider.invoke([new HumanMessage("Hi")]);
+
+    const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
+    expect(args).toContain("--tools");
+    expect(args).toContain("");
   });
 
   it("uses custom cliPath", async () => {
@@ -231,7 +261,7 @@ describe("createClaudeCliProvider", () => {
     await provider.invoke([new HumanMessage("Hi")]);
 
     const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
-    const prompt = args[3];
+    const prompt = args[7];
     expect(prompt).toContain("[Available Tools]");
     expect(prompt).toContain("calculator");
     expect(prompt).toContain("tool_calls");
@@ -253,7 +283,7 @@ describe("createClaudeCliProvider", () => {
     await provider.invoke([new HumanMessage("Hi")]);
 
     const args = (mockExecFile.mock.calls[0] as any[])[1] as string[];
-    const prompt = args[3];
+    const prompt = args[7];
     // Should contain JSON Schema properties, not Zod internals
     expect(prompt).toContain('"type": "object"');
     expect(prompt).toContain('"type": "string"');

@@ -216,10 +216,34 @@ describe("runPrintMode", () => {
 
     expect(mockCreateClaudeCliProvider).toHaveBeenCalledWith({
       model: "sonnet",
+      permissionMode: "bypassPermissions",
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({ model: mockClaudeCliProvider }),
     );
+  });
+
+  it("maps plan mode to Claude plan permission mode", async () => {
+    mockLoop.mockResolvedValueOnce({
+      response: "# Plan",
+      stopReason: "completed",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      iterations: 1,
+    });
+
+    await expect(
+      runPrintMode({
+        ...baseOptions,
+        provider: "claude",
+        model: "sonnet",
+        mode: "plan",
+      }),
+    ).rejects.toThrow("process.exit called");
+
+    expect(mockCreateClaudeCliProvider).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "plan",
+    });
   });
 
   it("auto-approves plan mode pending results in print mode", async () => {

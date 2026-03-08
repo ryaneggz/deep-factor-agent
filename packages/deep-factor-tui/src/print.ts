@@ -23,7 +23,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
 
   try {
     const tools = [createBashTool(sandbox)];
-    const resolvedModel = resolveProviderModel({ provider, model });
+    const resolvedModel = resolveProviderModel({ provider, model, mode });
 
     const agent = createDeepFactorAgent({
       model: resolvedModel,

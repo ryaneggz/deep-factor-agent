@@ -13,6 +13,8 @@ import {
 export interface ClaudeCliProviderOptions {
   /** Claude model to use (e.g. "sonnet", "opus"). Passed as `--model <model>`. */
   model?: string;
+  /** Claude CLI permission mode. Default: "bypassPermissions". */
+  permissionMode?: "acceptEdits" | "bypassPermissions" | "default" | "dontAsk" | "plan" | "auto";
   /** Path to the claude CLI binary. Default: "claude" */
   cliPath?: string;
   /** Timeout in milliseconds for the CLI process. Default: 120000 (2 min) */
@@ -21,6 +23,8 @@ export interface ClaudeCliProviderOptions {
   maxBuffer?: number;
   /** Input encoding for messages. Default: "xml". Use "text" for plain-text labels. */
   inputEncoding?: "xml" | "text";
+  /** Disable Claude CLI built-in tools so tool use goes through the outer agent loop. Default: true. */
+  disableBuiltInTools?: boolean;
 }
 
 interface ClaudeCliJsonResponse {
@@ -64,9 +68,11 @@ If you do not need to call any tools, respond with plain text (no JSON block).`;
 export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelAdapter {
   const cliPath = opts?.cliPath ?? "claude";
   const model = opts?.model;
+  const permissionMode = opts?.permissionMode ?? "bypassPermissions";
   const timeout = opts?.timeout ?? 120_000;
   const maxBuffer = opts?.maxBuffer ?? 10 * 1024 * 1024;
   const inputEncoding = opts?.inputEncoding ?? "xml";
+  const disableBuiltInTools = opts?.disableBuiltInTools ?? true;
 
   let boundToolDefs: StructuredToolInterface[] = [];
 
@@ -115,10 +121,15 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
         // Serialize messages using the configured encoding
         prompt += inputEncoding === "xml" ? messagesToXml(messages) : messagesToPrompt(messages);
 
-        const args = ["--print", "--output-format", "json", prompt];
+        const args = ["--print", "--output-format", "json"];
+        if (disableBuiltInTools) {
+          args.push("--tools", "");
+        }
+        args.push("--permission-mode", permissionMode);
         if (model) {
           args.push("--model", model);
         }
+        args.push(prompt);
 
         const stdout = await execFileAsync(cliPath, args, {
           timeout,
