@@ -21,14 +21,21 @@ let mockUseAgent: UseAgentReturn = {
   submitPendingInput: vi.fn(),
   pendingUiState: null,
 };
+const mockClaudeCliProvider = { invoke: vi.fn(), bindTools: vi.fn() };
+const createClaudeCliProviderMock = vi.fn(() => mockClaudeCliProvider);
+const useAgentMock = vi.fn(() => mockUseAgent);
 
 vi.mock("../src/hooks/useAgent.js", () => ({
-  useAgent: () => mockUseAgent,
+  useAgent: useAgentMock,
 }));
 
 vi.mock("../src/tools/bash.js", () => ({
   createBashTool: () => ({ name: "bash", description: "mock", invoke: vi.fn() }),
   bashTool: { name: "bash", description: "mock", invoke: vi.fn() },
+}));
+
+vi.mock("deep-factor-agent", () => ({
+  createClaudeCliProvider: createClaudeCliProviderMock,
 }));
 
 const appendSessionMock = vi.fn();
@@ -44,7 +51,7 @@ function renderApp(overrides?: Partial<UseAgentReturn>) {
     mockUseAgent = { ...mockUseAgent, ...overrides };
   }
   // Note: lastFrame() only shows the live (non-static) portion with ink-testing-library
-  return render(<TuiApp model="gpt-4" maxIter={10} sandbox="workspace" />);
+  return render(<TuiApp provider="langchain" model="gpt-4" maxIter={10} sandbox="workspace" />);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +72,8 @@ describe("TuiApp integration", () => {
       pendingUiState: null,
     };
     appendSessionMock.mockReset();
+    useAgentMock.mockClear();
+    createClaudeCliProviderMock.mockClear();
   });
 
   it("renders live section in idle state", () => {
@@ -110,7 +119,65 @@ describe("TuiApp integration", () => {
       expect.objectContaining({
         role: "user",
         content: "approve",
+        provider: "langchain",
+        model: "gpt-4",
       }),
     );
+  });
+
+  it("logs the initial prompt with provider and model", () => {
+    render(
+      <TuiApp prompt="Hello" provider="langchain" model="gpt-4" maxIter={10} sandbox="workspace" />,
+    );
+
+    expect(appendSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "user",
+        content: "Hello",
+        provider: "langchain",
+        model: "gpt-4",
+      }),
+    );
+  });
+
+  it("resolves the Claude CLI provider once at startup", () => {
+    render(<TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" />);
+
+    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "bypassPermissions",
+      disableBuiltInTools: true,
+    });
+    expect(useAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "claude",
+        model: mockClaudeCliProvider,
+        modelLabel: "sonnet",
+      }),
+    );
+  });
+
+  it("maps approve mode to Claude acceptEdits permission mode", () => {
+    render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="approve" />,
+    );
+
+    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "acceptEdits",
+      disableBuiltInTools: true,
+    });
+  });
+
+  it("maps plan mode to Claude plan permission mode", () => {
+    render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+    );
+
+    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "plan",
+      disableBuiltInTools: true,
+    });
   });
 });

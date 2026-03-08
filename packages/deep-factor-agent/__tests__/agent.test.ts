@@ -217,7 +217,8 @@ describe("DeepFactorAgent", () => {
 
       const result = await agent.loop("Test max errors");
       expect(result.stopReason).toBe("max_errors");
-      expect(result.stopDetail).toContain("3");
+      expect(result.stopDetail).toContain("3 consecutive errors:");
+      expect(result.stopDetail).toContain("Error 3");
 
       const errorEvents = result.thread.events.filter((e) => e.type === "error");
       expect(errorEvents.length).toBe(3);

@@ -165,6 +165,14 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           parallelGroup: event.parallelGroup,
         });
         break;
+      case "error":
+        messages.push({
+          id: `msg-${messages.length}`,
+          role: "tool_result",
+          content: `Error: ${event.error}`,
+          toolCallId: event.toolCallId,
+        });
+        break;
     }
   }
   return messages;
@@ -190,62 +198,67 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   // Starts at the count of initial/resumed messages so we don't re-log them.
   const loggedMessageCountRef = useRef<number>(options.initialMessages?.length ?? 0);
 
-  const handleResult = useCallback((result: AgentResult | PendingResult | PlanResult) => {
-    threadRef.current = result.thread;
-    const newMessages = eventsToChatMessages(result.thread.events);
-    // Prepend resumed display messages so they stay visible, but skip the
-    // events that came from the seeded thread (they'll be in newMessages too).
-    const resumedCount = resumedMessagesRef.current.length;
-    setMessages(
-      resumedCount > 0
-        ? [...resumedMessagesRef.current, ...newMessages.slice(resumedCount)]
-        : newMessages,
-    );
-    setUsage((prev) => addUsage(prev, result.usage));
-    setIterations(result.iterations);
+  const handleResult = useCallback(
+    (result: AgentResult | PendingResult | PlanResult) => {
+      threadRef.current = result.thread;
+      const newMessages = eventsToChatMessages(result.thread.events);
+      // Prepend resumed display messages so they stay visible, but skip the
+      // events that came from the seeded thread (they'll be in newMessages too).
+      const resumedCount = resumedMessagesRef.current.length;
+      setMessages(
+        resumedCount > 0
+          ? [...resumedMessagesRef.current, ...newMessages.slice(resumedCount)]
+          : newMessages,
+      );
+      setUsage((prev) => addUsage(prev, result.usage));
+      setIterations(result.iterations);
 
-    // Persist only NEW messages to session log (skip already-logged ones)
-    const alreadyLogged = loggedMessageCountRef.current;
-    const messagesToLog = newMessages.slice(alreadyLogged);
-    loggedMessageCountRef.current = newMessages.length;
-    for (const msg of messagesToLog) {
-      if (msg.role === "user") continue; // user messages logged at submit time
-      appendSession({
-        timestamp: new Date().toISOString(),
-        role: msg.role,
-        content: msg.content,
-        ...(msg.toolName ? { toolName: msg.toolName } : {}),
-        ...(msg.toolArgs ? { toolArgs: msg.toolArgs } : {}),
-        ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
-      });
-    }
+      // Persist only NEW messages to session log (skip already-logged ones)
+      const alreadyLogged = loggedMessageCountRef.current;
+      const messagesToLog = newMessages.slice(alreadyLogged);
+      loggedMessageCountRef.current = newMessages.length;
+      for (const msg of messagesToLog) {
+        if (msg.role === "user") continue; // user messages logged at submit time
+        appendSession({
+          timestamp: new Date().toISOString(),
+          role: msg.role,
+          content: msg.content,
+          model: options.modelLabel,
+          provider: options.provider,
+          ...(msg.toolName ? { toolName: msg.toolName } : {}),
+          ...(msg.toolArgs ? { toolArgs: msg.toolArgs } : {}),
+          ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
+        });
+      }
 
-    if (isPlanResult(result)) {
-      setPlan(result.plan);
-      setPendingUiState(null);
-      setStatus("done");
-    } else if (isPendingResult(result)) {
-      const planEvent = [...result.thread.events].reverse().find((e) => e.type === "plan");
-      const nextPlan = planEvent?.type === "plan" ? planEvent.content : null;
-      const req =
-        result.thread.events
-          .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
-          .pop() ?? null;
+      if (isPlanResult(result)) {
+        setPlan(result.plan);
+        setPendingUiState(null);
+        setStatus("done");
+      } else if (isPendingResult(result)) {
+        const planEvent = [...result.thread.events].reverse().find((e) => e.type === "plan");
+        const nextPlan = planEvent?.type === "plan" ? planEvent.content : null;
+        const req =
+          result.thread.events
+            .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
+            .pop() ?? null;
 
-      setPlan(req?.kind === "plan_review" ? nextPlan : null);
-      pendingRef.current = result;
-      setPendingUiState(buildPendingUiState(req, req?.kind === "plan_review" ? nextPlan : null));
-      setStatus("pending_input");
-    } else if (result.stopReason === "max_errors") {
-      const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
-      setError(new Error(detail));
-      setPendingUiState(null);
-      setStatus("error");
-    } else {
-      setPendingUiState(null);
-      setStatus("done");
-    }
-  }, []);
+        setPlan(req?.kind === "plan_review" ? nextPlan : null);
+        pendingRef.current = result;
+        setPendingUiState(buildPendingUiState(req, req?.kind === "plan_review" ? nextPlan : null));
+        setStatus("pending_input");
+      } else if (result.stopReason === "max_errors") {
+        const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
+        setError(new Error(detail));
+        setPendingUiState(null);
+        setStatus("error");
+      } else {
+        setPendingUiState(null);
+        setStatus("done");
+      }
+    },
+    [options.modelLabel, options.provider],
+  );
 
   const handleError = useCallback((err: unknown) => {
     setError(err instanceof Error ? err : new Error(String(err)));

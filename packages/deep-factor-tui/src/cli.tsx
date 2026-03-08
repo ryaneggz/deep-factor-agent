@@ -3,9 +3,15 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import meow from "meow";
 
-// Load env: ~/.deepfactor/.env first (global), then local .env (overrides)
-config({ path: join(homedir(), ".deepfactor", ".env") });
-config();
+let didLoadEnv = false;
+
+function loadEnv(): void {
+  if (didLoadEnv) return;
+  didLoadEnv = true;
+  // Load env: ~/.deepfactor/.env first (global), then local .env (overrides)
+  config({ path: join(homedir(), ".deepfactor", ".env") });
+  config();
+}
 
 const cli = meow(
   `
@@ -13,7 +19,8 @@ const cli = meow(
     $ deepfactor [prompt]
 
   Options
-    --model, -m      Model identifier (default: gpt-4.1-mini)
+    --provider       Provider: langchain, claude (default: langchain)
+    --model, -m      Model identifier (default depends on provider)
     --max-iter, -i   Maximum agent iterations (default: 10)
     --mode           Execution mode: plan, approve, yolo (default: yolo)
     --sandbox, -s    Sandbox mode: workspace (default), local, docker
@@ -23,7 +30,9 @@ const cli = meow(
   Examples
     $ deepfactor
     $ deepfactor "Explain how React hooks work"
+    $ deepfactor --provider claude
     $ deepfactor -p "What is 2+2?"
+    $ deepfactor --provider claude -p "What is 2+2?"
     $ deepfactor -p "List files in the current directory"
     $ deepfactor -s local "Run system commands"
     $ cat PROMPT.md | deepfactor -p
@@ -36,7 +45,6 @@ const cli = meow(
       model: {
         type: "string",
         shortFlag: "m",
-        default: "gpt-4.1-mini",
       },
       maxIter: {
         type: "number",
@@ -51,6 +59,9 @@ const cli = meow(
         type: "string",
         shortFlag: "s",
         default: "workspace",
+      },
+      provider: {
+        type: "string",
       },
       print: {
         type: "boolean",
@@ -67,6 +78,7 @@ const cli = meow(
 
 import type { SandboxMode } from "./tools/bash.js";
 import type { AgentMode } from "deep-factor-agent";
+import { DEFAULT_MODELS, DEFAULT_PROVIDER, normalizeProvider } from "./types.js";
 
 const validSandboxModes = ["workspace", "local", "docker"] as const;
 const sandboxMode = cli.flags.sandbox as SandboxMode;
@@ -82,6 +94,20 @@ if (!validModes.includes(mode)) {
   process.stderr.write(`Error: Invalid mode "${cli.flags.mode}". Use: plan, approve, yolo\n`);
   process.exit(1);
 }
+if (cli.flags.provider === "codex") {
+  process.stderr.write('Error: Provider "codex" is not supported yet. Coming soon.\n');
+  process.exit(1);
+}
+const providerFlag = normalizeProvider(cli.flags.provider);
+if (cli.flags.provider && !providerFlag) {
+  process.stderr.write(`Error: Invalid provider "${cli.flags.provider}". Use: langchain, claude\n`);
+  process.exit(1);
+}
+
+const hasProviderFlag = process.argv.includes("--provider");
+const hasModelFlag = process.argv.includes("--model") || process.argv.includes("-m");
+let provider = providerFlag ?? DEFAULT_PROVIDER;
+let model = cli.flags.model ?? DEFAULT_MODELS[provider];
 
 let prompt = cli.input.join(" ") || undefined;
 
@@ -101,10 +127,15 @@ if (cli.flags.print) {
     process.exit(1);
   }
 
+  if (provider === "langchain") {
+    loadEnv();
+  }
+
   const { runPrintMode } = await import("./print.js");
   await runPrintMode({
     prompt,
-    model: cli.flags.model,
+    provider,
+    model,
     maxIter: cli.flags.maxIter,
     sandbox: sandboxMode,
     mode,
@@ -114,8 +145,13 @@ if (cli.flags.print) {
   const React = await import("react");
   const { render } = await import("ink");
   const { TuiApp } = await import("./app.js");
-  const { getSessionId, loadSession, getLatestSessionId, buildThreadFromSession } =
-    await import("./session-logger.js");
+  const {
+    getSessionId,
+    loadSession,
+    getLatestSessionId,
+    buildThreadFromSession,
+    resolveSessionSettings,
+  } = await import("./session-logger.js");
 
   // Handle --resume flag: bare --resume or -r means "last", otherwise use provided ID
   const hasResumeFlag = process.argv.includes("--resume") || process.argv.includes("-r");
@@ -146,13 +182,25 @@ if (cli.flags.print) {
       ...(entry.toolCallId ? { toolCallId: entry.toolCallId } : {}),
     }));
     resumeThread = buildThreadFromSession(entries);
+    ({ provider, model } = resolveSessionSettings({
+      entries,
+      hasProviderFlag,
+      providerFlag,
+      hasModelFlag,
+      modelFlag: cli.flags.model,
+    }));
     process.stderr.write(`Resuming session: ${resumeId}\n`);
+  }
+
+  if (provider === "langchain") {
+    loadEnv();
   }
 
   const instance = render(
     React.createElement(TuiApp, {
       prompt,
-      model: cli.flags.model,
+      provider,
+      model,
       maxIter: cli.flags.maxIter,
       sandbox: sandboxMode,
       parallelToolCalls: true,

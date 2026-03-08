@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Static } from "ink";
+import type { DeepFactorAgentSettings } from "deep-factor-agent";
 import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
 import { LiveSection } from "./components/LiveSection.js";
 import { TranscriptTurn } from "./components/TranscriptTurn.js";
 import { createBashTool } from "./tools/bash.js";
+import { resolveProviderModel } from "./provider-resolution.js";
 import type { TuiAppProps } from "./types.js";
 import type {
   AgentTools,
@@ -30,6 +32,7 @@ function formatPendingSubmission(submission: PendingSubmission): string {
 
 export function TuiApp({
   prompt,
+  provider,
   model,
   maxIter,
   sandbox,
@@ -41,6 +44,10 @@ export function TuiApp({
   const hasRun = useRef(false);
 
   const tools: AgentTools = [createBashTool(sandbox)];
+  const resolvedModel = useMemo<DeepFactorAgentSettings["model"]>(
+    () => resolveProviderModel({ provider, model, mode }),
+    [provider, model, mode],
+  );
 
   const {
     messages,
@@ -53,42 +60,51 @@ export function TuiApp({
     submitPendingInput,
     pendingUiState,
   } = useAgent({
-    model,
+    model: resolvedModel,
+    modelLabel: model,
     maxIter,
     tools,
     parallelToolCalls,
     mode,
+    provider,
     initialMessages: resumeMessages,
     initialThread: resumeThread,
   });
 
-  // Send initial prompt on mount if provided
+  const handleSubmit = useCallback(
+    (value: string) => {
+      appendSession({
+        timestamp: new Date().toISOString(),
+        role: "user",
+        content: value,
+        model,
+        provider,
+      });
+      sendPrompt(value);
+    },
+    [model, provider, sendPrompt],
+  );
+
+  const handlePendingSubmit = useCallback(
+    (submission: PendingSubmission) => {
+      appendSession({
+        timestamp: new Date().toISOString(),
+        role: "user",
+        content: formatPendingSubmission(submission),
+        model,
+        provider,
+      });
+      submitPendingInput(submission);
+    },
+    [model, provider, submitPendingInput],
+  );
+
   useEffect(() => {
     if (prompt && !hasRun.current) {
       hasRun.current = true;
-      sendPrompt(prompt);
+      handleSubmit(prompt);
     }
-  }, [prompt, sendPrompt]);
-
-  const handleSubmit = (value: string) => {
-    appendSession({
-      timestamp: new Date().toISOString(),
-      role: "user",
-      content: value,
-      model,
-    });
-    sendPrompt(value);
-  };
-
-  const handlePendingSubmit = (submission: PendingSubmission) => {
-    appendSession({
-      timestamp: new Date().toISOString(),
-      role: "user",
-      content: formatPendingSubmission(submission),
-      model,
-    });
-    submitPendingInput(submission);
-  };
+  }, [handleSubmit, prompt]);
 
   const transcriptTurns: TranscriptTurnData[] = useMemo(
     () => groupMessagesIntoTurns(messages),
@@ -100,7 +116,7 @@ export function TuiApp({
 
   return (
     <>
-      <Header model={model} />
+      <Header provider={provider} model={model} />
       <Static items={staticTurns}>{(turn) => <TranscriptTurn key={turn.id} turn={turn} />}</Static>
       {activeTurn && <TranscriptTurn turn={activeTurn} />}
       <LiveSection

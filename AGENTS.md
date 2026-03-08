@@ -52,6 +52,17 @@
 - Tool adapter utilities in `packages/deep-factor-agent/src/tool-adapter.ts` (createLangChainTool, findToolByName, toolArrayToMap)
 - Tests in `packages/deep-factor-agent/__tests__/*.test.ts`
 
+### Provider Codebase Patterns
+
+- Providers live in `packages/deep-factor-agent/src/providers/` and implement `ModelAdapter`
+- LangChain-native models can still be passed directly as `BaseChatModel` instances or string IDs
+- CLI-backed providers include `claude-cli.ts` and `codex-cli.ts`
+- Claude Agent SDK support lives in `packages/deep-factor-agent/src/providers/claude-agent-sdk.ts`
+- Claude Agent SDK is an optional peer dependency and is loaded dynamically at runtime
+- Claude Agent SDK message conversion splits `SystemMessage` content into `systemPrompt` and serializes the remaining conversation into a prompt string
+- Claude Agent SDK response parsing maps SDK content blocks back into `AIMessage`, `tool_calls`, and usage metadata
+- Provider-specific tests live under `packages/deep-factor-agent/__tests__/providers/`
+
 ### TUI Codebase Patterns
 
 - Entry point: `packages/deep-factor-tui/src/cli.tsx` (meow + ink.render)

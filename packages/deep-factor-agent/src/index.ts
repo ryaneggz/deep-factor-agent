@@ -94,3 +94,26 @@ export { createClaudeCliProvider } from "./providers/claude-cli.js";
 export type { ClaudeCliProviderOptions } from "./providers/claude-cli.js";
 export { createCodexCliProvider } from "./providers/codex-cli.js";
 export type { CodexCliProviderOptions } from "./providers/codex-cli.js";
+export {
+  createClaudeAgentSdkProvider,
+  extractSystemPrompt,
+  convertMessagesToPrompt,
+  convertMessages,
+  parseResponseText,
+  parseToolUseBlocks,
+  parseUsageMetadata,
+  throwOnSdkError,
+  parseSdkResponse,
+  formatToolDefinitions,
+} from "./providers/claude-agent-sdk.js";
+export type {
+  ClaudeAgentSdkProviderOptions,
+  ConvertedMessages,
+  SdkTextBlock,
+  SdkToolUseBlock,
+  SdkContentBlock,
+  SdkUsage,
+  SdkResponseMessage,
+  SdkErrorType,
+  SdkErrorResult,
+} from "./providers/claude-agent-sdk.js";

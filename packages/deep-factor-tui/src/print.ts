@@ -6,9 +6,12 @@ import {
 } from "deep-factor-agent";
 import type { AgentResult, PendingResult, PlanResult, AgentMode } from "deep-factor-agent";
 import { createBashTool, type SandboxMode } from "./tools/bash.js";
+import { resolveProviderModel } from "./provider-resolution.js";
+import type { ProviderType } from "./types.js";
 
 export interface PrintModeOptions {
   prompt: string;
+  provider: ProviderType;
   model: string;
   maxIter: number;
   sandbox: SandboxMode;
@@ -16,13 +19,14 @@ export interface PrintModeOptions {
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<void> {
-  const { prompt, model, maxIter, sandbox, mode } = options;
+  const { prompt, provider, model, maxIter, sandbox, mode } = options;
 
   try {
     const tools = [createBashTool(sandbox)];
+    const resolvedModel = resolveProviderModel({ provider, model, mode });
 
     const agent = createDeepFactorAgent({
-      model,
+      model: resolvedModel,
       tools,
       stopWhen: [maxIterations(maxIter)],
       interruptOn: [],

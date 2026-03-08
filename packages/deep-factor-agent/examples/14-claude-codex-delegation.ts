@@ -7,8 +7,8 @@
  * into the prompt, and tool calls are parsed from JSON code blocks in the
  * CLI response.
  *
- * This is a non-interactive, single-shot example. Token usage will show
- * zeros since CLI providers don't expose usage_metadata.
+ * This is a non-interactive, single-shot example. Claude CLI responses now
+ * expose usage metadata; other CLI-backed providers may still report zeros.
  *
  * Usage:
  *   npx tsx examples/14-claude-codex-delegation.ts
@@ -148,13 +148,13 @@ async function main() {
     }
   }
 
-  // Token usage (will be zeros for CLI providers — expected)
+  // Token usage
   console.log(`\nToken usage:`);
   console.log(`  Input:  ${result.usage.inputTokens}`);
   console.log(`  Output: ${result.usage.outputTokens}`);
   console.log(`  Total:  ${result.usage.totalTokens}`);
   if (result.usage.inputTokens === 0) {
-    console.log("  (Zeros expected — CLI providers don't expose usage_metadata)");
+    console.log("  (Zero usage means the selected CLI provider did not return usage metadata)");
   }
 }
 

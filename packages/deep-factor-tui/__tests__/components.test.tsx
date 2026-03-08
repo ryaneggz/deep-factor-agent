@@ -22,13 +22,14 @@ const zeroUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 
 // ---------------------------------------------------------------------------
 describe("Header", () => {
   it("renders the title", () => {
-    const { lastFrame } = render(<Header model="gpt-4" />);
+    const { lastFrame } = render(<Header provider="langchain" model="gpt-4" />);
     expect(lastFrame()).toContain("Deep Factor TUI");
   });
 
-  it("renders the model name", () => {
-    const { lastFrame } = render(<Header model="claude-sonnet" />);
-    expect(lastFrame()).toContain("claude-sonnet");
+  it("renders the provider and model", () => {
+    const { lastFrame } = render(<Header provider="claude" model="sonnet" />);
+    expect(lastFrame()).toContain("claude");
+    expect(lastFrame()).toContain("sonnet");
   });
 });
 
