@@ -17,6 +17,7 @@ export function createDeepFactorAgent<
     interruptOn: settings.interruptOn ?? [],
     contextMode: settings.contextMode ?? "standard",
     parallelToolCalls: settings.parallelToolCalls ?? false,
+    mode: settings.mode ?? "yolo",
     contextManagement: {
       maxContextTokens: 150000,
       keepRecentIterations: 3,

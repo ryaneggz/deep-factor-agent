@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DeepFactorAgent, addUsage } from "../src/agent.js";
 import { maxIterations } from "../src/stop-conditions.js";
 import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "../src/human-in-the-loop.js";
-import { isPendingResult } from "../src/types.js";
+import { isPendingResult, isPlanResult } from "../src/types.js";
+import { createLangChainTool } from "../src/tool-adapter.js";
 import { tool } from "@langchain/core/tools";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { z } from "zod";
@@ -1339,6 +1340,248 @@ describe("DeepFactorAgent", () => {
       expect(toolResultEvents.length).toBe(2);
       expect(String(toolResultEvents[0].result)).toBe("safe_result");
       expect(String(toolResultEvents[1].result)).toContain("Waiting for human input");
+    });
+  });
+
+  describe("execution modes", () => {
+    it("plan mode returns PendingResult then PlanResult on approve", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("<proposed_plan>\n# Plan\n\nImplement feature.\n</proposed_plan>"),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "plan",
+      });
+
+      const result = await agent.loop("Plan the work");
+      expect(isPendingResult(result)).toBe(true);
+      if (isPendingResult(result)) {
+        const approved = await result.resume({ decision: "approve" });
+        expect(isPlanResult(approved)).toBe(true);
+        if (isPlanResult(approved)) {
+          expect(approved.stopReason).toBe("plan_completed");
+          expect(approved.plan).not.toContain("<proposed_plan>");
+          expect(approved.plan).toContain("# Plan");
+        }
+      }
+    });
+
+    it("plan mode plan content has no XML tags", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("<proposed_plan>\n# My Plan\n\nStep 1.\n</proposed_plan>"),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "plan",
+      });
+
+      const result = await agent.loop("Plan something");
+      expect(isPendingResult(result)).toBe(true);
+      if (isPendingResult(result)) {
+        // The plan event should have clean content
+        const planEvent = result.thread.events.find((e) => e.type === "plan");
+        expect(planEvent?.type).toBe("plan");
+        if (planEvent?.type === "plan") {
+          expect(planEvent.content).not.toContain("<proposed_plan>");
+          expect(planEvent.content).not.toContain("</proposed_plan>");
+          expect(planEvent.content).toContain("# My Plan");
+        }
+      }
+    });
+
+    it("plan mode does not duplicate the final plan as both assistant message and plan event", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("<proposed_plan>\n# Plan\n\nImplement feature.\n</proposed_plan>"),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "plan",
+      });
+
+      const result = await agent.loop("Plan the work");
+      expect(isPendingResult(result)).toBe(true);
+      const assistantMessages = result.thread.events.filter(
+        (event) => event.type === "message" && event.role === "assistant",
+      );
+      const planEvents = result.thread.events.filter((event) => event.type === "plan");
+
+      expect(assistantMessages).toHaveLength(0);
+      expect(planEvents).toHaveLength(1);
+    });
+
+    it("plan mode rejection returns AgentResult", async () => {
+      const mockModel = makeMockModel();
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("<proposed_plan>\n# Plan\n\nStep 1.\n</proposed_plan>"),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "plan",
+      });
+
+      const result = await agent.loop("Plan the work");
+      expect(isPendingResult(result)).toBe(true);
+      if (isPendingResult(result)) {
+        const rejected = await result.resume({ decision: "reject" });
+        expect(isPlanResult(rejected)).toBe(false);
+        expect(isPendingResult(rejected)).toBe(false);
+        expect(rejected.stopReason).toBe("completed");
+        expect((rejected as any).stopDetail).toBe("Plan rejected by user");
+      }
+    });
+
+    it("plan mode revision cycle produces a revised plan", async () => {
+      const mockModel = makeMockModel();
+      // First plan
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("<proposed_plan>\n# Plan v1\n\nOriginal steps.\n</proposed_plan>"),
+      );
+      // Revised plan after feedback
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("<proposed_plan>\n# Plan v2\n\nRevised steps.\n</proposed_plan>"),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "plan",
+      });
+
+      const result = await agent.loop("Plan something");
+      expect(isPendingResult(result)).toBe(true);
+      if (isPendingResult(result)) {
+        // Request revision
+        const revised = await result.resume({ decision: "edit", response: "Add more detail" });
+        expect(isPendingResult(revised)).toBe(true);
+        if (isPendingResult(revised)) {
+          // Approve revised plan
+          const approved = await revised.resume({ decision: "approve" });
+          expect(isPlanResult(approved)).toBe(true);
+          if (isPlanResult(approved)) {
+            expect(approved.plan).toContain("Plan v2");
+          }
+        }
+      }
+    });
+
+    it("plan mode denies mutating tools", async () => {
+      const mockModel = makeMockModel();
+      const writeTool = createLangChainTool("write_file", {
+        description: "Writes a file",
+        schema: z.object({ path: z.string() }),
+        execute: async () => "wrote file",
+      });
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [{ name: "write_file", args: { path: "a.txt" }, id: "tc_write" }],
+          }),
+        )
+        .mockResolvedValueOnce(
+          makeAIMessage("<proposed_plan>\n# Plan\n\nUse read-only steps.\n</proposed_plan>"),
+        );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "plan",
+        tools: [writeTool],
+      });
+
+      const result = await agent.loop("Plan and maybe write");
+      const toolResults = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(String(toolResults[0].result)).toContain("blocked in plan mode");
+      expect(isPendingResult(result)).toBe(true);
+    });
+
+    it("approve mode pauses on mutating tools", async () => {
+      const mockModel = makeMockModel();
+      const writeTool = createLangChainTool("write_file", {
+        description: "Writes a file",
+        schema: z.object({ path: z.string() }),
+        execute: async () => "wrote file",
+      });
+      mockModel.invoke.mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [{ name: "write_file", args: { path: "a.txt" }, id: "tc_write" }],
+        }),
+      );
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "approve",
+        tools: [writeTool],
+      });
+
+      const result = await agent.loop("Write a file");
+      expect(isPendingResult(result)).toBe(true);
+      if (isPendingResult(result)) {
+        const request = result.thread.events.find((e) => e.type === "human_input_requested");
+        expect(request?.type).toBe("human_input_requested");
+        if (request?.type === "human_input_requested") {
+          expect(request.kind).toBe("approval");
+          expect(request.choices).toEqual(["approve", "reject", "edit"]);
+        }
+      }
+    });
+
+    it("approve mode allows read-only tools to run", async () => {
+      const mockModel = makeMockModel();
+      const readTool = createLangChainTool("read_file", {
+        description: "Reads a file",
+        schema: z.object({ path: z.string() }),
+        execute: async () => "file contents",
+        metadata: { mutatesState: false },
+      });
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [{ name: "read_file", args: { path: "a.txt" }, id: "tc_read" }],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "approve",
+        tools: [readTool],
+      });
+
+      const result = await agent.loop("Read a file");
+      expect(result.stopReason).toBe("completed");
+      const toolResults = result.thread.events.filter((e) => e.type === "tool_result");
+      expect(String(toolResults[0].result)).toBe("file contents");
+    });
+
+    it("yolo mode executes mutating tools immediately", async () => {
+      const mockModel = makeMockModel();
+      const writeTool = createLangChainTool("write_file", {
+        description: "Writes a file",
+        schema: z.object({ path: z.string() }),
+        execute: async () => "wrote file",
+      });
+      mockModel.invoke
+        .mockResolvedValueOnce(
+          makeAIMessage("", {
+            tool_calls: [{ name: "write_file", args: { path: "a.txt" }, id: "tc_write" }],
+          }),
+        )
+        .mockResolvedValueOnce(makeAIMessage("Done"));
+
+      const agent = new DeepFactorAgent({
+        model: mockModel,
+        mode: "yolo",
+        tools: [writeTool],
+      });
+
+      const result = await agent.loop("Write immediately");
+      expect(result.stopReason).toBe("completed");
+      expect(result.thread.events.some((e) => e.type === "human_input_requested")).toBe(false);
     });
   });
 });

@@ -5,11 +5,13 @@ import {
   TOOL_NAME_REQUEST_HUMAN_INPUT,
   maxIterations,
   isPendingResult,
+  isPlanResult,
   addUsage,
 } from "deep-factor-agent";
 import type {
   AgentResult,
   PendingResult,
+  PlanResult,
   TokenUsage,
   HumanInputRequestedEvent,
   AgentEvent,
@@ -25,15 +27,32 @@ import type {
 
 export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
+  // Collect tool_call IDs whose results contain "blocked in plan mode" so we can skip both
+  const blockedToolCallIds = new Set<string>();
+  for (const event of events) {
+    if (
+      event.type === "tool_result" &&
+      typeof event.result === "string" &&
+      event.result.includes("blocked in plan mode")
+    ) {
+      blockedToolCallIds.add(event.toolCallId);
+    }
+  }
+
   for (const event of events) {
     switch (event.type) {
       case "message":
+        if (event.role === "user" && event.content.includes("Plan mode requires exactly one")) {
+          break; // skip plan-mode retry prompts
+        }
         if (event.role === "user" || event.role === "assistant") {
-          messages.push({ role: event.role, content: event.content });
+          messages.push({ id: `msg-${messages.length}`, role: event.role, content: event.content });
         }
         break;
       case "tool_call":
+        if (blockedToolCallIds.has(event.toolCallId)) break;
         messages.push({
+          id: `msg-${messages.length}`,
           role: "tool_call",
           content: event.toolName,
           toolName: event.toolName,
@@ -41,7 +60,9 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
         });
         break;
       case "tool_result":
+        if (blockedToolCallIds.has(event.toolCallId)) break;
         messages.push({
+          id: `msg-${messages.length}`,
           role: "tool_result",
           content: String(event.result),
           durationMs: event.durationMs,
@@ -64,18 +85,40 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   const [iterations, setIterations] = useState(0);
   const [error, setError] = useState<Error | null>(null);
   const [humanInputRequest, setHumanInputRequest] = useState<HumanInputRequestedEvent | null>(null);
+  const [plan, setPlan] = useState<string | null>(null);
 
   const pendingRef = useRef<PendingResult | null>(null);
   const threadRef = useRef<AgentThread | null>(null);
 
-  const handleResult = useCallback((result: AgentResult | PendingResult) => {
+  const handleResult = useCallback((result: AgentResult | PendingResult | PlanResult) => {
     threadRef.current = result.thread;
     const newMessages = eventsToChatMessages(result.thread.events);
     setMessages(newMessages);
     setUsage((prev) => addUsage(prev, result.usage));
     setIterations(result.iterations);
 
-    if (isPendingResult(result)) {
+    if (isPlanResult(result)) {
+      setPlan(result.plan);
+      setStatus("done");
+    } else if (
+      isPendingResult(result) &&
+      result.thread.events.some(
+        (e) => e.type === "human_input_requested" && e.kind === "plan_review",
+      )
+    ) {
+      // Plan review pending — extract plan content from the plan event
+      const planEvent = result.thread.events.find((e) => e.type === "plan");
+      if (planEvent?.type === "plan") {
+        setPlan(planEvent.content);
+      }
+      pendingRef.current = result;
+      const req =
+        result.thread.events
+          .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
+          .pop() ?? null;
+      setHumanInputRequest(req);
+      setStatus("pending_input");
+    } else if (isPendingResult(result)) {
       pendingRef.current = result;
       const req =
         result.thread.events
@@ -101,6 +144,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     (prompt: string) => {
       setStatus("running");
       setError(null);
+      setPlan(null);
       setHumanInputRequest(null);
       pendingRef.current = null;
 
@@ -112,6 +156,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         stopWhen: [maxIterations(options.maxIter)],
         interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
         parallelToolCalls: options.parallelToolCalls ?? true,
+        mode: options.mode ?? "yolo",
       });
 
       const existingThread = threadRef.current;
@@ -126,13 +171,14 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       options.maxIter,
       options.tools,
       options.parallelToolCalls,
+      options.mode,
       handleResult,
       handleError,
     ],
   );
 
   const submitHumanInput = useCallback(
-    (response: string) => {
+    (input: string | { decision?: "approve" | "reject" | "edit"; response?: string }) => {
       const pending = pendingRef.current;
       if (!pending) return;
 
@@ -140,7 +186,24 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       setHumanInputRequest(null);
       pendingRef.current = null;
 
-      pending.resume(response).then(handleResult).catch(handleError);
+      // Translate plain-string input for plan_review
+      const currentReq = pending.thread.events
+        .filter((e): e is HumanInputRequestedEvent => e.type === "human_input_requested")
+        .pop();
+      let resumeInput: string | { decision?: "approve" | "reject" | "edit"; response?: string } =
+        input;
+      if (currentReq?.kind === "plan_review" && typeof input === "string") {
+        const lower = input.trim().toLowerCase();
+        if (lower === "approve") {
+          resumeInput = { decision: "approve" };
+        } else if (lower === "reject") {
+          resumeInput = { decision: "reject" };
+        } else {
+          resumeInput = { decision: "edit", response: input };
+        }
+      }
+
+      pending.resume(resumeInput).then(handleResult).catch(handleError);
     },
     [handleResult, handleError],
   );
@@ -151,6 +214,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     usage,
     iterations,
     error,
+    plan,
     sendPrompt,
     submitHumanInput,
     humanInputRequest,

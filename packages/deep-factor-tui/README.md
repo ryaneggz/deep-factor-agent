@@ -73,6 +73,7 @@ node dist/cli.js --bash "List all TypeScript files in this directory"
 Options
   --model, -m      Model identifier (default: gpt-4.1-mini)
   --max-iter, -i   Maximum agent iterations (default: 10)
+  --mode           Execution mode: plan, approve, yolo (default: yolo)
   --sandbox, -s    Sandbox mode: workspace (default), local, docker
   --print, -p      Non-interactive print mode (output answer to stdout)
 ```
@@ -82,6 +83,12 @@ Options
 ```bash
 # Use a different model with more iterations
 deepfactor -m gpt-4.1 -i 20 "Summarize this project"
+
+# Planning mode
+deepfactor --mode plan "Plan a refactor for this repo"
+
+# Approval-gated writes
+deepfactor --mode approve "Make the requested code changes"
 
 # Local sandbox (full system access)
 deepfactor -s local "What OS is this?"

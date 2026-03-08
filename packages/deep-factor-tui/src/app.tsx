@@ -1,14 +1,17 @@
-import React, { useEffect, useRef } from "react";
-import { Box } from "ink";
+import React, { useEffect, useRef, useMemo } from "react";
+import { Static, Box, Text } from "ink";
 import { useAgent } from "./hooks/useAgent.js";
-import { Header } from "./components/Header.js";
-import { Content } from "./components/Content.js";
-import { Footer } from "./components/Footer.js";
+import { LiveSection } from "./components/LiveSection.js";
+import { MessageBubble } from "./components/MessageBubble.js";
 import { createBashTool } from "./tools/bash.js";
 import type { TuiAppProps } from "./types.js";
-import type { AgentTools } from "./types.js";
+import type { AgentTools, ChatMessage } from "./types.js";
 
-export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls }: TuiAppProps) {
+type StaticItem =
+  | { type: "header"; id: string; model: string }
+  | { type: "message"; id: string; message: ChatMessage };
+
+export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls, mode }: TuiAppProps) {
   const hasRun = useRef(false);
 
   const tools: AgentTools = [createBashTool(sandbox)];
@@ -19,10 +22,11 @@ export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls }: T
     usage,
     iterations,
     error,
+    plan,
     sendPrompt,
     submitHumanInput,
     humanInputRequest,
-  } = useAgent({ model, maxIter, tools, parallelToolCalls });
+  } = useAgent({ model, maxIter, tools, parallelToolCalls, mode });
 
   // Send initial prompt on mount if provided
   useEffect(() => {
@@ -40,16 +44,38 @@ export function TuiApp({ prompt, model, maxIter, sandbox, parallelToolCalls }: T
     }
   };
 
+  const staticItems: StaticItem[] = useMemo(() => {
+    const items: StaticItem[] = [{ type: "header", id: "header", model }];
+    for (const msg of messages) {
+      items.push({ type: "message", id: msg.id, message: msg });
+    }
+    return items;
+  }, [messages, model]);
+
   return (
-    <Box flexDirection="column" flexGrow={1}>
-      <Header model={model} status={status} />
-      <Content
-        messages={messages}
+    <>
+      <Static items={staticItems}>
+        {(item) => {
+          if (item.type === "header") {
+            return (
+              <Box key={item.id} gap={2}>
+                <Text bold>Deep Factor TUI</Text>
+                <Text dimColor>Model: {item.model}</Text>
+              </Box>
+            );
+          }
+          return <MessageBubble key={item.id} message={item.message} />;
+        }}
+      </Static>
+      <LiveSection
         status={status}
         error={error}
+        plan={plan}
         humanInputRequest={humanInputRequest}
+        usage={usage}
+        iterations={iterations}
+        onSubmit={handleSubmit}
       />
-      <Footer usage={usage} iterations={iterations} status={status} onSubmit={handleSubmit} />
-    </Box>
+    </>
   );
 }

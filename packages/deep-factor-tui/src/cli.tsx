@@ -15,6 +15,7 @@ const cli = meow(
   Options
     --model, -m      Model identifier (default: gpt-4.1-mini)
     --max-iter, -i   Maximum agent iterations (default: 10)
+    --mode           Execution mode: plan, approve, yolo (default: yolo)
     --sandbox, -s    Sandbox mode: workspace (default), local, docker
     --print, -p      Non-interactive print mode (output answer to stdout)
 
@@ -39,6 +40,10 @@ const cli = meow(
         shortFlag: "i",
         default: 10,
       },
+      mode: {
+        type: "string",
+        default: "yolo",
+      },
       sandbox: {
         type: "string",
         shortFlag: "s",
@@ -54,13 +59,20 @@ const cli = meow(
 );
 
 import type { SandboxMode } from "./tools/bash.js";
+import type { AgentMode } from "deep-factor-agent";
 
 const validSandboxModes = ["workspace", "local", "docker"] as const;
 const sandboxMode = cli.flags.sandbox as SandboxMode;
+const validModes = ["plan", "approve", "yolo"] as const;
+const mode = cli.flags.mode as AgentMode;
 if (!validSandboxModes.includes(sandboxMode)) {
   process.stderr.write(
     `Error: Invalid sandbox mode "${cli.flags.sandbox}". Use: workspace, local, docker\n`,
   );
+  process.exit(1);
+}
+if (!validModes.includes(mode)) {
+  process.stderr.write(`Error: Invalid mode "${cli.flags.mode}". Use: plan, approve, yolo\n`);
   process.exit(1);
 }
 
@@ -88,23 +100,24 @@ if (cli.flags.print) {
     model: cli.flags.model,
     maxIter: cli.flags.maxIter,
     sandbox: sandboxMode,
+    mode,
   });
 } else {
-  // TUI mode: fullscreen interactive
+  // TUI mode: inline interactive
   const React = await import("react");
-  const { withFullScreen } = await import("fullscreen-ink");
+  const { render } = await import("ink");
   const { TuiApp } = await import("./app.js");
 
-  const ink = withFullScreen(
+  const instance = render(
     React.createElement(TuiApp, {
       prompt,
       model: cli.flags.model,
       maxIter: cli.flags.maxIter,
       sandbox: sandboxMode,
       parallelToolCalls: true,
+      mode,
     }),
   );
 
-  await ink.start();
-  await ink.waitUntilExit();
+  await instance.waitUntilExit();
 }

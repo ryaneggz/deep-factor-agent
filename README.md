@@ -15,6 +15,7 @@ A TypeScript library for building loop-based AI agents with middleware, verifica
 - **Completion verification** — optionally verify the agent actually finished the task
 - **Middleware** — inject tools and lifecycle hooks (built-in: todo tracking, error recovery)
 - **Human-in-the-loop** — pause execution, collect human input, and resume
+- **Execution modes** — `plan`, `approve`, and `yolo` for planning-only, approval-gated, or unrestricted runs
 - **Context management** — automatic summarization when the context window fills up
 - **Streaming** — stream the first LLM turn for real-time UIs
 - **Universal model support** — string-based model IDs (`"openai:gpt-4.1-mini"`) or `BaseChatModel` instances
@@ -42,6 +43,7 @@ import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 // String-based model ID (universal — requires provider package installed)
 const agent = createDeepFactorAgent({
   model: "openai:gpt-4.1-mini",
+  mode: "yolo",
   instructions: "You are a helpful assistant.",
   stopWhen: [maxIterations(5)],
 });
@@ -73,10 +75,30 @@ import { createDeepFactorAgent } from "deep-factor-agent";
 
 const agent = createDeepFactorAgent({
   model: "openai:gpt-4.1-mini",
+  mode: "plan",
+  instructions: "Inspect the repo and return a proposed plan only.",
+});
+
+const result = await agent.loop("Plan the refactor.");
+
+if ("mode" in result && result.mode === "plan") {
+  console.log(result.plan);
+}
+```
+
+### Approval-gated execution
+
+```typescript
+const agent = createDeepFactorAgent({
+  model: "openai:gpt-4.1-mini",
+  mode: "approve",
 });
 
 const result = await agent.loop("Hello!");
-console.log(result.response);
+if (result.stopReason === "human_input_needed") {
+  const final = await result.resume({ decision: "edit", response: "Change fewer files." });
+  console.log("response" in final ? final.response : final.plan);
+}
 ```
 
 All other settings use sensible defaults — see the [Defaults table](#defaults) below.
@@ -249,6 +271,7 @@ When using `createDeepFactorAgent`, unspecified settings receive these defaults:
 | `middleware`                             | `[todoMiddleware(), errorRecoveryMiddleware()]` |
 | `interruptOn`                            | `[]` (no interruptions)                         |
 | `maxToolCallsPerIteration`               | `20`                                            |
+| `mode`                                   | `"yolo"`                                        |
 | `contextManagement.maxContextTokens`     | `150000`                                        |
 | `contextManagement.keepRecentIterations` | `3`                                             |
 
