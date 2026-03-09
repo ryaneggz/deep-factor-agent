@@ -2,6 +2,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
 import type { UseAgentReturn } from "../src/types.js";
+import type { AgentThread } from "deep-factor-agent";
 import type { TokenUsage } from "deep-factor-agent";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,19 @@ vi.mock("../src/session-logger.js", () => ({
 // Import after mocks are set up
 const { TuiApp } = await import("../src/app.js");
 
+async function flush(): Promise<void> {
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+const resumeThread: AgentThread = {
+  id: "resume-thread",
+  events: [],
+  metadata: {},
+  createdAt: 1,
+  updatedAt: 1,
+};
+
 function renderApp(overrides?: Partial<UseAgentReturn>) {
   if (overrides) {
     mockUseAgent = { ...mockUseAgent, ...overrides };
@@ -83,9 +97,7 @@ describe("TuiApp integration", () => {
   it("renders live section in idle state", () => {
     const { lastFrame } = renderApp();
     const frame = lastFrame()!;
-    // Live section shows status line and input bar
-    expect(frame).toContain("idle");
-    expect(frame).toContain("Tokens:");
+    expect(frame).toContain("• bypass permissions");
     expect(frame).toContain(">");
   });
 
@@ -218,6 +230,136 @@ describe("TuiApp integration", () => {
     expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
       model: "sonnet",
       permissionMode: "plan",
+      disableBuiltInTools: true,
+      outputFormat: "stream-json",
+      verbose: true,
+      includePartialMessages: true,
+    });
+  });
+
+  it("cycles modes with Shift+Tab in the idle composer and re-resolves Claude permissions", async () => {
+    const { stdin, lastFrame } = render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+    );
+
+    expect(lastFrame()).toContain("• plan mode (shift+tab to cycle)");
+
+    stdin.write("\u001b[Z");
+    await flush();
+    expect(lastFrame()).toContain("• approvals required (shift+tab to cycle)");
+
+    stdin.write("\u001b[Z");
+    await flush();
+    expect(lastFrame()).toContain("• bypass permissions (shift+tab to cycle)");
+
+    stdin.write("\u001b[Z");
+    await flush();
+    expect(lastFrame()).toContain("• plan mode (shift+tab to cycle)");
+
+    expect(createClaudeCliProviderMock.mock.calls.map(([args]) => args.permissionMode)).toEqual([
+      "plan",
+      "acceptEdits",
+      "bypassPermissions",
+      "plan",
+    ]);
+    expect(useAgentMock.mock.calls.map(([args]) => args.mode)).toEqual([
+      "plan",
+      "approve",
+      "yolo",
+      "plan",
+    ]);
+  });
+
+  it("ignores Shift+Tab while running", async () => {
+    mockUseAgent = { ...mockUseAgent, status: "running" };
+
+    const { stdin, lastFrame } = render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+    );
+
+    stdin.write("\u001b[Z");
+    await flush();
+
+    expect(createClaudeCliProviderMock).toHaveBeenCalledTimes(1);
+    expect(lastFrame()).toContain("• plan mode");
+  });
+
+  it("ignores Shift+Tab while pending input is active", async () => {
+    mockUseAgent = {
+      ...mockUseAgent,
+      status: "pending_input",
+      pendingUiState: {
+        kind: "plan_review",
+        title: "Plan Review",
+        question: "Review this plan",
+        plan: "# Plan\n\nShip it.",
+        actions: ["approve", "reject", "edit"],
+      },
+    };
+
+    const { stdin, lastFrame } = render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+    );
+
+    stdin.write("\u001b[Z");
+    await flush();
+
+    expect(createClaudeCliProviderMock).toHaveBeenCalledTimes(1);
+    expect(lastFrame()).toContain("• plan mode");
+  });
+
+  it("ignores Shift+Tab while the hotkey menu is open", async () => {
+    const { stdin, lastFrame } = render(
+      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+    );
+
+    stdin.write("\x1f");
+    await flush();
+    expect(lastFrame()).toContain("Keyboard Shortcuts");
+    expect(lastFrame()).not.toContain("shift+tab to cycle");
+
+    stdin.write("\u001b[Z");
+    await flush();
+
+    expect(lastFrame()).toContain("• plan mode");
+    expect(lastFrame()).not.toContain("• approvals required");
+  });
+
+  it("does not restore a previously toggled mode on resume", async () => {
+    const firstRender = render(
+      <TuiApp
+        provider="claude"
+        model="sonnet"
+        maxIter={10}
+        sandbox="workspace"
+        resumeMessages={[{ id: "resume-0", role: "assistant", content: "Earlier reply" }]}
+        resumeThread={resumeThread}
+      />,
+    );
+
+    firstRender.stdin.write("\u001b[Z");
+    await flush();
+    expect(firstRender.lastFrame()).toContain("• plan mode (shift+tab to cycle)");
+    firstRender.unmount();
+
+    createClaudeCliProviderMock.mockClear();
+    useAgentMock.mockClear();
+
+    const secondRender = render(
+      <TuiApp
+        provider="claude"
+        model="sonnet"
+        maxIter={10}
+        sandbox="workspace"
+        resumeMessages={[{ id: "resume-0", role: "assistant", content: "Earlier reply" }]}
+        resumeThread={resumeThread}
+      />,
+    );
+
+    expect(secondRender.lastFrame()).toContain("• bypass permissions (shift+tab to cycle)");
+    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
+      model: "sonnet",
+      permissionMode: "bypassPermissions",
       disableBuiltInTools: true,
       outputFormat: "stream-json",
       verbose: true,

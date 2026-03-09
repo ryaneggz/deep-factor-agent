@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Static } from "ink";
-import type { DeepFactorAgentSettings } from "deep-factor-agent";
+import type { AgentMode, DeepFactorAgentSettings } from "deep-factor-agent";
 import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
 import { LiveSection } from "./components/LiveSection.js";
@@ -42,11 +42,12 @@ export function TuiApp({
   resumeThread,
 }: TuiAppProps) {
   const hasRun = useRef(false);
+  const [activeMode, setActiveMode] = useState<AgentMode>(mode ?? "yolo");
 
   const tools: AgentTools = [createBashTool(sandbox)];
   const resolvedModel = useMemo<DeepFactorAgentSettings["model"]>(
-    () => resolveProviderModel({ provider, model, mode, liveUpdates: true }),
-    [provider, model, mode],
+    () => resolveProviderModel({ provider, model, mode: activeMode, liveUpdates: true }),
+    [provider, model, activeMode],
   );
 
   const {
@@ -65,11 +66,24 @@ export function TuiApp({
     maxIter,
     tools,
     parallelToolCalls,
-    mode,
+    mode: activeMode,
     provider,
     initialMessages: resumeMessages,
     initialThread: resumeThread,
   });
+
+  const handleCycleMode = useCallback(() => {
+    setActiveMode((currentMode) => {
+      switch (currentMode) {
+        case "plan":
+          return "approve";
+        case "approve":
+          return "yolo";
+        case "yolo":
+          return "plan";
+      }
+    });
+  }, []);
 
   const handleSubmit = useCallback(
     (value: string) => {
@@ -120,6 +134,7 @@ export function TuiApp({
       <Static items={staticTurns}>{(turn) => <TranscriptTurn key={turn.id} turn={turn} />}</Static>
       {activeTurn && <TranscriptTurn turn={activeTurn} />}
       <LiveSection
+        mode={activeMode}
         status={status}
         error={error}
         plan={plan}
@@ -128,6 +143,7 @@ export function TuiApp({
         iterations={iterations}
         onPromptSubmit={handleSubmit}
         onPendingSubmit={handlePendingSubmit}
+        onCycleMode={handleCycleMode}
       />
     </>
   );

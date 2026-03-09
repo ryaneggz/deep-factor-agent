@@ -50,6 +50,31 @@ function isSyntheticUserMessage(content: string): boolean {
   );
 }
 
+function extractJsonFence(content: string): string | null {
+  const match = /^\s*```json\s*\n?([\s\S]*?)\n?```\s*$/.exec(content);
+  return match?.[1] ?? null;
+}
+
+export function isToolCallEnvelopeMessage(content: string): boolean {
+  const fencedJson = extractJsonFence(content);
+  if (!fencedJson) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(fencedJson) as { tool_calls?: unknown };
+    return Array.isArray(parsed.tool_calls);
+  } catch {
+    return false;
+  }
+}
+
+export function filterDisplayMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.filter(
+    (message) => !(message.role === "assistant" && isToolCallEnvelopeMessage(message.content)),
+  );
+}
+
 function formatHumanInputReceived(event: HumanInputReceivedEvent): string {
   if (event.decision === "approve") {
     return "approve";
@@ -219,14 +244,14 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
   const applyThreadSnapshot = useCallback((thread: AgentThread): ChatMessage[] => {
     threadRef.current = thread;
-    const newMessages = eventsToChatMessages(thread.events);
+    const rawMessages = eventsToChatMessages(thread.events);
     const resumedCount = resumedMessagesRef.current.length;
-    setMessages(
+    const displayMessages =
       resumedCount > 0
-        ? [...resumedMessagesRef.current, ...newMessages.slice(resumedCount)]
-        : newMessages,
-    );
-    return newMessages;
+        ? [...resumedMessagesRef.current, ...rawMessages.slice(resumedCount)]
+        : rawMessages;
+    setMessages(filterDisplayMessages(displayMessages));
+    return rawMessages;
   }, []);
 
   const handleUpdate = useCallback(

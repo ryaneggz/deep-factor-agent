@@ -2,6 +2,7 @@ import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { Header } from "../src/components/Header.js";
+import { HotkeyMenu } from "../src/components/HotkeyMenu.js";
 import { StatusLine } from "../src/components/StatusLine.js";
 import { LiveSection } from "../src/components/LiveSection.js";
 import { PendingInputPanel } from "../src/components/PendingInputPanel.js";
@@ -37,23 +38,27 @@ describe("Header", () => {
 // StatusLine
 // ---------------------------------------------------------------------------
 describe("StatusLine", () => {
-  it("renders token counts", () => {
-    const usage: TokenUsage = { inputTokens: 100, outputTokens: 50, totalTokens: 150 };
-    const { lastFrame } = render(<StatusLine usage={usage} iterations={3} status="done" />);
+  it("renders the compact mode row", () => {
+    const { lastFrame } = render(
+      <StatusLine mode="plan" usage={zeroUsage} iterations={0} status="idle" canCycleMode={true} />,
+    );
+
     const frame = lastFrame()!;
-    expect(frame).toContain("150");
-    expect(frame).toContain("100");
-    expect(frame).toContain("50");
+    expect(frame).toContain("• plan mode");
+    expect(frame).toContain("shift+tab to cycle");
+    expect(frame).toContain("Ctrl+/ shortcuts");
+    expect(frame).not.toContain("idle");
   });
 
-  it("renders iterations", () => {
-    const { lastFrame } = render(<StatusLine usage={zeroUsage} iterations={7} status="running" />);
-    expect(lastFrame()).toContain("7");
-  });
+  it("renders the compact secondary status row only when useful", () => {
+    const usage: TokenUsage = { inputTokens: 100, outputTokens: 50, totalTokens: 150 };
+    const { lastFrame } = render(
+      <StatusLine mode="approve" usage={usage} iterations={3} status="done" canCycleMode={false} />,
+    );
 
-  it("renders status text", () => {
-    const { lastFrame } = render(<StatusLine usage={zeroUsage} iterations={0} status="idle" />);
-    expect(lastFrame()).toContain("idle");
+    const frame = lastFrame()!;
+    expect(frame).toContain("• approvals required");
+    expect(frame).toContain("done · 150 tok · 3 iter");
   });
 });
 
@@ -254,9 +259,12 @@ describe("TranscriptTurn", () => {
     expect(frame).toContain("Bash(date)");
     expect(frame).toContain("11ms");
     expect(frame).toContain("Sun Mar 8 09:28:54 MDT 2026");
-    expect(frame).toContain("... +1 more lines");
+    expect(frame).toContain("... +1 lines");
     expect(frame).toContain("Current system time is Sun Mar 8 09:28:54 MDT 2026.");
-    expect(frame).toContain("|");
+    expect(frame).toContain("• Bash(date)");
+    expect(frame).toContain("└ Sun Mar 8 09:28:54 MDT 2026");
+    expect(frame).toContain("• Current system time is Sun Mar 8 09:28:54 MDT 2026.");
+    expect(frame).not.toContain("|");
   });
 
   it("renders carryover activity without a user row", () => {
@@ -283,6 +291,7 @@ describe("InputBar", () => {
   it("renders with a border", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="idle"
         error={null}
         plan={null}
@@ -291,6 +300,7 @@ describe("InputBar", () => {
         iterations={0}
         onPromptSubmit={() => {}}
         onPendingSubmit={() => {}}
+        onCycleMode={() => {}}
       />,
     );
     const frame = lastFrame()!;
@@ -298,9 +308,10 @@ describe("InputBar", () => {
     expect(frame).toMatch(/[╭╮╰╯│─]/);
   });
 
-  it("shows Alt+Enter hint", () => {
+  it("does not render the old always-on composer hint line", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="idle"
         error={null}
         plan={null}
@@ -309,14 +320,16 @@ describe("InputBar", () => {
         iterations={0}
         onPromptSubmit={() => {}}
         onPendingSubmit={() => {}}
+        onCycleMode={() => {}}
       />,
     );
-    expect(lastFrame()).toContain("Alt+Enter for newline");
+    expect(lastFrame()).not.toContain("Alt+Enter for newline");
   });
 
-  it("shows Ctrl+/ shortcut hint", () => {
+  it("shows the compact footer under the composer", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="idle"
         error={null}
         plan={null}
@@ -325,9 +338,19 @@ describe("InputBar", () => {
         iterations={0}
         onPromptSubmit={() => {}}
         onPendingSubmit={() => {}}
+        onCycleMode={() => {}}
       />,
     );
-    expect(lastFrame()).toContain("Ctrl+/ for shortcuts");
+    const frame = lastFrame()!;
+    expect(frame).toContain("• plan mode (shift+tab to cycle)");
+    expect(frame).toContain("Ctrl+/ shortcuts");
+  });
+});
+
+describe("HotkeyMenu", () => {
+  it("lists Shift+Tab", () => {
+    const { lastFrame } = render(<HotkeyMenu />);
+    expect(lastFrame()).toContain("Shift+Tab");
   });
 });
 
@@ -340,6 +363,7 @@ describe("LiveSection", () => {
   it('shows "Thinking..." when running', () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="running"
         error={null}
         plan={null}
@@ -348,6 +372,7 @@ describe("LiveSection", () => {
         iterations={0}
         onPromptSubmit={noop}
         onPendingSubmit={() => {}}
+        onCycleMode={noop}
       />,
     );
     expect(lastFrame()).toContain("Thinking...");
@@ -356,6 +381,7 @@ describe("LiveSection", () => {
   it("shows error message", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="approve"
         status="error"
         error={new Error("something broke")}
         plan={null}
@@ -364,14 +390,18 @@ describe("LiveSection", () => {
         iterations={0}
         onPromptSubmit={noop}
         onPendingSubmit={() => {}}
+        onCycleMode={noop}
       />,
     );
-    expect(lastFrame()).toContain("something broke");
+    const frame = lastFrame()!;
+    expect(frame).toContain("something broke");
+    expect(frame).toContain("• approvals required");
   });
 
   it("shows pending panel actions for plan review", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="pending_input"
         error={null}
         plan={"# Plan\n\nShip it."}
@@ -386,6 +416,7 @@ describe("LiveSection", () => {
         iterations={0}
         onPromptSubmit={noop}
         onPendingSubmit={() => {}}
+        onCycleMode={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -399,6 +430,7 @@ describe("LiveSection", () => {
   it("shows InputBar when idle", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="idle"
         error={null}
         plan={null}
@@ -407,6 +439,7 @@ describe("LiveSection", () => {
         iterations={0}
         onPromptSubmit={noop}
         onPendingSubmit={() => {}}
+        onCycleMode={noop}
       />,
     );
     expect(lastFrame()).toContain(">");
@@ -415,6 +448,7 @@ describe("LiveSection", () => {
   it("hides InputBar when running", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="running"
         error={null}
         plan={null}
@@ -423,6 +457,7 @@ describe("LiveSection", () => {
         iterations={0}
         onPromptSubmit={noop}
         onPendingSubmit={() => {}}
+        onCycleMode={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -431,10 +466,11 @@ describe("LiveSection", () => {
     expect(hasInputPrompt).toBe(false);
   });
 
-  it("renders StatusLine with usage info", () => {
+  it("shows the compact secondary row when usage or iterations are present", () => {
     const usage: TokenUsage = { inputTokens: 10, outputTokens: 5, totalTokens: 15 };
     const { lastFrame } = render(
       <LiveSection
+        mode="yolo"
         status="idle"
         error={null}
         plan={null}
@@ -443,16 +479,39 @@ describe("LiveSection", () => {
         iterations={2}
         onPromptSubmit={noop}
         onPendingSubmit={() => {}}
+        onCycleMode={noop}
       />,
     );
     const frame = lastFrame()!;
-    expect(frame).toContain("15");
-    expect(frame).toContain("2");
+    expect(frame).toContain("• bypass permissions");
+    expect(frame).toContain("idle · 15 tok · 2 iter");
+  });
+
+  it("shows only the primary footer row in idle state with no usage or iterations", () => {
+    const { lastFrame } = render(
+      <LiveSection
+        mode="plan"
+        status="idle"
+        error={null}
+        plan={null}
+        pendingUiState={null}
+        usage={zeroUsage}
+        iterations={0}
+        onPromptSubmit={noop}
+        onPendingSubmit={() => {}}
+        onCycleMode={noop}
+      />,
+    );
+
+    const frame = lastFrame()!;
+    expect(frame).toContain("• plan mode (shift+tab to cycle)");
+    expect(frame).not.toContain("idle ·");
   });
 
   it("hides the global input while a decision panel is active", () => {
     const { lastFrame } = render(
       <LiveSection
+        mode="plan"
         status="pending_input"
         error={null}
         plan={"# Plan\n\nShip it."}
@@ -467,6 +526,7 @@ describe("LiveSection", () => {
         iterations={0}
         onPromptSubmit={noop}
         onPendingSubmit={() => {}}
+        onCycleMode={noop}
       />,
     );
 

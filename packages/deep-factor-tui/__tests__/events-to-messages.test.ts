@@ -1,6 +1,10 @@
 import type { AgentEvent } from "deep-factor-agent";
 import { describe, expect, it } from "vitest";
-import { eventsToChatMessages } from "../src/hooks/useAgent.js";
+import {
+  eventsToChatMessages,
+  filterDisplayMessages,
+  isToolCallEnvelopeMessage,
+} from "../src/hooks/useAgent.js";
 
 describe("eventsToChatMessages", () => {
   it("surfaces error events as tool_result messages", () => {
@@ -71,5 +75,35 @@ describe("eventsToChatMessages", () => {
       parallelGroup: "pg-1",
       durationMs: 12,
     });
+  });
+
+  it("detects and filters pure assistant JSON tool-call envelopes from display only", () => {
+    const jsonEnvelope = [
+      "```json",
+      '{"tool_calls":[{"id":"tool-1","name":"bash","args":{"command":"pwd"}}]}',
+      "```",
+    ].join("\n");
+    const messages = eventsToChatMessages([
+      {
+        type: "message",
+        role: "assistant",
+        content: jsonEnvelope,
+        timestamp: 1,
+        iteration: 1,
+      },
+      {
+        type: "message",
+        role: "assistant",
+        content: "Working on it.",
+        timestamp: 2,
+        iteration: 1,
+      },
+    ]);
+
+    expect(isToolCallEnvelopeMessage(jsonEnvelope)).toBe(true);
+    expect(messages).toHaveLength(2);
+    expect(filterDisplayMessages(messages)).toEqual([
+      { id: "msg-1", role: "assistant", content: "Working on it." },
+    ]);
   });
 });

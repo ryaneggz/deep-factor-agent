@@ -4,6 +4,7 @@ import { Box, Text } from "ink";
 const shortcuts = [
   { keys: "Alt+Enter", description: "Insert newline" },
   { keys: "Enter", description: "Submit message" },
+  { keys: "Shift+Tab", description: "Cycle mode" },
   { keys: "Ctrl+/", description: "Show shortcuts" },
   { keys: "Esc", description: "Dismiss menu" },
   { keys: "Backspace", description: "Delete character" },

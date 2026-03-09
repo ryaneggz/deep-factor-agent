@@ -8,11 +8,14 @@ interface TextInputKey {
   backspace?: boolean;
   delete?: boolean;
   ctrl?: boolean;
+  tab?: boolean;
+  shift?: boolean;
 }
 
 interface UseTextInputOptions {
   onSubmit: (value: string) => void;
   onHotkeyMenu?: () => void;
+  onCycleMode?: () => void;
   onEscape?: () => void;
   isActive?: boolean;
   onKeyPress?: (inputChar: string, key: TextInputKey, currentValue: string) => boolean | void;
@@ -32,28 +35,54 @@ interface UseTextInputReturn {
 export function useTextInput({
   onSubmit,
   onHotkeyMenu,
+  onCycleMode,
   onEscape,
   isActive = true,
   onKeyPress,
 }: UseTextInputOptions): UseTextInputReturn {
   const [input, setInput] = useState("");
   const inputRef = useRef("");
+  const onSubmitRef = useRef(onSubmit);
+  const onHotkeyMenuRef = useRef(onHotkeyMenu);
+  const onCycleModeRef = useRef(onCycleMode);
+  const onEscapeRef = useRef(onEscape);
+  const onKeyPressRef = useRef(onKeyPress);
+  const isActiveRef = useRef(isActive);
+
+  // Synchronous ref sync is intentional — useInput callbacks must read the
+  // latest values on the same render tick (useEffect would introduce staleness).
+  // eslint-disable-next-line react-hooks/refs
+  onSubmitRef.current = onSubmit;
+  // eslint-disable-next-line react-hooks/refs
+  onHotkeyMenuRef.current = onHotkeyMenu;
+  // eslint-disable-next-line react-hooks/refs
+  onCycleModeRef.current = onCycleMode;
+  // eslint-disable-next-line react-hooks/refs
+  onEscapeRef.current = onEscape;
+  // eslint-disable-next-line react-hooks/refs
+  onKeyPressRef.current = onKeyPress;
+  // eslint-disable-next-line react-hooks/refs
+  isActiveRef.current = isActive;
 
   useInput((inputChar, key) => {
-    if (!isActive) {
+    if (!isActiveRef.current) {
       return;
     }
-    if (onKeyPress?.(inputChar, key, inputRef.current)) {
+    if (key.tab && key.shift) {
+      onCycleModeRef.current?.();
+      return;
+    }
+    if (onKeyPressRef.current?.(inputChar, key, inputRef.current)) {
       return;
     }
     // Ctrl+/ sends \x1f (Unit Separator) in most terminals
-    if (inputChar === "\x1f" && onHotkeyMenu) {
-      onHotkeyMenu();
+    if (inputChar === "\x1f" && onHotkeyMenuRef.current) {
+      onHotkeyMenuRef.current();
       return;
     }
     // Escape key
-    if (key.escape && onEscape) {
-      onEscape();
+    if (key.escape && onEscapeRef.current) {
+      onEscapeRef.current();
       return;
     }
     // Alt+Enter inserts a newline
@@ -66,7 +95,7 @@ export function useTextInput({
     if (key.return) {
       const current = inputRef.current.trim();
       if (current.length > 0) {
-        onSubmit(current);
+        onSubmitRef.current(current);
         inputRef.current = "";
         setInput("");
       }

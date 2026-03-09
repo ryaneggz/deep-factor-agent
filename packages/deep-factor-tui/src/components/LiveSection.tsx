@@ -1,13 +1,14 @@
 import React, { useState, useCallback } from "react";
 import { Box, Text } from "ink";
+import type { AgentMode, TokenUsage } from "deep-factor-agent";
 import { StatusLine } from "./StatusLine.js";
 import { InputBar } from "./InputBar.js";
 import { HotkeyMenu } from "./HotkeyMenu.js";
 import { PendingInputPanel } from "./PendingInputPanel.js";
-import type { TokenUsage } from "deep-factor-agent";
 import type { AgentStatus, PendingSubmission, PendingUiState } from "../types.js";
 
 interface LiveSectionProps {
+  mode: AgentMode;
   status: AgentStatus;
   error: Error | null;
   plan: string | null;
@@ -16,9 +17,11 @@ interface LiveSectionProps {
   iterations: number;
   onPromptSubmit: (value: string) => void;
   onPendingSubmit: (submission: PendingSubmission) => void;
+  onCycleMode: () => void;
 }
 
 export function LiveSection({
+  mode,
   status,
   error,
   plan,
@@ -27,9 +30,11 @@ export function LiveSection({
   iterations,
   onPromptSubmit,
   onPendingSubmit,
+  onCycleMode,
 }: LiveSectionProps) {
   const showInput = (status === "idle" || status === "done") && pendingUiState == null;
   const [showHotkeyMenu, setShowHotkeyMenu] = useState(false);
+  const canCycleMode = showInput && !showHotkeyMenu;
 
   const handleHotkeyMenu = useCallback(() => {
     setShowHotkeyMenu((prev) => !prev);
@@ -74,10 +79,17 @@ export function LiveSection({
           onSubmit={onPromptSubmit}
           onHotkeyMenu={handleHotkeyMenu}
           onEscape={showHotkeyMenu ? handleEscape : undefined}
+          onCycleMode={canCycleMode ? onCycleMode : undefined}
         />
       )}
       {!showInput && showHotkeyMenu && <HotkeyMenu />}
-      <StatusLine usage={usage} iterations={iterations} status={status} />
+      <StatusLine
+        mode={mode}
+        usage={usage}
+        iterations={iterations}
+        status={status}
+        canCycleMode={canCycleMode}
+      />
     </Box>
   );
 }

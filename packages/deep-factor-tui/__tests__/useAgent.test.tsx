@@ -507,4 +507,114 @@ describe("useAgent", () => {
     });
     await flush();
   });
+
+  it("filters pure assistant JSON tool-call envelopes from display but still logs them", async () => {
+    let resolveLoop: ((result: AgentResult) => void) | undefined;
+    const jsonEnvelope = [
+      "```json",
+      '{"tool_calls":[{"id":"tool-1","name":"bash","args":{"command":"pwd"}}]}',
+      "```",
+    ].join("\n");
+    const userEvent: AgentEvent = {
+      type: "message",
+      role: "user",
+      content: "Inspect the repo",
+      timestamp: 1,
+      iteration: 0,
+    };
+    const envelopeEvent: AgentEvent = {
+      type: "message",
+      role: "assistant",
+      content: jsonEnvelope,
+      timestamp: 2,
+      iteration: 1,
+    };
+    const toolCallEvent: AgentEvent = {
+      type: "tool_call",
+      toolName: "bash",
+      toolCallId: "tool-1",
+      args: { command: "pwd" },
+      timestamp: 3,
+      iteration: 1,
+    };
+    const toolResultEvent: AgentEvent = {
+      type: "tool_result",
+      toolCallId: "tool-1",
+      result: "/workspace",
+      timestamp: 4,
+      iteration: 1,
+    };
+    const assistantEvent: AgentEvent = {
+      type: "message",
+      role: "assistant",
+      content: "Workspace inspected.",
+      timestamp: 5,
+      iteration: 1,
+    };
+    const completionEvent: AgentEvent = {
+      type: "completion",
+      result: "Workspace inspected.",
+      verified: false,
+      timestamp: 6,
+      iteration: 1,
+    };
+    const finalThread = makeThread([
+      userEvent,
+      envelopeEvent,
+      toolCallEvent,
+      toolResultEvent,
+      assistantEvent,
+      completionEvent,
+    ]);
+
+    createDeepFactorAgentMock.mockImplementation(
+      (settings: { onUpdate?: (update: AgentExecutionUpdate) => void }) => ({
+        loop: vi.fn(() => {
+          settings.onUpdate?.(makeUpdate(finalThread, zeroUsage, "done", completionEvent));
+
+          return new Promise<AgentResult>((resolve) => {
+            resolveLoop = resolve;
+          });
+        }),
+        continueLoop: vi.fn(),
+      }),
+    );
+
+    render(
+      <HookHarness
+        options={{
+          model: "sonnet",
+          modelLabel: "sonnet",
+          maxIter: 10,
+          provider: "claude",
+        }}
+      />,
+    );
+
+    stateRef.current?.sendPrompt("Inspect the repo");
+    await flush();
+
+    expect(stateRef.current?.messages.map((message) => message.content)).toEqual([
+      "Inspect the repo",
+      "bash",
+      "/workspace",
+      "Workspace inspected.",
+    ]);
+
+    resolveLoop?.({
+      response: "Workspace inspected.",
+      thread: finalThread,
+      usage: zeroUsage,
+      iterations: 1,
+      stopReason: "completed",
+    });
+    await flush();
+
+    expect(appendSessionMock.mock.calls.map(([entry]) => entry.content)).toEqual([
+      jsonEnvelope,
+      "bash",
+      "/workspace",
+      "Workspace inspected.",
+    ]);
+  });
 });

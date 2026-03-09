@@ -31,11 +31,16 @@ function ToolMetadata({
 
 export function TranscriptSegment({ segment }: TranscriptSegmentProps) {
   if (segment.kind === "assistant") {
+    const lines = segment.content.split("\n");
+
     return (
-      <Box>
-        <Text dimColor>| </Text>
-        <Text bold>- </Text>
-        <Text>{segment.content}</Text>
+      <Box flexDirection="column">
+        {lines.map((line, index) => (
+          <Box key={`${segment.id}-assistant-${index}`}>
+            <Text>{index === 0 ? "• " : "  "}</Text>
+            <Text>{line}</Text>
+          </Box>
+        ))}
       </Box>
     );
   }
@@ -45,19 +50,19 @@ export function TranscriptSegment({ segment }: TranscriptSegmentProps) {
   return (
     <Box flexDirection="column">
       <Box>
-        <Text dimColor>| </Text>
+        <Text>• </Text>
         <Text bold>{formatToolLabel(segment.toolName, segment.toolArgs)}</Text>
         <ToolMetadata durationMs={segment.durationMs} parallelGroup={segment.parallelGroup} />
       </Box>
       {preview?.lines.map((line, index) => (
         <Box key={`${segment.id}-result-${index}`}>
-          <Text dimColor>| </Text>
+          <Text dimColor>{index === 0 ? "  └ " : "    "}</Text>
           <Text>{line}</Text>
         </Box>
       ))}
       {preview && preview.overflowLineCount > 0 && (
         <Box>
-          <Text dimColor>| ... +{preview.overflowLineCount} more lines</Text>
+          <Text dimColor> ... +{preview.overflowLineCount} lines</Text>
         </Box>
       )}
     </Box>
