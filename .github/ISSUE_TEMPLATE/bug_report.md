@@ -6,6 +6,18 @@ labels: ["bug"]
 assignees: ""
 ---
 
+## Metadata
+
+> **IMPORTANT**: The very first step should _ALWAYS_ be validating this metadata section to maintain a **CLEAN** development workflow.
+
+```yml
+pull_request_title: "FROM fix/[issue#]-[shortdesc] TO master"
+branch: "fix/[issue#]-[shortdesc]"
+worktree_path: "$WORKSPACE/.worktrees/fix-[issue#]"
+```
+
+---
+
 ## User Impact
 
 - As a ..., I expect ..., but instead ...

@@ -6,6 +6,18 @@ labels: ["feature"]
 assignees: ""
 ---
 
+## Metadata
+
+> **IMPORTANT**: The very first step should _ALWAYS_ be validating this metadata section to maintain a **CLEAN** development workflow.
+
+```yml
+pull_request_title: "FROM feat/[issue#]-[shortdesc] TO master"
+branch: "feat/[issue#]-[shortdesc]"
+worktree_path: "$WORKSPACE/.worktrees/feat-[issue#]"
+```
+
+---
+
 ## User Stories
 
 - As a ..., I want ..., so that ...
