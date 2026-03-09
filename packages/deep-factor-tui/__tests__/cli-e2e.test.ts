@@ -41,10 +41,12 @@ describe("CLI e2e", () => {
     expect(result.stderr).toContain("requires a prompt");
   });
 
-  it("--help outputs usage text with --print, --sandbox, and codex provider help", async () => {
+  it("--help outputs usage text with --print, --complete, --complete-dir, and codex provider help", async () => {
     const result = await run(["--help"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("--print");
+    expect(output).toContain("--complete");
+    expect(output).toContain("--complete-dir");
     expect(output).toContain("--sandbox");
     expect(output).toContain("langchain, claude, codex");
     expect(output).not.toContain("--parallel");
@@ -76,5 +78,17 @@ describe("CLI e2e", () => {
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('Invalid provider "nope"');
     expect(result.stderr).toContain("langchain, claude, codex");
+  });
+
+  it("--complete-dir without --complete exits with a validation error", async () => {
+    const result = await run(["--complete-dir", "packages/deep-factor-tui/.ralph"]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain("--complete-dir can only be used with --complete");
+  });
+
+  it("--complete rejects a missing completion directory with a clear error", async () => {
+    const result = await run(["--complete", "--complete-dir", "does-not-exist"]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain("Completion directory does not exist");
   });
 });

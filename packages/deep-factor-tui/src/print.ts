@@ -1,12 +1,7 @@
-import {
-  createDeepFactorAgent,
-  maxIterations,
-  isPlanResult,
-  isPendingResult,
-} from "deep-factor-agent";
-import type { AgentResult, PendingResult, PlanResult, AgentMode } from "deep-factor-agent";
-import { createBashTool, type SandboxMode } from "./tools/bash.js";
-import { resolveProviderModel } from "./provider-resolution.js";
+import { isPlanResult } from "deep-factor-agent";
+import type { AgentMode } from "deep-factor-agent";
+import type { SandboxMode } from "./tools/bash.js";
+import { runHeadlessAgentToCompletion } from "./agent-runner.js";
 import type { ProviderType } from "./types.js";
 
 export interface PrintModeOptions {
@@ -22,25 +17,14 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
   const { prompt, provider, model, maxIter, sandbox, mode } = options;
 
   try {
-    const tools = [createBashTool(sandbox)];
-    const resolvedModel = resolveProviderModel({ provider, model, mode });
-
-    const agent = createDeepFactorAgent({
-      model: resolvedModel,
-      tools,
-      stopWhen: [maxIterations(maxIter)],
-      interruptOn: [],
-      parallelToolCalls: true,
+    const finalResult = await runHeadlessAgentToCompletion({
+      prompt,
+      provider,
+      model,
+      maxIter,
+      sandbox,
       mode,
     });
-
-    const result: AgentResult | PendingResult | PlanResult = await agent.loop(prompt);
-
-    // Plan mode now returns PendingResult — auto-approve in non-interactive print mode
-    let finalResult: AgentResult | PendingResult | PlanResult = result;
-    if (isPendingResult(finalResult) && mode === "plan") {
-      finalResult = await finalResult.resume({ decision: "approve" });
-    }
 
     if (finalResult.stopReason === "human_input_needed") {
       process.stderr.write("Error: Agent requested human input in non-interactive print mode.\n");

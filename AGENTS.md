@@ -66,11 +66,13 @@
 ### TUI Codebase Patterns
 
 - Entry point: `packages/deep-factor-tui/src/cli.tsx` (meow + ink.render)
+- Headless CLI modes live in `packages/deep-factor-tui/src/print.ts` and `packages/deep-factor-tui/src/complete.ts`, and they should share provider/tool setup through `packages/deep-factor-tui/src/agent-runner.ts`
 - App shell: `packages/deep-factor-tui/src/app.tsx` (<Static> for header/messages scrollback + <LiveSection> for active UI)
 - Agent hook: `packages/deep-factor-tui/src/hooks/useAgent.ts` (React state bridge)
 - Text input hook: `packages/deep-factor-tui/src/hooks/useTextInput.ts` (cursor input handling)
 - Components: `packages/deep-factor-tui/src/components/` (Header, LiveSection, MessageBubble, ToolCallBlock, InputBar, StatusLine)
 - Bash tool: `packages/deep-factor-tui/src/tools/bash.ts` (createBashTool factory, --sandbox flag: workspace|local|docker)
+- Completion mode resolves a Ralph workspace from `--complete-dir`, runs the agent from that workspace's parent directory, and prefers `CLAUDE.md` for the Claude provider or `PROMPT.md`/`prompt.md` for other providers
 - TUI types: `packages/deep-factor-tui/src/types.ts` (TuiAppProps, ChatMessage, AgentStatus)
 - Tests: `packages/deep-factor-tui/__tests__/` (components, integration, e2e)
 

@@ -25,6 +25,8 @@ const cli = meow(
     --mode           Execution mode: plan, approve, yolo (default: yolo)
     --sandbox, -s    Sandbox mode: workspace (default), local, docker
     --print, -p      Non-interactive print mode (output answer to stdout)
+    --complete       Non-interactive completion mode (load workflow from .ralph)
+    --complete-dir   Target Ralph workspace directory (default: ./.ralph)
     --resume, -r     Resume a previous session (optionally pass session ID)
 
   Examples
@@ -36,6 +38,8 @@ const cli = meow(
     $ deepfactor --provider claude -p "What is 2+2?"
     $ deepfactor --provider codex -p "What is 2+2?"
     $ deepfactor -p "List files in the current directory"
+    $ deepfactor --complete
+    $ deepfactor --complete --complete-dir packages/deep-factor-tui/.ralph
     $ deepfactor -s local "Run system commands"
     $ cat PROMPT.md | deepfactor -p
     $ deepfactor --resume
@@ -69,6 +73,13 @@ const cli = meow(
         type: "boolean",
         shortFlag: "p",
         default: false,
+      },
+      complete: {
+        type: "boolean",
+        default: false,
+      },
+      completeDir: {
+        type: "string",
       },
       resume: {
         type: "string",
@@ -110,6 +121,37 @@ let provider = providerFlag ?? DEFAULT_PROVIDER;
 let model = cli.flags.model ?? DEFAULT_MODELS[provider];
 
 let prompt = cli.input.join(" ") || undefined;
+
+if (cli.flags.completeDir && !cli.flags.complete) {
+  process.stderr.write("Error: --complete-dir can only be used with --complete.\n");
+  process.exit(1);
+}
+
+if (cli.flags.complete && cli.flags.print) {
+  process.stderr.write("Error: --complete cannot be used together with --print.\n");
+  process.exit(1);
+}
+
+if (cli.flags.complete && prompt) {
+  process.stderr.write("Error: --complete does not accept a prompt argument.\n");
+  process.exit(1);
+}
+
+if (cli.flags.complete) {
+  if (provider === "langchain") {
+    loadEnv();
+  }
+
+  const { runCompleteMode } = await import("./complete.js");
+  await runCompleteMode({
+    provider,
+    model,
+    maxIter: cli.flags.maxIter,
+    sandbox: sandboxMode,
+    mode,
+    completeDir: cli.flags.completeDir,
+  });
+}
 
 if (cli.flags.print) {
   // Print mode: non-interactive, headless agent

@@ -77,6 +77,8 @@ Options
   --mode           Execution mode: plan, approve, yolo (default: yolo)
   --sandbox, -s    Sandbox mode: workspace (default), local, docker
   --print, -p      Non-interactive print mode (output answer to stdout)
+  --complete       Non-interactive completion mode (load workflow from .ralph)
+  --complete-dir   Target Ralph workspace directory (default: ./.ralph)
 ```
 
 ### Examples
@@ -100,6 +102,12 @@ deepfactor
 # Print mode — non-interactive, outputs answer to stdout
 deepfactor -p "What is 2+2?"
 
+# Completion mode — non-interactive, loads prompt/state from ./.ralph
+deepfactor --complete
+
+# Target a package-local Ralph workspace without changing directories
+deepfactor --complete --complete-dir packages/deep-factor-tui/.ralph
+
 # Claude CLI provider using existing CLI auth
 deepfactor --provider claude -p "Reply with exactly: hello"
 
@@ -112,6 +120,22 @@ deepfactor -p -s local "List files in the current directory"
 # Pipe stdin in print mode
 cat PROMPT.md | deepfactor -p
 ```
+
+### Completion mode
+
+`--complete` is a headless workflow for Ralph-style workspaces. It does not accept a positional prompt. Instead, the CLI:
+
+1. Resolves the Ralph workspace from `--complete-dir` or `./.ralph`
+2. Creates `prd.json` and `progress.txt` if they are missing
+3. Validates that `prd.json` contains valid JSON
+4. Loads the workflow prompt from the Ralph workspace and runs the agent from the workspace parent directory
+
+Prompt resolution is explicit:
+
+- With `--provider claude`, the CLI prefers `CLAUDE.md`, then `PROMPT.md`, then `prompt.md`
+- With other providers, the CLI prefers `PROMPT.md`, then `prompt.md`, then `CLAUDE.md`
+
+If `prd.json.example` exists in the Ralph workspace, it is copied to `prd.json` on first run. Otherwise the CLI creates a minimal JSON stub. `progress.txt` is initialized with a Ralph progress header and then reused on later runs.
 
 ## Architecture
 
