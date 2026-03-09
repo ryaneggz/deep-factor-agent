@@ -23,6 +23,8 @@ let mockUseAgent: UseAgentReturn = {
 };
 const mockClaudeCliProvider = { invoke: vi.fn(), bindTools: vi.fn() };
 const createClaudeCliProviderMock = vi.fn(() => mockClaudeCliProvider);
+const mockCodexCliProvider = { invoke: vi.fn(), invokeWithUpdates: vi.fn(), bindTools: vi.fn() };
+const createCodexCliProviderMock = vi.fn(() => mockCodexCliProvider);
 const useAgentMock = vi.fn(() => mockUseAgent);
 
 vi.mock("../src/hooks/useAgent.js", () => ({
@@ -36,6 +38,7 @@ vi.mock("../src/tools/bash.js", () => ({
 
 vi.mock("deep-factor-agent", () => ({
   createClaudeCliProvider: createClaudeCliProviderMock,
+  createCodexCliProvider: createCodexCliProviderMock,
 }));
 
 const appendSessionMock = vi.fn();
@@ -74,6 +77,7 @@ describe("TuiApp integration", () => {
     appendSessionMock.mockReset();
     useAgentMock.mockClear();
     createClaudeCliProviderMock.mockClear();
+    createCodexCliProviderMock.mockClear();
   });
 
   it("renders live section in idle state", () => {
@@ -144,6 +148,7 @@ describe("TuiApp integration", () => {
     render(<TuiApp provider="langchain" model="gpt-4" maxIter={10} sandbox="workspace" />);
 
     expect(createClaudeCliProviderMock).not.toHaveBeenCalled();
+    expect(createCodexCliProviderMock).not.toHaveBeenCalled();
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: "langchain",
@@ -168,6 +173,24 @@ describe("TuiApp integration", () => {
         provider: "claude",
         model: mockClaudeCliProvider,
         modelLabel: "sonnet",
+      }),
+    );
+  });
+
+  it("resolves the Codex CLI provider once at startup in jsonl mode", () => {
+    render(<TuiApp provider="codex" model="gpt-5.4" maxIter={10} sandbox="workspace" />);
+
+    expect(createCodexCliProviderMock).toHaveBeenCalledWith({
+      model: "gpt-5.4",
+      outputFormat: "jsonl",
+      sandbox: "read-only",
+      skipGitRepoCheck: true,
+    });
+    expect(useAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "codex",
+        model: mockCodexCliProvider,
+        modelLabel: "gpt-5.4",
       }),
     );
   });

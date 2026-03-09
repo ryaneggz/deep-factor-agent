@@ -53,12 +53,6 @@ describe.skipIf(!hasClaudeAuth())("Claude CLI smoke", () => {
     expect(result.stdout.toLowerCase()).toContain("world");
   }, 30_000);
 
-  it("keeps codex explicitly unsupported", async () => {
-    const result = await run(["--provider", "codex", "-p", "test"]);
-    expect(result.code).not.toBe(0);
-    expect(result.stderr.toLowerCase()).toContain("coming soon");
-  });
-
   it("completes tool-requesting prompts without depending on Claude built-in tools", async () => {
     const result = await run(
       [

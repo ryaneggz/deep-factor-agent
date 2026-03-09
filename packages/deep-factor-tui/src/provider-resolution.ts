@@ -1,4 +1,4 @@
-import { createClaudeCliProvider } from "deep-factor-agent";
+import { createClaudeCliProvider, createCodexCliProvider } from "deep-factor-agent";
 import type { DeepFactorAgentSettings } from "deep-factor-agent";
 import type { AgentMode } from "deep-factor-agent";
 import type { ProviderType } from "./types.js";
@@ -29,18 +29,29 @@ export function resolveProviderModel(args: {
   liveUpdates?: boolean;
 }): DeepFactorAgentSettings["model"] {
   const { provider, model, mode, liveUpdates = false } = args;
-  return provider === "claude"
-    ? createClaudeCliProvider({
-        model,
-        permissionMode: resolveClaudePermissionMode(mode),
-        disableBuiltInTools: true,
-        ...(liveUpdates
-          ? {
-              outputFormat: "stream-json" as const,
-              verbose: true,
-              includePartialMessages: true,
-            }
-          : {}),
-      })
-    : model;
+  if (provider === "claude") {
+    return createClaudeCliProvider({
+      model,
+      permissionMode: resolveClaudePermissionMode(mode),
+      disableBuiltInTools: true,
+      ...(liveUpdates
+        ? {
+            outputFormat: "stream-json" as const,
+            verbose: true,
+            includePartialMessages: true,
+          }
+        : {}),
+    });
+  }
+
+  if (provider === "codex") {
+    return createCodexCliProvider({
+      model,
+      outputFormat: liveUpdates ? "jsonl" : "text",
+      sandbox: "read-only",
+      skipGitRepoCheck: true,
+    });
+  }
+
+  return model;
 }

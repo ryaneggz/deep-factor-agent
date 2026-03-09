@@ -415,4 +415,96 @@ describe("useAgent", () => {
     });
     await flush();
   });
+
+  it("streams Codex inline runs through the same update path as Claude", async () => {
+    let resolveLoop: ((result: AgentResult) => void) | undefined;
+    const assistantEvent: AgentEvent = {
+      type: "message",
+      role: "assistant",
+      content: "hello",
+      timestamp: 2,
+      iteration: 1,
+    };
+    const completionEvent: AgentEvent = {
+      type: "completion",
+      result: "hello",
+      verified: false,
+      timestamp: 3,
+      iteration: 1,
+    };
+    const finalThread = makeThread([
+      {
+        type: "message",
+        role: "user",
+        content: "Hello",
+        timestamp: 1,
+        iteration: 0,
+      },
+      assistantEvent,
+      completionEvent,
+    ]);
+
+    createDeepFactorAgentMock.mockImplementation(
+      (settings: { onUpdate?: (update: AgentExecutionUpdate) => void }) => ({
+        loop: vi.fn(() => {
+          settings.onUpdate?.(
+            makeUpdate(
+              makeThread(finalThread.events.slice(0, 2)),
+              { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+              "running",
+              assistantEvent,
+            ),
+          );
+          settings.onUpdate?.(
+            makeUpdate(
+              finalThread,
+              { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+              "done",
+              completionEvent,
+            ),
+          );
+
+          return new Promise<AgentResult>((resolve) => {
+            resolveLoop = resolve;
+          });
+        }),
+        continueLoop: vi.fn(),
+      }),
+    );
+
+    render(
+      <HookHarness
+        options={{
+          model: { invoke: vi.fn(), invokeWithUpdates: vi.fn(), bindTools: vi.fn() } as any,
+          modelLabel: "gpt-5.4",
+          maxIter: 10,
+          provider: "codex",
+        }}
+      />,
+    );
+
+    stateRef.current?.sendPrompt("Hello");
+    await flush();
+
+    expect(createDeepFactorAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        streamMode: "updates",
+        onUpdate: expect.any(Function),
+      }),
+    );
+    expect(stateRef.current?.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+    expect(stateRef.current?.usage).toEqual({ inputTokens: 5, outputTokens: 2, totalTokens: 7 });
+
+    resolveLoop?.({
+      response: "hello",
+      thread: finalThread,
+      usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+      iterations: 1,
+      stopReason: "completed",
+    });
+    await flush();
+  });
 });

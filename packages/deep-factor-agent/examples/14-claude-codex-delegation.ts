@@ -45,7 +45,7 @@ if (providerName !== "claude" && providerName !== "codex") {
 const provider =
   providerName === "claude"
     ? createClaudeCliProvider({ model: "sonnet" })
-    : createCodexCliProvider({ model: "o4-mini" });
+    : createCodexCliProvider({ model: "gpt-5.4" });
 
 console.log(`\n--- Example 14: CLI Provider Delegation (${providerName}) ---\n`);
 

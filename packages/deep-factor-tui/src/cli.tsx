@@ -19,7 +19,7 @@ const cli = meow(
     $ deepfactor [prompt]
 
   Options
-    --provider       Provider: langchain, claude (default: langchain)
+    --provider       Provider: langchain, claude, codex (default: langchain)
     --model, -m      Model identifier (default depends on provider)
     --max-iter, -i   Maximum agent iterations (default: 10)
     --mode           Execution mode: plan, approve, yolo (default: yolo)
@@ -31,8 +31,10 @@ const cli = meow(
     $ deepfactor
     $ deepfactor "Explain how React hooks work"
     $ deepfactor --provider claude
+    $ deepfactor --provider codex
     $ deepfactor -p "What is 2+2?"
     $ deepfactor --provider claude -p "What is 2+2?"
+    $ deepfactor --provider codex -p "What is 2+2?"
     $ deepfactor -p "List files in the current directory"
     $ deepfactor -s local "Run system commands"
     $ cat PROMPT.md | deepfactor -p
@@ -94,13 +96,11 @@ if (!validModes.includes(mode)) {
   process.stderr.write(`Error: Invalid mode "${cli.flags.mode}". Use: plan, approve, yolo\n`);
   process.exit(1);
 }
-if (cli.flags.provider === "codex") {
-  process.stderr.write('Error: Provider "codex" is not supported yet. Coming soon.\n');
-  process.exit(1);
-}
 const providerFlag = normalizeProvider(cli.flags.provider);
 if (cli.flags.provider && !providerFlag) {
-  process.stderr.write(`Error: Invalid provider "${cli.flags.provider}". Use: langchain, claude\n`);
+  process.stderr.write(
+    `Error: Invalid provider "${cli.flags.provider}". Use: langchain, claude, codex\n`,
+  );
   process.exit(1);
 }
 

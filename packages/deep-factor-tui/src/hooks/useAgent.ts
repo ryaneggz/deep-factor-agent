@@ -319,7 +319,10 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     setStatus("error");
   }, []);
 
-  const shouldStreamUpdates = options.provider === "langchain" || options.provider === "claude";
+  const shouldStreamUpdates =
+    options.provider === "langchain" ||
+    options.provider === "claude" ||
+    options.provider === "codex";
 
   const sendPrompt = useCallback(
     (prompt: string) => {

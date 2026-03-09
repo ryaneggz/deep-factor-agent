@@ -1,22 +1,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockLoop, mockCreateAgent, mockClaudeCliProvider, mockCreateClaudeCliProvider } =
-  vi.hoisted(() => {
-    const mockLoop = vi.fn();
-    const mockCreateAgent = vi.fn().mockReturnValue({ loop: mockLoop });
-    const mockClaudeCliProvider = { invoke: vi.fn(), bindTools: vi.fn() };
-    const mockCreateClaudeCliProvider = vi.fn(() => mockClaudeCliProvider);
-    return {
-      mockLoop,
-      mockCreateAgent,
-      mockClaudeCliProvider,
-      mockCreateClaudeCliProvider,
-    };
-  });
+const {
+  mockLoop,
+  mockCreateAgent,
+  mockClaudeCliProvider,
+  mockCreateClaudeCliProvider,
+  mockCodexCliProvider,
+  mockCreateCodexCliProvider,
+} = vi.hoisted(() => {
+  const mockLoop = vi.fn();
+  const mockCreateAgent = vi.fn().mockReturnValue({ loop: mockLoop });
+  const mockClaudeCliProvider = { invoke: vi.fn(), bindTools: vi.fn() };
+  const mockCreateClaudeCliProvider = vi.fn(() => mockClaudeCliProvider);
+  const mockCodexCliProvider = { invoke: vi.fn(), invokeWithUpdates: vi.fn(), bindTools: vi.fn() };
+  const mockCreateCodexCliProvider = vi.fn(() => mockCodexCliProvider);
+  return {
+    mockLoop,
+    mockCreateAgent,
+    mockClaudeCliProvider,
+    mockCreateClaudeCliProvider,
+    mockCodexCliProvider,
+    mockCreateCodexCliProvider,
+  };
+});
 
 vi.mock("deep-factor-agent", () => ({
   createDeepFactorAgent: mockCreateAgent,
   createClaudeCliProvider: mockCreateClaudeCliProvider,
+  createCodexCliProvider: mockCreateCodexCliProvider,
   maxIterations: vi.fn((n: number) => ({ name: "maxIterations", maxIter: n })),
   isPlanResult: vi.fn((result: { mode?: string }) => result.mode === "plan"),
   isPendingResult: vi.fn(
@@ -221,6 +232,33 @@ describe("runPrintMode", () => {
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({ model: mockClaudeCliProvider }),
+    );
+  });
+
+  it("resolves the Codex CLI provider before creating the agent in final-only mode", async () => {
+    mockLoop.mockResolvedValueOnce({
+      response: "4",
+      stopReason: "completed",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      iterations: 1,
+    });
+
+    await expect(
+      runPrintMode({
+        ...baseOptions,
+        provider: "codex",
+        model: "gpt-5.4",
+      }),
+    ).rejects.toThrow("process.exit called");
+
+    expect(mockCreateCodexCliProvider).toHaveBeenCalledWith({
+      model: "gpt-5.4",
+      outputFormat: "text",
+      sandbox: "read-only",
+      skipGitRepoCheck: true,
+    });
+    expect(mockCreateAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ model: mockCodexCliProvider }),
     );
   });
 

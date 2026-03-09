@@ -9,7 +9,7 @@ import type {
 export type AgentTools = NonNullable<DeepFactorAgentSettings["tools"]>;
 
 export type AgentStatus = "idle" | "running" | "done" | "error" | "pending_input";
-export type ProviderType = "langchain" | "claude";
+export type ProviderType = "langchain" | "claude" | "codex";
 export type LegacyProviderType = "claude-sdk";
 export type ProviderInput = ProviderType | LegacyProviderType;
 
@@ -18,16 +18,18 @@ export const DEFAULT_PROVIDER: ProviderType = "langchain";
 export const DEFAULT_MODELS: Record<ProviderType, string> = {
   langchain: "gpt-4.1-mini",
   claude: "sonnet",
+  codex: "gpt-5.4",
 };
 
 export function isProviderType(value: string): value is ProviderType {
-  return value === "langchain" || value === "claude";
+  return value === "langchain" || value === "claude" || value === "codex";
 }
 
 export function normalizeProvider(value: string | undefined): ProviderType | undefined {
   if (!value) return undefined;
   if (value === "langchain") return "langchain";
   if (value === "claude" || value === "claude-sdk") return "claude";
+  if (value === "codex") return "codex";
   return undefined;
 }
 

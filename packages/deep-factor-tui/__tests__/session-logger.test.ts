@@ -67,4 +67,26 @@ describe("resolveSessionSettings", () => {
       model: "gpt-4.1-mini",
     });
   });
+
+  it("round-trips stored codex provider metadata", () => {
+    expect(
+      resolveSessionSettings({
+        entries: [
+          {
+            timestamp: "2026-03-08T10:00:00.000Z",
+            sessionId: "abc",
+            role: "user",
+            content: "Hello",
+            provider: "codex",
+            model: "gpt-5.4",
+          },
+        ],
+        hasProviderFlag: false,
+        hasModelFlag: false,
+      }),
+    ).toEqual({
+      provider: "codex",
+      model: "gpt-5.4",
+    });
+  });
 });

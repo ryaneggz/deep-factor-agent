@@ -71,7 +71,7 @@ node dist/cli.js --bash "List all TypeScript files in this directory"
 
 ```
 Options
-  --provider       Provider: langchain, claude (default: langchain)
+  --provider       Provider: langchain, claude, codex (default: langchain)
   --model, -m      Model identifier (default: gpt-4.1-mini)
   --max-iter, -i   Maximum agent iterations (default: 10)
   --mode           Execution mode: plan, approve, yolo (default: yolo)
@@ -102,6 +102,9 @@ deepfactor -p "What is 2+2?"
 
 # Claude CLI provider using existing CLI auth
 deepfactor --provider claude -p "Reply with exactly: hello"
+
+# Codex CLI provider using existing CLI auth
+deepfactor --provider codex -p "Reply with exactly: hello"
 
 # Print mode with local sandbox
 deepfactor -p -s local "List files in the current directory"
@@ -175,6 +178,7 @@ Test suite:
 | `print.test.ts`       | Unit        | Print mode headless agent output                                                         |
 | `cli-e2e.test.ts`     | E2E         | Binary startup smoke test, provider parsing, print mode errors                           |
 | `claude-cli.smoke.ts` | Smoke       | Built CLI wrapper validation against local `claude` auth                                 |
+| `codex-cli.smoke.ts`  | Smoke       | Built CLI wrapper validation against local `codex` auth                                  |
 
 ## Development
 
