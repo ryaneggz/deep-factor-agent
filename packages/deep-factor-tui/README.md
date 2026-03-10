@@ -128,7 +128,7 @@ src/
 │   ├── Header.tsx       # Title, model name, color-coded status indicator
 │   ├── LiveSection.tsx  # Active UI: spinner, errors, status line, input bar
 │   ├── MessageBubble.tsx # Single message by role (user/assistant/tool_call/tool_result)
-│   ├── ToolCallBlock.tsx # Tool name (bold yellow) + truncated JSON args
+│   ├── ToolCallBlock.tsx # Tool labels for semantic actions like Bash(...), Read(...), Edit(...)
 │   ├── InputBar.tsx     # Blue "> " prompt + text + cursor
 │   └── StatusLine.tsx   # Token usage, iteration count, status
 └── tools/
@@ -152,7 +152,7 @@ Tokens: 150  Iterations: 1  Status: done      ← LiveSection (always visible
 1. `cli.tsx` parses flags and renders `<TuiApp>` via `ink.render()`
 2. `<TuiApp>` uses Ink's `<Static>` to emit header and messages into terminal scrollback, with `<LiveSection>` always visible at the bottom
 3. `useAgent()` creates a `DeepFactorAgent` and runs the loop
-4. Agent events (messages, tool calls, tool results) are converted to `ChatMessage[]`
+4. Agent events (messages, tool calls, tool results) are converted to `ChatMessage[]`, preserving compact tool display metadata when available
 5. Components render messages, status, spinner, and input prompts
 6. Human-in-the-loop: agent pauses → question displayed → user responds via input bar → agent resumes
 

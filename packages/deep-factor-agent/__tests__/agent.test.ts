@@ -277,6 +277,17 @@ describe("DeepFactorAgent", () => {
       if (toolCallEvents[0].type === "tool_call") {
         expect(toolCallEvents[0].toolName).toBe("search");
         expect(toolCallEvents[0].toolCallId).toBe("tc_1");
+        expect(toolCallEvents[0].display).toMatchObject({
+          kind: "generic",
+          label: 'Tool search(query="test")',
+        });
+      }
+
+      if (toolResultEvents[0].type === "tool_result") {
+        expect(toolResultEvents[0].display).toMatchObject({
+          kind: "generic",
+          previewLines: ['{"results":["found"]}'],
+        });
       }
     });
 
@@ -1075,6 +1086,8 @@ describe("DeepFactorAgent", () => {
       expect(toolResultEvents.length).toBe(2);
       expect(toolResultEvents[0].parallelGroup).toBeDefined();
       expect(toolResultEvents[0].parallelGroup).toBe(toolResultEvents[1].parallelGroup);
+      expect(toolResultEvents[0].display?.label).toBe("Tool fast_tool");
+      expect(toolResultEvents[1].display?.label).toBe("Tool fast_tool");
     });
 
     it("does not parallelize HITL tool calls", async () => {

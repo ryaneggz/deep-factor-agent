@@ -180,6 +180,7 @@ if (cli.flags.print) {
       ...(entry.toolName ? { toolName: entry.toolName } : {}),
       ...(entry.toolArgs ? { toolArgs: entry.toolArgs } : {}),
       ...(entry.toolCallId ? { toolCallId: entry.toolCallId } : {}),
+      ...(entry.toolDisplay ? { toolDisplay: entry.toolDisplay } : {}),
     }));
     resumeThread = buildThreadFromSession(entries);
     ({ provider, model } = resolveSessionSettings({

@@ -28,11 +28,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
     case "tool_call":
       return (
-        <ToolCallBlock toolName={message.toolName ?? message.content} toolArgs={message.toolArgs} />
+        <ToolCallBlock
+          toolName={message.toolName ?? message.content}
+          toolArgs={message.toolArgs}
+          toolDisplay={message.toolDisplay}
+        />
       );
 
     case "tool_result": {
-      const preview = formatToolResultPreview(message.content);
+      const preview = formatToolResultPreview(message.content, message.toolDisplay);
       const metadata = [
         message.durationMs != null ? `${message.durationMs}ms` : null,
         message.parallelGroup ? "[parallel]" : null,
@@ -41,6 +45,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         .join(" ");
       return (
         <Box flexDirection="column">
+          {preview.fileChanges?.map((change, index) => (
+            <Box key={`${message.id}-change-${index}`}>
+              <Text dimColor>{index === 0 ? "Result" : "      "}</Text>
+              <Text>{` ${change.change} ${change.path}`}</Text>
+            </Box>
+          ))}
           {preview.lines.map((line, index) => (
             <Box key={`${message.id}-${index}`}>
               <Text dimColor>{index === 0 ? "Result" : "      "}</Text>

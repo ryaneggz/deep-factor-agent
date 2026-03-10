@@ -1,4 +1,11 @@
-import type { ChatMessage, TranscriptSegment, TranscriptTurn } from "./types.js";
+import type { ToolDisplayMetadata, ToolFileChangeSummary } from "deep-factor-agent";
+import type {
+  ChatMessage,
+  ToolTranscriptSegment,
+  TranscriptRenderBlock,
+  TranscriptSegment,
+  TranscriptTurn,
+} from "./types.js";
 
 const MAX_TOOL_ARG_PREVIEW = 48;
 const MAX_TOOL_RESULT_LINE_LENGTH = 88;
@@ -7,6 +14,10 @@ const MAX_TOOL_RESULT_LINES = 2;
 export interface ToolResultPreview {
   lines: string[];
   overflowLineCount: number;
+  fileChanges?: ToolFileChangeSummary[];
+  fileOverflowCount?: number;
+  diffPreviewLines?: string[];
+  diffOverflowLineCount?: number;
 }
 
 function truncateInline(value: string, maxLength: number): string {
@@ -47,7 +58,15 @@ export function formatToolArgsPreview(toolArgs?: Record<string, unknown>): strin
   return `${preview}${entries.length > 2 ? ", ..." : ""}`;
 }
 
-export function formatToolLabel(toolName: string, toolArgs?: Record<string, unknown>): string {
+export function formatToolLabel(
+  toolName: string,
+  toolArgs?: Record<string, unknown>,
+  toolDisplay?: ToolDisplayMetadata,
+): string {
+  if (toolDisplay?.label) {
+    return toolDisplay.label;
+  }
+
   if (toolName === "bash" && typeof toolArgs?.command === "string") {
     return `Bash(${truncateInline(toolArgs.command, MAX_TOOL_RESULT_LINE_LENGTH)})`;
   }
@@ -62,7 +81,60 @@ export function formatToolLabel(toolName: string, toolArgs?: Record<string, unkn
   return `${prefix}(${preview ?? entries.length})`;
 }
 
-export function formatToolResultPreview(result: string): ToolResultPreview {
+export function formatToolChangeSummary(change: ToolFileChangeSummary): string {
+  const prefix =
+    change.change === "created" ? "created" : change.change === "deleted" ? "deleted" : "edited";
+  const counts =
+    change.additions != null || change.deletions != null
+      ? ` (+${change.additions ?? 0} -${change.deletions ?? 0})`
+      : "";
+  return `${prefix} ${change.path}${counts}`;
+}
+
+export function formatFileChangeTotals(toolDisplay?: ToolDisplayMetadata): string | null {
+  if (!toolDisplay?.fileChanges || toolDisplay.fileChanges.length === 0) {
+    return null;
+  }
+
+  const totals = toolDisplay.fileChanges.reduce(
+    (acc, change) => {
+      acc.additions += change.additions ?? 0;
+      acc.deletions += change.deletions ?? 0;
+      acc.hasCounts = acc.hasCounts || change.additions != null || change.deletions != null;
+      return acc;
+    },
+    { additions: 0, deletions: 0, hasCounts: false },
+  );
+
+  if (!totals.hasCounts) {
+    return null;
+  }
+
+  return `Added ${totals.additions} lines, removed ${totals.deletions} lines`;
+}
+
+export function formatToolResultPreview(
+  result: string,
+  toolDisplay?: ToolDisplayMetadata,
+): ToolResultPreview {
+  if (toolDisplay?.fileChanges && toolDisplay.fileChanges.length > 0) {
+    return {
+      lines: [],
+      overflowLineCount: 0,
+      fileChanges: toolDisplay.fileChanges,
+      fileOverflowCount: toolDisplay.overflowLineCount ?? 0,
+      diffPreviewLines: toolDisplay.diffPreviewLines,
+      diffOverflowLineCount: toolDisplay.diffOverflowLineCount,
+    };
+  }
+
+  if (toolDisplay?.previewLines && toolDisplay.previewLines.length > 0) {
+    return {
+      lines: toolDisplay.previewLines,
+      overflowLineCount: toolDisplay.overflowLineCount ?? 0,
+    };
+  }
+
   const normalized = result.replace(/\r\n/g, "\n");
   const rawLines = normalized.split("\n").map((line) => line.trimEnd());
   const meaningfulLines = rawLines.filter((line) => line.trim().length > 0);
@@ -76,6 +148,69 @@ export function formatToolResultPreview(result: string): ToolResultPreview {
     lines,
     overflowLineCount: Math.max(0, sourceLines.length - lines.length),
   };
+}
+
+function isGroupedFileReadSegment(segment: TranscriptSegment): segment is ToolTranscriptSegment {
+  return (
+    segment.kind === "tool" &&
+    segment.toolDisplay?.kind === "file_read" &&
+    Array.isArray(segment.toolDisplay.fileReads) &&
+    segment.toolDisplay.fileReads.length > 0
+  );
+}
+
+export function buildTranscriptRenderBlocks(
+  segments: TranscriptSegment[],
+): TranscriptRenderBlock[] {
+  const blocks: TranscriptRenderBlock[] = [];
+
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+
+    if (segment.kind === "assistant") {
+      blocks.push({
+        kind: "assistant_block",
+        id: segment.id,
+        segment,
+      });
+      continue;
+    }
+
+    if (!isGroupedFileReadSegment(segment)) {
+      const toolSegment = segment as ToolTranscriptSegment;
+      blocks.push({
+        kind: "tool_block",
+        id: toolSegment.id,
+        segment: toolSegment,
+      });
+      continue;
+    }
+
+    const groupedSegments: ToolTranscriptSegment[] = [segment];
+    const fileReads = [...(segment.toolDisplay?.fileReads ?? [])];
+
+    while (index + 1 < segments.length && isGroupedFileReadSegment(segments[index + 1]!)) {
+      index += 1;
+      const next = segments[index] as ToolTranscriptSegment;
+      groupedSegments.push(next);
+      fileReads.push(...(next.toolDisplay?.fileReads ?? []));
+    }
+
+    const readCount = fileReads.length;
+    const expandable = fileReads.some((read) => (read.detailLines?.length ?? 0) > 0);
+    blocks.push({
+      kind: "file_read_group_block",
+      id: groupedSegments.map((item) => item.id).join("__"),
+      segments: groupedSegments,
+      fileReads,
+      header: expandable
+        ? `Read ${readCount} file${readCount === 1 ? "" : "s"} (ctrl+o to expand)`
+        : `Read ${readCount} file${readCount === 1 ? "" : "s"}`,
+      expandable,
+    });
+  }
+
+  return blocks;
 }
 
 function createTurn(index: number, userMessage?: ChatMessage, isCarryover = false): TranscriptTurn {
@@ -155,6 +290,7 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
         toolName: message.toolName ?? message.content,
         toolArgs: message.toolArgs,
         toolCallId: message.toolCallId,
+        toolDisplay: message.toolDisplay,
       });
       continue;
     }
@@ -164,6 +300,7 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
       pendingTool.result = message.content;
       pendingTool.durationMs = message.durationMs;
       pendingTool.parallelGroup = message.parallelGroup;
+      pendingTool.toolDisplay = message.toolDisplay ?? pendingTool.toolDisplay;
       continue;
     }
 
@@ -175,6 +312,7 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
       result: message.content,
       durationMs: message.durationMs,
       parallelGroup: message.parallelGroup,
+      toolDisplay: message.toolDisplay,
     });
   }
 

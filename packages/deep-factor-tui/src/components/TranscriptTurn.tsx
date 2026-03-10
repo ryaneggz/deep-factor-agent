@@ -1,13 +1,22 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { TranscriptTurn as TranscriptTurnData } from "../types.js";
+import { buildTranscriptRenderBlocks } from "../transcript.js";
 import { TranscriptSegment } from "./TranscriptSegment.js";
 
 interface TranscriptTurnProps {
   turn: TranscriptTurnData;
+  isActiveTurn?: boolean;
+  expandFileReadGroups?: boolean;
 }
 
-export function TranscriptTurn({ turn }: TranscriptTurnProps) {
+export function TranscriptTurn({
+  turn,
+  isActiveTurn = false,
+  expandFileReadGroups = false,
+}: TranscriptTurnProps) {
+  const blocks = buildTranscriptRenderBlocks(turn.segments);
+
   return (
     <Box flexDirection="column" marginBottom={1}>
       {turn.userMessage ? (
@@ -19,10 +28,14 @@ export function TranscriptTurn({ turn }: TranscriptTurnProps) {
         <Text dimColor>Earlier activity</Text>
       )}
 
-      {turn.segments.length > 0 && (
+      {blocks.length > 0 && (
         <Box flexDirection="column" marginTop={turn.userMessage ? 1 : 0}>
-          {turn.segments.map((segment) => (
-            <TranscriptSegment key={segment.id} segment={segment} />
+          {blocks.map((block) => (
+            <TranscriptSegment
+              key={block.id}
+              block={block}
+              expandFileReadGroups={isActiveTurn && expandFileReadGroups}
+            />
           ))}
         </Box>
       )}

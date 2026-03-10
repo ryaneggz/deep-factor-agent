@@ -10,6 +10,7 @@ interface PendingInputPanelProps {
   hotkeysVisible?: boolean;
   onToggleHotkeys?: () => void;
   onCloseHotkeys?: () => void;
+  onToggleFileReadGroups?: () => void;
 }
 
 function getPanelColor(pending: PendingUiState): string {
@@ -43,6 +44,7 @@ export function PendingInputPanel({
   hotkeysVisible = false,
   onToggleHotkeys,
   onCloseHotkeys,
+  onToggleFileReadGroups,
 }: PendingInputPanelProps) {
   const defaultMode =
     pending.kind === "plan_review" || pending.kind === "approval" ? "action" : "edit";
@@ -116,6 +118,7 @@ export function PendingInputPanel({
         }}
         isActive={!hotkeysVisible}
         onHotkeyMenu={onToggleHotkeys}
+        onCtrlO={onToggleFileReadGroups}
         onEscape={hotkeysVisible ? onCloseHotkeys : undefined}
         onKeyPress={(inputChar, key, currentValue) => {
           if (key.ctrl || key.meta || currentValue.trim().length > 0) {
@@ -261,6 +264,7 @@ export function PendingInputPanel({
             onSubmit={(value) => onSubmit({ kind: "edit", feedback: value })}
             isActive={!hotkeysVisible}
             onHotkeyMenu={onToggleHotkeys}
+            onCtrlO={onToggleFileReadGroups}
             onEscape={hotkeysVisible ? onCloseHotkeys : () => setMode("action")}
             placeholder={
               pending.kind === "plan_review"

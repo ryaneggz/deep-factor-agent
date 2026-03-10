@@ -5,6 +5,7 @@ import { useTextInput } from "../hooks/useTextInput.js";
 interface InputBarProps {
   onSubmit: (value: string) => void;
   onHotkeyMenu?: () => void;
+  onCtrlO?: () => void;
   onCycleMode?: () => void;
   onEscape?: () => void;
   isActive?: boolean;
@@ -30,6 +31,7 @@ interface InputBarProps {
 export function InputBar({
   onSubmit,
   onHotkeyMenu,
+  onCtrlO,
   onCycleMode,
   onEscape,
   isActive = true,
@@ -40,6 +42,7 @@ export function InputBar({
   const { input } = useTextInput({
     onSubmit,
     onHotkeyMenu,
+    onCtrlO,
     onCycleMode,
     onEscape,
     isActive,

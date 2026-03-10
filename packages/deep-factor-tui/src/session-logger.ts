@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import type { AgentThread, AgentEvent } from "deep-factor-agent";
 import { DEFAULT_MODELS, DEFAULT_PROVIDER, normalizeProvider } from "./types.js";
 import type { ProviderType, ProviderInput } from "./types.js";
+import type { ToolDisplayMetadata } from "deep-factor-agent";
 
 const SESSIONS_DIR = join(homedir(), ".deepfactor", "sessions");
 
@@ -25,6 +26,7 @@ export interface SessionEntry {
   toolName?: string;
   toolArgs?: Record<string, unknown>;
   toolCallId?: string;
+  toolDisplay?: ToolDisplayMetadata;
   model?: string;
   provider?: ProviderInput;
 }
@@ -144,6 +146,7 @@ export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
           toolName: entry.toolName ?? "unknown",
           toolCallId: tcId,
           args: entry.toolArgs ?? {},
+          display: entry.toolDisplay,
           timestamp: ts,
           iteration,
         });
@@ -154,6 +157,7 @@ export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
           type: "tool_result",
           toolCallId: entry.toolCallId ?? (lastToolCallId || randomUUID()),
           result: entry.content,
+          display: entry.toolDisplay,
           timestamp: ts,
           iteration,
         });

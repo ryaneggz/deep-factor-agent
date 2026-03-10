@@ -29,6 +29,11 @@ export type {
   AgentMode,
   ApprovalDecision,
   HumanInputKind,
+  ToolDisplayKind,
+  ToolFileChangeSummary,
+  ToolFileReadSummary,
+  ToolDisplayMetadata,
+  ToolExecutionResult,
   DeepFactorAgentSettings,
   AgentResult,
   PlanResult,
@@ -37,6 +42,7 @@ export type {
 } from "./types.js";
 
 export { isPendingResult, isPlanResult } from "./types.js";
+export { buildToolCallDisplay, buildToolResultDisplay } from "./tool-display.js";
 
 // Stop conditions
 export {

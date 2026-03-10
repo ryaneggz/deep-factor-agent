@@ -52,6 +52,7 @@ describe("eventsToChatMessages", () => {
         toolName: "read_file",
         toolCallId: "tool-1",
         args: { path: "a.txt" },
+        display: { kind: "file_read", label: "Read(a.txt)" },
         timestamp: 1,
         iteration: 1,
       },
@@ -59,6 +60,20 @@ describe("eventsToChatMessages", () => {
         type: "tool_result",
         toolCallId: "tool-1",
         result: "A",
+        display: {
+          kind: "file_read",
+          label: "Read(a.txt)",
+          fileReads: [
+            {
+              path: "a.txt",
+              startLine: 1,
+              endLine: 1,
+              totalLines: 1,
+              previewLines: ["1| A"],
+              detailLines: ["1| A"],
+            },
+          ],
+        },
         parallelGroup: "pg-1",
         durationMs: 12,
         timestamp: 2,
@@ -74,6 +89,20 @@ describe("eventsToChatMessages", () => {
       toolCallId: "tool-1",
       parallelGroup: "pg-1",
       durationMs: 12,
+      toolDisplay: {
+        kind: "file_read",
+        label: "Read(a.txt)",
+        fileReads: [
+          {
+            path: "a.txt",
+            startLine: 1,
+            endLine: 1,
+            totalLines: 1,
+            previewLines: ["1| A"],
+            detailLines: ["1| A"],
+          },
+        ],
+      },
     });
   });
 

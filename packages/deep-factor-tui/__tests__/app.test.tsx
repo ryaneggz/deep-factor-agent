@@ -32,9 +32,8 @@ vi.mock("../src/hooks/useAgent.js", () => ({
   useAgent: useAgentMock,
 }));
 
-vi.mock("../src/tools/bash.js", () => ({
-  createBashTool: () => ({ name: "bash", description: "mock", invoke: vi.fn() }),
-  bashTool: { name: "bash", description: "mock", invoke: vi.fn() },
+vi.mock("../src/tools/default-tools.js", () => ({
+  createDefaultTools: () => [{ name: "bash", description: "mock", invoke: vi.fn() }],
 }));
 
 vi.mock("deep-factor-agent", () => ({
@@ -365,5 +364,84 @@ describe("TuiApp integration", () => {
       verbose: true,
       includePartialMessages: true,
     });
+  });
+
+  it("toggles active-turn file read details with Ctrl+O", async () => {
+    mockUseAgent = {
+      ...mockUseAgent,
+      status: "done",
+      messages: [
+        { id: "msg-0", role: "user", content: "Read both files" },
+        {
+          id: "msg-1",
+          role: "tool_call",
+          content: "read_file",
+          toolName: "read_file",
+          toolArgs: { path: "a.txt" },
+          toolCallId: "tool-1",
+        },
+        {
+          id: "msg-2",
+          role: "tool_result",
+          content: "Read a.txt",
+          toolCallId: "tool-1",
+          toolDisplay: {
+            kind: "file_read",
+            label: "Read(a.txt)",
+            fileReads: [
+              {
+                path: "a.txt",
+                startLine: 1,
+                endLine: 2,
+                totalLines: 2,
+                previewLines: ["1| alpha"],
+                detailLines: ["1| alpha", "2| beta"],
+              },
+            ],
+          },
+        },
+        {
+          id: "msg-3",
+          role: "tool_call",
+          content: "read_file",
+          toolName: "read_file",
+          toolArgs: { path: "b.txt" },
+          toolCallId: "tool-2",
+        },
+        {
+          id: "msg-4",
+          role: "tool_result",
+          content: "Read b.txt",
+          toolCallId: "tool-2",
+          toolDisplay: {
+            kind: "file_read",
+            label: "Read(b.txt)",
+            fileReads: [
+              {
+                path: "b.txt",
+                startLine: 1,
+                endLine: 1,
+                totalLines: 1,
+                previewLines: ["1| gamma"],
+                detailLines: ["1| gamma"],
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const { stdin, lastFrame } = renderApp();
+
+    expect(lastFrame()).toContain("Read 2 files (ctrl+o to expand)");
+    expect(lastFrame()).toContain("Loaded a.txt");
+    expect(lastFrame()).not.toContain("1| alpha");
+
+    stdin.write("\x0f");
+    await flush();
+
+    expect(lastFrame()).toContain("1| alpha");
+    expect(lastFrame()).toContain("2| beta");
+    expect(lastFrame()).toContain("1| gamma");
   });
 });
