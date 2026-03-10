@@ -35,9 +35,13 @@ vi.mock("deep-factor-agent", () => ({
   ),
 }));
 
-vi.mock("../src/tools/bash.js", () => ({
-  createBashTool: () => ({ name: "bash", description: "mock bash tool" }),
-  bashTool: { name: "bash", description: "mock bash tool" },
+vi.mock("../src/tools/default-tools.js", () => ({
+  createDefaultTools: () => [
+    { name: "bash", description: "mock bash tool" },
+    { name: "read_file", description: "mock read tool" },
+    { name: "write_file", description: "mock write tool" },
+    { name: "edit_file", description: "mock edit tool" },
+  ],
 }));
 
 import { runPrintMode } from "../src/print.js";

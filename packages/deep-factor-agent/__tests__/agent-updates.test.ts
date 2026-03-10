@@ -5,6 +5,7 @@ import { z } from "zod";
 import { DeepFactorAgent } from "../src/agent.js";
 import type { AgentExecutionUpdate } from "../src/types.js";
 import type { ModelAdapter, ModelInvocationUpdate } from "../src/providers/types.js";
+import { createLangChainTool } from "../src/tool-adapter.js";
 
 function makeMockModel() {
   const model: any = {
@@ -280,6 +281,71 @@ describe("DeepFactorAgent update streaming", () => {
     expect(approvalIndex).toBeGreaterThan(toolCallIndex);
   });
 
+  it("preserves explicit file-read display metadata on sequential tool execution", async () => {
+    const readTool = createLangChainTool("read_file", {
+      description: "Read a file",
+      schema: z.object({ path: z.string() }),
+      metadata: { mutatesState: false },
+      execute: async ({ path }) => ({
+        content: `Read ${path}\n\n1| hello`,
+        display: {
+          kind: "file_read",
+          label: `Read(${path})`,
+          fileReads: [
+            {
+              path,
+              startLine: 1,
+              endLine: 1,
+              totalLines: 1,
+              previewLines: ["1| hello"],
+              detailLines: ["1| hello"],
+            },
+          ],
+        },
+      }),
+    });
+    const mockModel = makeMockModel();
+    const updates: AgentExecutionUpdate[] = [];
+
+    mockModel.invoke
+      .mockResolvedValueOnce(
+        makeAIMessage("", {
+          tool_calls: [{ name: "read_file", args: { path: "a.txt" }, id: "tool-1" }],
+        }),
+      )
+      .mockResolvedValueOnce(makeAIMessage("Done."));
+
+    const agent = new DeepFactorAgent({
+      model: mockModel,
+      tools: [readTool],
+      streamMode: "updates",
+      onUpdate: (update) => updates.push(update),
+    });
+
+    const result = await agent.loop("Read a.txt");
+    const toolResult = result.thread.events.find(
+      (event) => event.type === "tool_result" && event.toolCallId === "tool-1",
+    );
+
+    expect(toolResult).toMatchObject({
+      type: "tool_result",
+      result: "Read a.txt\n\n1| hello",
+      display: {
+        kind: "file_read",
+        label: "Read(a.txt)",
+        fileReads: [{ path: "a.txt", detailLines: ["1| hello"] }],
+      },
+    });
+    expect(
+      updates.find(
+        (update) =>
+          update.lastEvent?.type === "tool_result" &&
+          update.lastEvent.toolCallId === "tool-1" &&
+          update.lastEvent.display?.fileReads?.[0]?.path === "a.txt",
+      ),
+    ).toBeDefined();
+  });
+
   it("emits plan events live for provider-native updates without leaving duplicate assistant text", async () => {
     const updates: AgentExecutionUpdate[] = [];
     const planText = "<proposed_plan>\n# Plan\n\n1. Inspect\n2. Patch\n</proposed_plan>";
@@ -357,11 +423,28 @@ describe("DeepFactorAgent update streaming", () => {
     expect(iterationZeroErrors).toHaveLength(1);
   });
 
-  it("preserves parallelGroup metadata on live tool result updates", async () => {
-    const readFileTool = tool(async ({ path }: { path: string }) => `read:${path}`, {
-      name: "read_file",
+  it("preserves explicit file-read display metadata on parallel tool result updates", async () => {
+    const readFileTool = createLangChainTool("read_file", {
       description: "Read a file",
       schema: z.object({ path: z.string() }),
+      metadata: { mutatesState: false },
+      execute: async ({ path }) => ({
+        content: `Read ${path}\n\n1| ${path}`,
+        display: {
+          kind: "file_read",
+          label: `Read(${path})`,
+          fileReads: [
+            {
+              path,
+              startLine: 1,
+              endLine: 1,
+              totalLines: 1,
+              previewLines: [`1| ${path}`],
+              detailLines: [`1| ${path}`],
+            },
+          ],
+        },
+      }),
     });
     const mockModel = makeMockModel();
     const updates: AgentExecutionUpdate[] = [];
@@ -394,6 +477,8 @@ describe("DeepFactorAgent update streaming", () => {
     expect(resultUpdates).toHaveLength(2);
     expect(resultUpdates[0]?.parallelGroup).toBeDefined();
     expect(resultUpdates[0]?.parallelGroup).toBe(resultUpdates[1]?.parallelGroup);
+    expect(resultUpdates[0]?.display?.fileReads?.[0]?.path).toBe("a.txt");
+    expect(resultUpdates[1]?.display?.fileReads?.[0]?.path).toBe("b.txt");
   });
 
   it("ignores subscriber callback failures", async () => {

@@ -15,6 +15,7 @@ import { TOOL_NAME_REQUEST_HUMAN_INPUT } from "./human-in-the-loop.js";
 import { evaluateStopConditions } from "./stop-conditions.js";
 import { ContextManager } from "./context-manager.js";
 import { serializeThreadToXml } from "./xml-serializer.js";
+import { buildToolCallDisplay, buildToolResultDisplay } from "./tool-display.js";
 import { getToolMetadata, toolArrayToMap } from "./tool-adapter.js";
 import { performance } from "node:perf_hooks";
 import type {
@@ -37,6 +38,8 @@ import type {
   ApprovalDecision,
   AgentMiddleware,
   MiddlewareContext,
+  ToolDisplayMetadata,
+  ToolExecutionResult,
 } from "./types.js";
 import type { ModelAdapter, ModelInvocationUpdate } from "./providers/types.js";
 import { isModelAdapter } from "./providers/types.js";
@@ -107,6 +110,36 @@ function extractTextContent(content: string | unknown): string {
 function compactError(error: unknown, maxLen = 500): string {
   const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   return msg.length > maxLen ? msg.substring(0, maxLen) + "..." : msg;
+}
+
+function isToolExecutionResult(value: unknown): value is ToolExecutionResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "content" in value &&
+    typeof (value as { content: unknown }).content === "string"
+  );
+}
+
+function stringifyToolResult(result: unknown): string {
+  if (typeof result === "string") {
+    return result;
+  }
+  if (isToolExecutionResult(result)) {
+    return result.content;
+  }
+  return JSON.stringify(result);
+}
+
+function resolveToolResultDisplay(
+  toolName: string,
+  args: Record<string, unknown>,
+  result: unknown,
+): ToolDisplayMetadata {
+  if (isToolExecutionResult(result) && result.display) {
+    return result.display;
+  }
+  return buildToolResultDisplay(toolName, args, stringifyToolResult(result));
 }
 
 interface ParsedPlanBlock {
@@ -515,6 +548,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     }
   }
 
+  private async invokeTool(
+    tool: StructuredToolInterface,
+    args: Record<string, unknown> | undefined,
+  ): Promise<unknown> {
+    const rawExecutor = (tool as { executeRaw?: (input: unknown) => Promise<unknown> }).executeRaw;
+    if (rawExecutor) {
+      return rawExecutor(args ?? {});
+    }
+    return tool.invoke(args);
+  }
+
   private createPendingResult(
     thread: AgentThread,
     usage: TokenUsage,
@@ -726,6 +770,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         type: "tool_result",
         toolCallId,
         result: "[Waiting for human input]",
+        display: buildToolResultDisplay(tc.name, args, "[Waiting for human input]"),
         timestamp: now,
         iteration,
       };
@@ -754,6 +799,11 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         type: "tool_result",
         toolCallId,
         result: `[Tool "${tc.name}" not executed — interrupted for human approval]`,
+        display: buildToolResultDisplay(
+          tc.name,
+          (tc.args ?? {}) as Record<string, unknown>,
+          `[Tool "${tc.name}" not executed — interrupted for human approval]`,
+        ),
         timestamp: now,
         iteration,
       };
@@ -792,6 +842,11 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         type: "tool_result",
         toolCallId,
         result: decision.reason,
+        display: buildToolResultDisplay(
+          tc.name,
+          (tc.args ?? {}) as Record<string, unknown>,
+          decision.reason,
+        ),
         timestamp: now,
         iteration,
       };
@@ -808,6 +863,11 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         type: "tool_result",
         toolCallId,
         result: `[Tool "${tc.name}" not executed — awaiting approval]`,
+        display: buildToolResultDisplay(
+          tc.name,
+          (tc.args ?? {}) as Record<string, unknown>,
+          `[Tool "${tc.name}" not executed — awaiting approval]`,
+        ),
         timestamp: now,
         iteration,
       };
@@ -848,6 +908,11 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         type: "tool_result",
         toolCallId,
         result: `Tool not found: "${tc.name}"`,
+        display: buildToolResultDisplay(
+          tc.name,
+          (tc.args ?? {}) as Record<string, unknown>,
+          `Tool not found: "${tc.name}"`,
+        ),
         timestamp: now,
         iteration,
       };
@@ -863,14 +928,22 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     }
 
     try {
-      const toolResult = await foundTool.invoke(tc.args);
-      const resultStr = typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
+      const toolResult = await this.invokeTool(
+        foundTool,
+        (tc.args ?? {}) as Record<string, unknown>,
+      );
+      const resultStr = stringifyToolResult(toolResult);
       const durationMs = Math.round(performance.now() - start);
       this.syncTodoMetadata(tc.name, resultStr, thread);
       const resultEvent: ToolResultEvent = {
         type: "tool_result",
         toolCallId,
         result: resultStr,
+        display: resolveToolResultDisplay(
+          tc.name,
+          (tc.args ?? {}) as Record<string, unknown>,
+          toolResult,
+        ),
         timestamp: now,
         iteration,
         durationMs,
@@ -886,6 +959,11 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         type: "tool_result",
         toolCallId,
         result: `Tool error: ${compactError(error)}`,
+        display: buildToolResultDisplay(
+          tc.name,
+          (tc.args ?? {}) as Record<string, unknown>,
+          `Tool error: ${compactError(error)}`,
+        ),
         timestamp: now,
         iteration,
         durationMs: Math.round(performance.now() - start),
@@ -1077,6 +1155,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
             toolName: tc.name,
             toolCallId,
             args: (tc.args ?? {}) as Record<string, unknown>,
+            display: buildToolCallDisplay(tc.name, (tc.args ?? {}) as Record<string, unknown>),
             timestamp,
             iteration,
           },
@@ -1200,13 +1279,15 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
                 const start = performance.now();
                 if (foundTool) {
                   try {
-                    const toolResult = await foundTool.invoke(tc.args);
-                    const resultStr =
-                      typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult);
+                    const toolResult = await this.invokeTool(
+                      foundTool,
+                      (tc.args ?? {}) as Record<string, unknown>,
+                    );
+                    const resultStr = stringifyToolResult(toolResult);
                     const durationMs = Math.round(performance.now() - start);
                     this.syncTodoMetadata(tc.name, resultStr, thread);
 
-                    return { toolCallId, result: resultStr, durationMs, tc };
+                    return { toolCallId, result: toolResult, durationMs, tc };
                   } catch (err) {
                     const durationMs = Math.round(performance.now() - start);
                     const errorMsg = `Tool error: ${compactError(err)}`;
@@ -1222,10 +1303,16 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
             // Record ToolResultEvents + push ToolMessages in original order
             for (const pr of parallelResults) {
+              const resultStr = stringifyToolResult(pr.result);
               const toolResultEvent: ToolResultEvent = {
                 type: "tool_result",
                 toolCallId: pr.toolCallId,
-                result: pr.result,
+                result: resultStr,
+                display: resolveToolResultDisplay(
+                  pr.tc.name,
+                  (pr.tc.args ?? {}) as Record<string, unknown>,
+                  pr.result,
+                ),
                 timestamp: Date.now(),
                 iteration,
                 durationMs: pr.durationMs,
@@ -1239,7 +1326,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
               messages.push(
                 new ToolMessage({
                   tool_call_id: pr.toolCallId,
-                  content: pr.result,
+                  content: resultStr,
                 }),
               );
             }

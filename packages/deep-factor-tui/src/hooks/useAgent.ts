@@ -30,6 +30,7 @@ import type {
   PendingAction,
 } from "../types.js";
 import { appendSession } from "../session-logger.js";
+import { DEFAULT_TUI_AGENT_INSTRUCTIONS } from "../default-agent-instructions.js";
 
 function isPendingAction(value: string): value is PendingAction {
   return value === "approve" || value === "reject" || value === "edit";
@@ -178,6 +179,7 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           toolName: event.toolName,
           toolArgs: event.args,
           toolCallId: event.toolCallId,
+          toolDisplay: event.display,
         });
         break;
       case "tool_result":
@@ -189,6 +191,7 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           toolCallId: event.toolCallId,
           durationMs: event.durationMs,
           parallelGroup: event.parallelGroup,
+          toolDisplay: event.display,
         });
         break;
       case "error":
@@ -309,6 +312,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
           ...(msg.toolName ? { toolName: msg.toolName } : {}),
           ...(msg.toolArgs ? { toolArgs: msg.toolArgs } : {}),
           ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
+          ...(msg.toolDisplay ? { toolDisplay: msg.toolDisplay } : {}),
         });
       }
 
@@ -363,6 +367,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       const agent = createDeepFactorAgent({
         model: options.model,
         tools,
+        instructions: DEFAULT_TUI_AGENT_INSTRUCTIONS,
         stopWhen: [maxIterations(options.maxIter)],
         interruptOn: [TOOL_NAME_REQUEST_HUMAN_INPUT],
         parallelToolCalls: options.parallelToolCalls ?? true,

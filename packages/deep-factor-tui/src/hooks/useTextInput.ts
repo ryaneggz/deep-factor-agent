@@ -15,6 +15,7 @@ interface TextInputKey {
 interface UseTextInputOptions {
   onSubmit: (value: string) => void;
   onHotkeyMenu?: () => void;
+  onCtrlO?: () => void;
   onCycleMode?: () => void;
   onEscape?: () => void;
   isActive?: boolean;
@@ -35,6 +36,7 @@ interface UseTextInputReturn {
 export function useTextInput({
   onSubmit,
   onHotkeyMenu,
+  onCtrlO,
   onCycleMode,
   onEscape,
   isActive = true,
@@ -44,6 +46,7 @@ export function useTextInput({
   const inputRef = useRef("");
   const onSubmitRef = useRef(onSubmit);
   const onHotkeyMenuRef = useRef(onHotkeyMenu);
+  const onCtrlORef = useRef(onCtrlO);
   const onCycleModeRef = useRef(onCycleMode);
   const onEscapeRef = useRef(onEscape);
   const onKeyPressRef = useRef(onKeyPress);
@@ -55,6 +58,8 @@ export function useTextInput({
   onSubmitRef.current = onSubmit;
   // eslint-disable-next-line react-hooks/refs
   onHotkeyMenuRef.current = onHotkeyMenu;
+  // eslint-disable-next-line react-hooks/refs
+  onCtrlORef.current = onCtrlO;
   // eslint-disable-next-line react-hooks/refs
   onCycleModeRef.current = onCycleMode;
   // eslint-disable-next-line react-hooks/refs
@@ -70,6 +75,13 @@ export function useTextInput({
     }
     if (key.tab && key.shift) {
       onCycleModeRef.current?.();
+      return;
+    }
+    if (
+      onCtrlORef.current &&
+      (inputChar === "\x0f" || (key.ctrl && inputChar.toLowerCase() === "o"))
+    ) {
+      onCtrlORef.current();
       return;
     }
     if (onKeyPressRef.current?.(inputChar, key, inputRef.current)) {

@@ -20,6 +20,43 @@ export type AgentMode = "plan" | "approve" | "yolo";
 export type ApprovalDecision = "approve" | "reject" | "edit";
 export type HumanInputKind = "question" | "approval" | "plan_review";
 
+export type ToolDisplayKind = "generic" | "command" | "file_read" | "file_edit" | "file_write";
+
+export interface ToolFileChangeSummary {
+  path: string;
+  change: "created" | "edited" | "deleted";
+  additions?: number;
+  deletions?: number;
+}
+
+export interface ToolFileReadSummary {
+  path: string;
+  startLine: number;
+  endLine: number;
+  totalLines: number;
+  previewLines: string[];
+  detailLines?: string[];
+  overflowLineCount?: number;
+}
+
+export interface ToolDisplayMetadata {
+  kind: ToolDisplayKind;
+  label: string;
+  previewLines?: string[];
+  overflowLineCount?: number;
+  fileChanges?: ToolFileChangeSummary[];
+  fileReads?: ToolFileReadSummary[];
+  diffPreviewLines?: string[];
+  diffOverflowLineCount?: number;
+  detailLines?: string[];
+  detailOverflowLineCount?: number;
+}
+
+export interface ToolExecutionResult {
+  content: string;
+  display?: ToolDisplayMetadata;
+}
+
 export interface BaseEvent {
   type: AgentEventType;
   timestamp: number;
@@ -31,6 +68,7 @@ export interface ToolCallEvent extends BaseEvent {
   toolName: string;
   toolCallId: string;
   args: Record<string, unknown>;
+  display?: ToolDisplayMetadata;
 }
 
 export interface ApprovalEvent extends BaseEvent {
@@ -45,6 +83,7 @@ export interface ToolResultEvent extends BaseEvent {
   type: "tool_result";
   toolCallId: string;
   result: unknown;
+  display?: ToolDisplayMetadata;
   /** Execution duration in milliseconds (recorded when timing is available). */
   durationMs?: number;
   /** Identifier grouping tool results that executed concurrently in the same parallel batch. */
@@ -200,6 +239,7 @@ export interface AgentToolMetadata {
 
 export interface AgentTool extends StructuredToolInterface {
   metadata?: AgentToolMetadata;
+  executeRaw?: (args: unknown) => Promise<unknown>;
 }
 
 export interface AgentMiddleware {

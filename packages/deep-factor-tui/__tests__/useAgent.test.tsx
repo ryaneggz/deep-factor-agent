@@ -190,6 +190,9 @@ describe("useAgent", () => {
 
     expect(createDeepFactorAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        instructions: expect.stringContaining(
+          "prefer the native tools `read_file`, `write_file`, and `edit_file`",
+        ),
         streamMode: "updates",
         onUpdate: expect.any(Function),
       }),

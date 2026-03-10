@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "deep-factor-agent": "workspace:*",
+    "diff": "^8.0.2",
     "dotenv": "^16.6.1",
     "ink": "^6.8.0",
     "meow": "^13.2.0",

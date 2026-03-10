@@ -5,7 +5,7 @@ import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
 import { LiveSection } from "./components/LiveSection.js";
 import { TranscriptTurn } from "./components/TranscriptTurn.js";
-import { createBashTool } from "./tools/bash.js";
+import { createDefaultTools } from "./tools/default-tools.js";
 import { resolveProviderModel } from "./provider-resolution.js";
 import type { TuiAppProps } from "./types.js";
 import type {
@@ -43,8 +43,9 @@ export function TuiApp({
 }: TuiAppProps) {
   const hasRun = useRef(false);
   const [activeMode, setActiveMode] = useState<AgentMode>(mode ?? "yolo");
+  const [expandActiveFileReadGroups, setExpandActiveFileReadGroups] = useState(false);
 
-  const tools: AgentTools = [createBashTool(sandbox)];
+  const tools = useMemo<AgentTools>(() => createDefaultTools(sandbox), [sandbox]);
   const resolvedModel = useMemo<DeepFactorAgentSettings["model"]>(
     () => resolveProviderModel({ provider, model, mode: activeMode, liveUpdates: true }),
     [provider, model, activeMode],
@@ -128,11 +129,31 @@ export function TuiApp({
   const activeTurn =
     transcriptTurns.length > 0 ? transcriptTurns[transcriptTurns.length - 1] : null;
 
+  const prevActiveTurnId = useRef<string | null>(null);
+  if (activeTurn?.id !== prevActiveTurnId.current) {
+    prevActiveTurnId.current = activeTurn?.id ?? null;
+    if (expandActiveFileReadGroups) {
+      setExpandActiveFileReadGroups(false);
+    }
+  }
+
+  const handleToggleFileReadGroups = useCallback(() => {
+    setExpandActiveFileReadGroups((current) => !current);
+  }, []);
+
   return (
     <>
       <Header provider={provider} model={model} />
-      <Static items={staticTurns}>{(turn) => <TranscriptTurn key={turn.id} turn={turn} />}</Static>
-      {activeTurn && <TranscriptTurn turn={activeTurn} />}
+      <Static items={staticTurns}>
+        {(turn) => <TranscriptTurn key={turn.id} turn={turn} isActiveTurn={false} />}
+      </Static>
+      {activeTurn && (
+        <TranscriptTurn
+          turn={activeTurn}
+          isActiveTurn={true}
+          expandFileReadGroups={expandActiveFileReadGroups}
+        />
+      )}
       <LiveSection
         mode={activeMode}
         status={status}
@@ -144,6 +165,7 @@ export function TuiApp({
         onPromptSubmit={handleSubmit}
         onPendingSubmit={handlePendingSubmit}
         onCycleMode={handleCycleMode}
+        onToggleFileReadGroups={handleToggleFileReadGroups}
       />
     </>
   );

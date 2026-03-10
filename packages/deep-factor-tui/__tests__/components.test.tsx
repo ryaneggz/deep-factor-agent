@@ -8,8 +8,10 @@ import { LiveSection } from "../src/components/LiveSection.js";
 import { PendingInputPanel } from "../src/components/PendingInputPanel.js";
 import { TranscriptTurn } from "../src/components/TranscriptTurn.js";
 import {
+  buildTranscriptRenderBlocks,
   formatToolLabel,
   formatToolArgsPreview,
+  formatFileChangeTotals,
   formatToolResultPreview,
   groupMessagesIntoTurns,
 } from "../src/transcript.js";
@@ -172,6 +174,19 @@ describe("transcript helpers", () => {
     expect(formatToolLabel("bash", { command: "pwd" })).toBe("Bash(pwd)");
   });
 
+  it("prefers structured tool display labels when present", () => {
+    expect(
+      formatToolLabel(
+        "write_file",
+        { path: "notes.txt" },
+        {
+          kind: "file_write",
+          label: "Write(notes.txt)",
+        },
+      ),
+    ).toBe("Write(notes.txt)");
+  });
+
   it("formats compact tool arg previews", () => {
     expect(formatToolArgsPreview({ path: "a.txt", recursive: true })).toBe(
       'path="a.txt", recursive=true',
@@ -183,6 +198,145 @@ describe("transcript helpers", () => {
 
     expect(preview.lines).toEqual(["line one", "line two"]);
     expect(preview.overflowLineCount).toBe(2);
+  });
+
+  it("uses structured file change previews when present", () => {
+    const preview = formatToolResultPreview("ignored", {
+      kind: "file_edit",
+      label: "Edit(src/app.ts)",
+      fileChanges: [
+        { path: "src/app.ts", change: "edited", additions: 12, deletions: 4 },
+        { path: "src/lib.ts", change: "deleted" },
+      ],
+      overflowLineCount: 1,
+      diffPreviewLines: ["@@ -1 +1 @@", "-old", "+new"],
+      diffOverflowLineCount: 2,
+    });
+
+    expect(preview.fileChanges).toEqual([
+      { path: "src/app.ts", change: "edited", additions: 12, deletions: 4 },
+      { path: "src/lib.ts", change: "deleted" },
+    ]);
+    expect(preview.fileOverflowCount).toBe(1);
+    expect(preview.diffPreviewLines).toEqual(["@@ -1 +1 @@", "-old", "+new"]);
+    expect(preview.diffOverflowLineCount).toBe(2);
+  });
+
+  it("formats aggregate add/remove totals for write-like displays", () => {
+    expect(
+      formatFileChangeTotals({
+        kind: "file_edit",
+        label: "Edit(src/app.ts)",
+        fileChanges: [
+          { path: "src/app.ts", change: "edited", additions: 12, deletions: 4 },
+          { path: "src/lib.ts", change: "edited", additions: 3, deletions: 1 },
+        ],
+      }),
+    ).toBe("Added 15 lines, removed 5 lines");
+  });
+
+  it("preserves structured tool display metadata when grouping messages", () => {
+    const turns = groupMessagesIntoTurns([
+      { id: "msg-0", role: "user", content: "Edit the file" },
+      {
+        id: "msg-1",
+        role: "tool_call",
+        content: "Edit",
+        toolName: "Edit",
+        toolArgs: { path: "src/app.ts" },
+        toolCallId: "tool-1",
+        toolDisplay: { kind: "file_edit", label: "Edit(src/app.ts)" },
+      },
+      {
+        id: "msg-2",
+        role: "tool_result",
+        content: "done",
+        toolCallId: "tool-1",
+        toolDisplay: {
+          kind: "file_edit",
+          label: "Edit(src/app.ts)",
+          fileChanges: [{ path: "src/app.ts", change: "edited", additions: 2, deletions: 1 }],
+        },
+      },
+    ]);
+
+    expect(turns[0]?.segments[0]).toMatchObject({
+      kind: "tool",
+      toolDisplay: {
+        label: "Edit(src/app.ts)",
+        fileChanges: [{ path: "src/app.ts", change: "edited", additions: 2, deletions: 1 }],
+      },
+    });
+  });
+
+  it("collapses adjacent file reads into a render block", () => {
+    const turns = groupMessagesIntoTurns([
+      { id: "msg-0", role: "user", content: "Read both files" },
+      {
+        id: "msg-1",
+        role: "tool_call",
+        content: "read_file",
+        toolName: "read_file",
+        toolArgs: { path: "a.txt" },
+        toolCallId: "tool-1",
+      },
+      {
+        id: "msg-2",
+        role: "tool_result",
+        content: "Read a.txt",
+        toolCallId: "tool-1",
+        toolDisplay: {
+          kind: "file_read",
+          label: "Read(a.txt)",
+          fileReads: [
+            {
+              path: "a.txt",
+              startLine: 1,
+              endLine: 1,
+              totalLines: 1,
+              previewLines: ["1| alpha"],
+              detailLines: ["1| alpha"],
+            },
+          ],
+        },
+      },
+      {
+        id: "msg-3",
+        role: "tool_call",
+        content: "read_file",
+        toolName: "read_file",
+        toolArgs: { path: "b.txt" },
+        toolCallId: "tool-2",
+      },
+      {
+        id: "msg-4",
+        role: "tool_result",
+        content: "Read b.txt",
+        toolCallId: "tool-2",
+        toolDisplay: {
+          kind: "file_read",
+          label: "Read(b.txt)",
+          fileReads: [
+            {
+              path: "b.txt",
+              startLine: 1,
+              endLine: 1,
+              totalLines: 1,
+              previewLines: ["1| beta"],
+              detailLines: ["1| beta"],
+            },
+          ],
+        },
+      },
+    ]);
+
+    const blocks = buildTranscriptRenderBlocks(turns[0]!.segments);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      kind: "file_read_group_block",
+      header: "Read 2 files (ctrl+o to expand)",
+      fileReads: [{ path: "a.txt" }, { path: "b.txt" }],
+    });
   });
 
   it("surfaces human input responses and suppresses synthetic steering messages", () => {
@@ -281,6 +435,118 @@ describe("TranscriptTurn", () => {
     const frame = lastFrame()!;
     expect(frame).toContain("Earlier activity");
     expect(frame).toContain("Earlier response");
+  });
+
+  it("renders concise file edit summaries and diff previews", () => {
+    const { lastFrame } = render(
+      <TranscriptTurn
+        turn={{
+          id: "turn-1",
+          userMessage: { id: "msg-0", role: "user", content: "Apply the patch" },
+          segments: [
+            {
+              id: "msg-1",
+              kind: "tool",
+              toolName: "Edit",
+              toolArgs: { path: "src/app.ts" },
+              result: "diff --git a/src/app.ts b/src/app.ts",
+              toolDisplay: {
+                kind: "file_edit",
+                label: "Edit(src/app.ts)",
+                fileChanges: [
+                  { path: "src/app.ts", change: "edited", additions: 12, deletions: 4 },
+                  { path: "src/lib.ts", change: "deleted" },
+                ],
+                overflowLineCount: 1,
+                diffPreviewLines: ["@@ -1 +1 @@", "-old", "+new"],
+                diffOverflowLineCount: 2,
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    const frame = lastFrame()!;
+    expect(frame).toContain("Edit(src/app.ts)");
+    expect(frame).toContain("Added 12 lines, removed 4 lines");
+    expect(frame).toContain("edited src/app.ts (+12 -4)");
+    expect(frame).toContain("deleted src/lib.ts");
+    expect(frame).toContain("... +1 files");
+    expect(frame).toContain("@@ -1 +1 @@");
+    expect(frame).toContain("... +2 lines");
+    expect(frame).not.toContain("diff --git a/src/app.ts b/src/app.ts");
+  });
+
+  it("expands file-read groups only for the active turn", () => {
+    const turn = {
+      id: "turn-2",
+      userMessage: { id: "msg-0", role: "user" as const, content: "Read both files" },
+      segments: [
+        {
+          id: "msg-1",
+          kind: "tool" as const,
+          toolName: "read_file",
+          toolArgs: { path: "a.txt" },
+          result: "Read a.txt",
+          toolDisplay: {
+            kind: "file_read" as const,
+            label: "Read(a.txt)",
+            fileReads: [
+              {
+                path: "a.txt",
+                startLine: 1,
+                endLine: 2,
+                totalLines: 2,
+                previewLines: ["1| alpha"],
+                detailLines: ["1| alpha", "2| beta"],
+              },
+            ],
+          },
+        },
+        {
+          id: "msg-2",
+          kind: "tool" as const,
+          toolName: "read_file",
+          toolArgs: { path: "b.txt" },
+          result: "Read b.txt",
+          toolDisplay: {
+            kind: "file_read" as const,
+            label: "Read(b.txt)",
+            fileReads: [
+              {
+                path: "b.txt",
+                startLine: 1,
+                endLine: 1,
+                totalLines: 1,
+                previewLines: ["1| gamma"],
+                detailLines: ["1| gamma"],
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const collapsed = render(
+      <TranscriptTurn turn={turn} isActiveTurn={true} expandFileReadGroups={false} />,
+    );
+    expect(collapsed.lastFrame()).toContain("Read 2 files (ctrl+o to expand)");
+    expect(collapsed.lastFrame()).toContain("Loaded a.txt");
+    expect(collapsed.lastFrame()).not.toContain("1| alpha");
+
+    const expanded = render(
+      <TranscriptTurn turn={turn} isActiveTurn={true} expandFileReadGroups={true} />,
+    );
+    expect(expanded.lastFrame()).toContain("1| alpha");
+    expect(expanded.lastFrame()).toContain("2| beta");
+    expect(expanded.lastFrame()).toContain("1| gamma");
+
+    const staticExpanded = render(
+      <TranscriptTurn turn={turn} isActiveTurn={false} expandFileReadGroups={true} />,
+    );
+    expect(staticExpanded.lastFrame()).toContain("Loaded a.txt");
+    expect(staticExpanded.lastFrame()).not.toContain("1| alpha");
   });
 });
 

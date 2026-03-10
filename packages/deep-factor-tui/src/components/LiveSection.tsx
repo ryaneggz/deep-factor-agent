@@ -18,6 +18,7 @@ interface LiveSectionProps {
   onPromptSubmit: (value: string) => void;
   onPendingSubmit: (submission: PendingSubmission) => void;
   onCycleMode: () => void;
+  onToggleFileReadGroups?: () => void;
 }
 
 export function LiveSection({
@@ -31,6 +32,7 @@ export function LiveSection({
   onPromptSubmit,
   onPendingSubmit,
   onCycleMode,
+  onToggleFileReadGroups,
 }: LiveSectionProps) {
   const showInput = (status === "idle" || status === "done") && pendingUiState == null;
   const [showHotkeyMenu, setShowHotkeyMenu] = useState(false);
@@ -59,6 +61,7 @@ export function LiveSection({
           hotkeysVisible={showHotkeyMenu}
           onToggleHotkeys={handleHotkeyMenu}
           onCloseHotkeys={handleEscape}
+          onToggleFileReadGroups={onToggleFileReadGroups}
         />
       )}
 
@@ -78,6 +81,7 @@ export function LiveSection({
         <InputBar
           onSubmit={onPromptSubmit}
           onHotkeyMenu={handleHotkeyMenu}
+          onCtrlO={onToggleFileReadGroups}
           onEscape={showHotkeyMenu ? handleEscape : undefined}
           onCycleMode={canCycleMode ? onCycleMode : undefined}
         />

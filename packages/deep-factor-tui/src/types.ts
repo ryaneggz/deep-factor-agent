@@ -3,6 +3,8 @@ import type {
   DeepFactorAgentSettings,
   AgentMode,
   AgentThread,
+  ToolDisplayMetadata,
+  ToolFileReadSummary,
 } from "deep-factor-agent";
 
 /** Extract tool array type from agent settings to avoid direct @langchain/core import */
@@ -42,6 +44,7 @@ export interface ChatMessage {
   toolCallId?: string;
   durationMs?: number;
   parallelGroup?: string;
+  toolDisplay?: ToolDisplayMetadata;
 }
 
 export type TranscriptSegment =
@@ -55,6 +58,22 @@ export type TranscriptSegment =
       result?: string;
       durationMs?: number;
       parallelGroup?: string;
+      toolDisplay?: ToolDisplayMetadata;
+    };
+
+export type AssistantTranscriptSegment = Extract<TranscriptSegment, { kind: "assistant" }>;
+export type ToolTranscriptSegment = Extract<TranscriptSegment, { kind: "tool" }>;
+
+export type TranscriptRenderBlock =
+  | { kind: "assistant_block"; id: string; segment: AssistantTranscriptSegment }
+  | { kind: "tool_block"; id: string; segment: ToolTranscriptSegment }
+  | {
+      kind: "file_read_group_block";
+      id: string;
+      segments: ToolTranscriptSegment[];
+      fileReads: ToolFileReadSummary[];
+      header: string;
+      expandable: boolean;
     };
 
 export interface TranscriptTurn {
