@@ -20,7 +20,8 @@
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "bench": "vitest bench"
   },
   "dependencies": {
     "deep-factor-agent": "workspace:*",
