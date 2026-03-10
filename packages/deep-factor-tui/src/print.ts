@@ -1,42 +1,62 @@
-import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
-import type { AgentResult, PendingResult } from "deep-factor-agent";
-import { bashTool } from "./tools/bash.js";
+import {
+  createDeepFactorAgent,
+  maxIterations,
+  isPlanResult,
+  isPendingResult,
+} from "deep-factor-agent";
+import type { AgentResult, PendingResult, PlanResult, AgentMode } from "deep-factor-agent";
+import type { SandboxMode } from "./tools/bash.js";
+import { createDefaultTools } from "./tools/default-tools.js";
+import { resolveProviderModel } from "./provider-resolution.js";
+import type { ProviderType } from "./types.js";
+import { DEFAULT_TUI_AGENT_INSTRUCTIONS } from "./default-agent-instructions.js";
 
 export interface PrintModeOptions {
   prompt: string;
+  provider: ProviderType;
   model: string;
   maxIter: number;
-  sandbox: boolean;
+  sandbox: SandboxMode;
+  mode: AgentMode;
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<void> {
-  const { prompt, model, maxIter, sandbox } = options;
+  const { prompt, provider, model, maxIter, sandbox, mode } = options;
 
   try {
-    const tools = sandbox ? [bashTool] : [];
+    const tools = createDefaultTools(sandbox);
+    const resolvedModel = resolveProviderModel({ provider, model, mode });
 
     const agent = createDeepFactorAgent({
-      model,
+      model: resolvedModel,
       tools,
+      instructions: DEFAULT_TUI_AGENT_INSTRUCTIONS,
       stopWhen: [maxIterations(maxIter)],
       interruptOn: [],
       parallelToolCalls: true,
+      mode,
     });
 
-    const result: AgentResult | PendingResult = await agent.loop(prompt);
+    const result: AgentResult | PendingResult | PlanResult = await agent.loop(prompt);
 
-    if (result.stopReason === "human_input_needed") {
+    // Plan mode now returns PendingResult — auto-approve in non-interactive print mode
+    let finalResult: AgentResult | PendingResult | PlanResult = result;
+    if (isPendingResult(finalResult) && mode === "plan") {
+      finalResult = await finalResult.resume({ decision: "approve" });
+    }
+
+    if (finalResult.stopReason === "human_input_needed") {
       process.stderr.write("Error: Agent requested human input in non-interactive print mode.\n");
       process.exit(1);
     }
 
-    if (result.stopReason === "max_errors") {
-      const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
+    if (finalResult.stopReason === "max_errors") {
+      const detail = finalResult.stopDetail ?? "Agent stopped due to repeated errors";
       process.stderr.write(`Error: ${detail}\n`);
       process.exit(1);
     }
 
-    process.stdout.write(result.response);
+    process.stdout.write(isPlanResult(finalResult) ? finalResult.plan : finalResult.response);
     process.exit(0);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

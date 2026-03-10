@@ -1,17 +1,55 @@
-import React, { useEffect, useRef } from "react";
-import { Box } from "ink";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Static } from "ink";
+import type { AgentMode, DeepFactorAgentSettings } from "deep-factor-agent";
 import { useAgent } from "./hooks/useAgent.js";
 import { Header } from "./components/Header.js";
-import { Content } from "./components/Content.js";
-import { Footer } from "./components/Footer.js";
-import { bashTool } from "./tools/bash.js";
+import { LiveSection } from "./components/LiveSection.js";
+import { TranscriptTurn } from "./components/TranscriptTurn.js";
+import { createDefaultTools } from "./tools/default-tools.js";
+import { resolveProviderModel } from "./provider-resolution.js";
 import type { TuiAppProps } from "./types.js";
-import type { AgentTools } from "./types.js";
+import type {
+  AgentTools,
+  TranscriptTurn as TranscriptTurnData,
+  PendingSubmission,
+} from "./types.js";
+import { appendSession } from "./session-logger.js";
+import { groupMessagesIntoTurns } from "./transcript.js";
 
-export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }: TuiAppProps) {
+function formatPendingSubmission(submission: PendingSubmission): string {
+  switch (submission.kind) {
+    case "approve":
+      return "approve";
+    case "reject":
+      return "reject";
+    case "edit":
+      return submission.feedback;
+    case "choice":
+    case "text":
+      return submission.value;
+  }
+}
+
+export function TuiApp({
+  prompt,
+  provider,
+  model,
+  maxIter,
+  sandbox,
+  parallelToolCalls,
+  mode,
+  resumeMessages,
+  resumeThread,
+}: TuiAppProps) {
   const hasRun = useRef(false);
+  const [activeMode, setActiveMode] = useState<AgentMode>(mode ?? "yolo");
+  const [expandActiveFileReadGroups, setExpandActiveFileReadGroups] = useState(false);
 
-  const tools: AgentTools = enableBash ? [bashTool] : [];
+  const tools = useMemo<AgentTools>(() => createDefaultTools(sandbox), [sandbox]);
+  const resolvedModel = useMemo<DeepFactorAgentSettings["model"]>(
+    () => resolveProviderModel({ provider, model, mode: activeMode, liveUpdates: true }),
+    [provider, model, activeMode],
+  );
 
   const {
     messages,
@@ -19,37 +57,116 @@ export function TuiApp({ prompt, model, maxIter, enableBash, parallelToolCalls }
     usage,
     iterations,
     error,
+    plan,
     sendPrompt,
-    submitHumanInput,
-    humanInputRequest,
-  } = useAgent({ model, maxIter, tools, parallelToolCalls });
+    submitPendingInput,
+    pendingUiState,
+  } = useAgent({
+    model: resolvedModel,
+    modelLabel: model,
+    maxIter,
+    tools,
+    parallelToolCalls,
+    mode: activeMode,
+    provider,
+    initialMessages: resumeMessages,
+    initialThread: resumeThread,
+  });
 
-  // Send initial prompt on mount if provided
+  const handleCycleMode = useCallback(() => {
+    setActiveMode((currentMode) => {
+      switch (currentMode) {
+        case "plan":
+          return "approve";
+        case "approve":
+          return "yolo";
+        case "yolo":
+          return "plan";
+      }
+    });
+  }, []);
+
+  const handleSubmit = useCallback(
+    (value: string) => {
+      appendSession({
+        timestamp: new Date().toISOString(),
+        role: "user",
+        content: value,
+        model,
+        provider,
+      });
+      sendPrompt(value);
+    },
+    [model, provider, sendPrompt],
+  );
+
+  const handlePendingSubmit = useCallback(
+    (submission: PendingSubmission) => {
+      appendSession({
+        timestamp: new Date().toISOString(),
+        role: "user",
+        content: formatPendingSubmission(submission),
+        model,
+        provider,
+      });
+      submitPendingInput(submission);
+    },
+    [model, provider, submitPendingInput],
+  );
+
   useEffect(() => {
     if (prompt && !hasRun.current) {
       hasRun.current = true;
-      sendPrompt(prompt);
+      handleSubmit(prompt);
     }
-  }, [prompt, sendPrompt]);
+  }, [handleSubmit, prompt]);
 
-  const handleSubmit = (value: string) => {
-    if (status === "pending_input") {
-      submitHumanInput(value);
-    } else {
-      sendPrompt(value);
+  const transcriptTurns: TranscriptTurnData[] = useMemo(
+    () => groupMessagesIntoTurns(messages),
+    [messages],
+  );
+  const staticTurns = useMemo(() => transcriptTurns.slice(0, -1), [transcriptTurns]);
+  const activeTurn =
+    transcriptTurns.length > 0 ? transcriptTurns[transcriptTurns.length - 1] : null;
+
+  const prevActiveTurnId = useRef<string | null>(null);
+  if (activeTurn?.id !== prevActiveTurnId.current) {
+    prevActiveTurnId.current = activeTurn?.id ?? null;
+    if (expandActiveFileReadGroups) {
+      setExpandActiveFileReadGroups(false);
     }
-  };
+  }
+
+  const handleToggleFileReadGroups = useCallback(() => {
+    setExpandActiveFileReadGroups((current) => !current);
+  }, []);
 
   return (
-    <Box flexDirection="column" flexGrow={1}>
-      <Header model={model} status={status} />
-      <Content
-        messages={messages}
+    <>
+      <Header provider={provider} model={model} />
+      <Static items={staticTurns}>
+        {(turn) => <TranscriptTurn key={turn.id} turn={turn} isActiveTurn={false} />}
+      </Static>
+      {activeTurn && (
+        <TranscriptTurn
+          turn={activeTurn}
+          isActiveTurn={true}
+          expandFileReadGroups={expandActiveFileReadGroups}
+        />
+      )}
+      <LiveSection
+        mode={activeMode}
         status={status}
         error={error}
-        humanInputRequest={humanInputRequest}
+        plan={plan}
+        pendingUiState={pendingUiState}
+        usage={usage}
+        iterations={iterations}
+        onPromptSubmit={handleSubmit}
+        onPendingSubmit={handlePendingSubmit}
+        onCycleMode={handleCycleMode}
+        onToggleFileReadGroups={handleToggleFileReadGroups}
       />
-      <Footer usage={usage} iterations={iterations} status={status} onSubmit={handleSubmit} />
-    </Box>
+    </>
   );
 }

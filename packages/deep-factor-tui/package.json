@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "type": "module",
   "bin": {
-    "deep-factor-tui": "dist/cli.js"
+    "deepfactor": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,6 +17,7 @@
     "build": "tsc && node scripts/postbuild.js",
     "dev": "tsc --watch",
     "test": "vitest run",
+    "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "coverage": "vitest run --coverage",
@@ -24,8 +25,8 @@
   },
   "dependencies": {
     "deep-factor-agent": "workspace:*",
+    "diff": "^8.0.2",
     "dotenv": "^16.6.1",
-    "fullscreen-ink": "^0.1.0",
     "ink": "^6.8.0",
     "meow": "^13.2.0",
     "react": "^19.0.0",
@@ -39,7 +40,7 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
-  "description": "Fullscreen terminal UI for the [deep-factor-agent](../deep-factor-agent) — an LLM agent loop with tool use, human-in-the-loop, and token tracking. Built with [fullscreen-ink](https://github.com/DaniGuardiola/fullscreen-ink) (alternate screen buffer), [Ink](https://github.com/vadimdemedes/ink) (React for the terminal), and [meow](https://github.com/sindresorhus/meow) for arg parsing.",
+  "description": "Inline terminal UI for the [deep-factor-agent](../deep-factor-agent) — an LLM agent loop with tool use, human-in-the-loop, and token tracking. Built with [Ink](https://github.com/vadimdemedes/ink) (React for the terminal) and [meow](https://github.com/sindresorhus/meow) for arg parsing.",
   "keywords": [],
   "author": "",
   "license": "ISC"

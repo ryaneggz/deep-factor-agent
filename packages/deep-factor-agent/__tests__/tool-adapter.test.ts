@@ -25,6 +25,39 @@ describe("createLangChainTool", () => {
     expect(result).toBe("hello");
   });
 
+  it("uses ToolExecutionResult content for invoke while preserving raw execution", async () => {
+    const t = createLangChainTool("read_file", {
+      description: "Read a file",
+      schema: z.object({ path: z.string() }),
+      execute: async ({ path }) => ({
+        content: `Read ${path}`,
+        display: {
+          kind: "file_read" as const,
+          label: `Read(${path})`,
+          fileReads: [
+            {
+              path,
+              startLine: 1,
+              endLine: 1,
+              totalLines: 1,
+              previewLines: [" 1| hello"],
+            },
+          ],
+        },
+      }),
+    });
+
+    const result = await t.invoke({ path: "a.txt" });
+    const rawResult = await (t as { executeRaw: (args: unknown) => Promise<unknown> }).executeRaw({
+      path: "a.txt",
+    });
+    expect(result).toBe("Read a.txt");
+    expect(rawResult).toMatchObject({
+      content: "Read a.txt",
+      display: { label: "Read(a.txt)" },
+    });
+  });
+
   it("auto-stringifies non-string return values via JSON.stringify", async () => {
     const t = createLangChainTool("obj", {
       description: "Return an object",

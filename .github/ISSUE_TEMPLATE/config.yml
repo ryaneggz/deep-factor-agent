@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Project Setup and Usage
+    url: https://github.com/ryaneggz/deep-factor-agent/blob/master/README.md
+    about: For installation, workspace commands, and library usage questions.
+  - name: Agent Examples
+    url: https://github.com/ryaneggz/deep-factor-agent/blob/master/packages/deep-factor-agent/examples/README.md
+    about: For runnable examples and provider setup reference.
+  - name: TUI Usage and Manual Testing
+    url: https://github.com/ryaneggz/deep-factor-agent/blob/master/packages/deep-factor-tui/README.md
+    about: For TUI flags, provider modes, and interactive usage expectations.

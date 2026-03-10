@@ -1,1 +1,3 @@
-Create a simple express crud app at ./server. Write unit and integration tests.
+- Refactor current folder to a websocket server in typescript at ./server that interacts with the deepfactor cli.
+- Write unit and integration tests.
+- Remove express js crud server in ./server

@@ -13,13 +13,20 @@ export function execFileAsync(
   options: { timeout: number; maxBuffer: number },
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(file, args, { ...options, encoding: "utf8" }, (error, stdout) => {
-      if (error) {
-        reject(new Error(error.message));
-      } else {
-        resolve(stdout);
-      }
-    });
+    const child = execFile(
+      file,
+      args,
+      { ...options, encoding: "utf8" },
+      (error, stdout, stderr) => {
+        if (error) {
+          const detail = stderr?.trim();
+          reject(new Error(detail ? `${error.message}\n${detail}` : error.message));
+        } else {
+          resolve(stdout);
+        }
+      },
+    );
+    child.stdin?.end();
   });
 }
 

@@ -1,19 +1,36 @@
 import { tool } from "@langchain/core/tools";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { z } from "zod";
+import type { AgentTool, AgentToolMetadata, ToolExecutionResult } from "./types.js";
+
+function isToolExecutionResult(value: unknown): value is ToolExecutionResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "content" in value &&
+    typeof (value as { content: unknown }).content === "string"
+  );
+}
 
 export function createLangChainTool<T extends z.ZodType>(
   name: string,
   config: {
     description: string;
     schema: T;
-    execute: (args: z.infer<T>) => Promise<unknown>;
+    execute: (args: z.infer<T>) => Promise<string | ToolExecutionResult | unknown>;
+    metadata?: AgentToolMetadata;
   },
 ): StructuredToolInterface {
-  return tool(
+  const created = tool(
     async (args: z.infer<T>) => {
       const result = await config.execute(args);
-      return typeof result === "string" ? result : JSON.stringify(result);
+      if (typeof result === "string") {
+        return result;
+      }
+      if (isToolExecutionResult(result)) {
+        return result.content;
+      }
+      return JSON.stringify(result);
     },
     {
       name,
@@ -21,6 +38,9 @@ export function createLangChainTool<T extends z.ZodType>(
       schema: config.schema,
     },
   );
+  (created as AgentTool).metadata = config.metadata;
+  (created as AgentTool).executeRaw = config.execute as (args: unknown) => Promise<unknown>;
+  return created;
 }
 
 export function toolArrayToMap(
@@ -38,4 +58,9 @@ export function findToolByName(
   name: string,
 ): StructuredToolInterface | undefined {
   return tools.find((t) => t.name === name);
+}
+
+export function getToolMetadata(tool?: StructuredToolInterface): AgentToolMetadata | undefined {
+  if (!tool) return undefined;
+  return (tool as AgentTool).metadata;
 }
