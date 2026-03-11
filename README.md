@@ -1,24 +1,36 @@
 # deep-factor-agent
 
-A TypeScript library for building loop-based AI agents with middleware, verification, stop conditions, human-in-the-loop, and context management  aligned with the [12-factor agent](https://github.com/humanlayer/12-factor-agents) methodology.
+A TypeScript library for building loop-based AI agents with middleware, verification, stop conditions, human-in-the-loop, and context management aligned with the [12-factor agent](https://github.com/humanlayer/12-factor-agents) methodology.
 
 ## Overview
 
-`deep-factor-agent` wraps [LangChain's `initChatModel`](https://js.langchain.com/docs/how_to/chat_models_universal_init/) in an opinionated agent loop that gives you fine-grained control over iteration limits, cost guardrails, completion verification, context window management, and human escalation  all through a declarative configuration surface.
+`deep-factor-agent` wraps [LangChain's `initChatModel`](https://js.langchain.com/docs/how_to/chat_models_universal_init/) in an opinionated agent loop that gives you fine-grained control over iteration limits, cost guardrails, completion verification, context window management, and human escalation all through a declarative configuration surface.
 
-**Why a loop-based agent?** Single-shot LLM calls are rarely enough for non-trivial tasks. An agentic loop lets the model call tools, observe results, reflect, and iterate until the task is truly done  while stop conditions and middleware keep execution safe and observable.
+**Why a loop-based agent?** Single-shot LLM calls are rarely enough for non-trivial tasks. An agentic loop lets the model call tools, observe results, reflect, and iterate until the task is truly done while stop conditions and middleware keep execution safe and observable.
 
 ### Key capabilities
 
-- **Agentic loop**  iterative tool-calling with automatic message history
-- **Stop conditions**  cap iterations, tokens, or dollar cost
-- **Completion verification**  optionally verify the agent actually finished the task
-- **Middleware**  inject tools and lifecycle hooks (built-in: todo tracking, error recovery)
-- **Human-in-the-loop**  pause execution, collect human input, and resume
-- **Execution modes**  `plan`, `approve`, and `yolo` for planning-only, approval-gated, or unrestricted runs
-- **Context management**  automatic summarization when the context window fills up
-- **Streaming**  stream the first LLM turn for real-time UIs
-- **Universal model support**  string-based model IDs (`"openai:gpt-4.1-mini"`) or `BaseChatModel` instances
+- **Agentic loop** iterative tool-calling with automatic message history
+- **Multi-provider** LangChain models, Claude CLI, Codex CLI, and Claude Agent SDK via [`ModelAdapter`](docs/providers.md)
+- **Stop conditions** cap iterations, tokens, or dollar cost
+- **Completion verification** optionally verify the agent actually finished the task
+- **Middleware** inject tools and lifecycle hooks (built-in: todo tracking, error recovery)
+- **Human-in-the-loop** pause execution, collect human input, and resume
+- **Execution modes** `plan`, `approve`, and `yolo` for planning-only, approval-gated, or unrestricted runs
+- **Context management** automatic summarization when the context window fills up
+- **Unified logging** cross-provider JSONL log format with 16 event types for replay and validation
+- **Streaming** stream the first LLM turn for real-time UIs
+- **Parallel tool calls** execute independent tool calls concurrently
+- **Context modes** standard LangChain messages or XML-serialized thread for long-context coherence
+
+## Packages
+
+This monorepo contains two packages:
+
+| Package                                           | Description                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`deep-factor-agent`](packages/deep-factor-agent) | Core agent library loop, middleware, providers, stop conditions, unified log   |
+| [`deep-factor-tui`](packages/deep-factor-tui)     | Interactive terminal UI (`deepfactor` CLI), default tools, session persistence |
 
 ## Installation
 
@@ -26,7 +38,7 @@ A TypeScript library for building loop-based AI agents with middleware, verifica
 pnpm add deep-factor-agent langchain @langchain/core zod
 ```
 
-`langchain` and `@langchain/core` are runtime dependencies. `zod` (v4+) is a **peer dependency**  you must install it yourself.
+`langchain` and `@langchain/core` are runtime dependencies. `zod` (v4+) is a **peer dependency** you must install it yourself.
 
 You also need a model provider package, e.g.:
 
@@ -40,7 +52,7 @@ pnpm add @langchain/openai
 ```typescript
 import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 
-// String-based model ID (universal  requires provider package installed)
+// String-based model ID (universal  requires provider package installed)
 const agent = createDeepFactorAgent({
   model: "openai:gpt-4.1-mini",
   mode: "yolo",
@@ -65,6 +77,47 @@ const model = await initChatModel("gpt-4.1-mini", {
 });
 const agent = createDeepFactorAgent({ model });
 ```
+
+### Using CLI providers
+
+```typescript
+import { createDeepFactorAgent, createClaudeCliProvider } from "deep-factor-agent";
+
+const agent = createDeepFactorAgent({
+  model: createClaudeCliProvider({ model: "sonnet" }),
+  mode: "yolo",
+});
+
+const result = await agent.loop("Summarize this project.");
+```
+
+See [docs/providers.md](docs/providers.md) for Claude CLI, Codex CLI, and Claude Agent SDK options.
+
+## TUI (Terminal UI)
+
+The `deepfactor` CLI provides an interactive terminal interface:
+
+```bash
+# Interactive mode
+deepfactor
+
+# With prompt
+deepfactor "Explain how React hooks work"
+
+# Print mode (non-interactive)
+deepfactor -p "What is 2+2?"
+
+# JSONL unified log output
+deepfactor -p -o stream-json "What is 2+2?" > session.jsonl
+
+# Choose provider and mode
+deepfactor --provider claude --mode approve "Refactor this code"
+
+# Resume last session
+deepfactor -r
+```
+
+See [docs/tui-guide.md](docs/tui-guide.md) for all CLI flags, keyboard shortcuts, and session management.
 
 ## Usage Examples
 
@@ -101,8 +154,6 @@ if (result.stopReason === "human_input_needed") {
 }
 ```
 
-All other settings use sensible defaults  see the [Defaults table](#defaults) below.
-
 ### Agent with tools and verification
 
 ```typescript
@@ -110,7 +161,7 @@ import { createDeepFactorAgent, maxIterations } from "deep-factor-agent";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-const getWeather = tool(async ({ city }) => `726F and sunny in ${city}`, {
+const getWeather = tool(async ({ city }) => `726F and sunny in ${city}`, {
   name: "getWeather",
   description: "Get weather for a city",
   schema: z.object({ city: z.string() }),
@@ -122,7 +173,7 @@ const agent = createDeepFactorAgent({
   tools: [getWeather],
   stopWhen: [maxIterations(10)],
   verifyCompletion: async ({ result }) => ({
-    complete: result.includes("6F"),
+    complete: result.includes("6F"),
     reason: "Response must contain a temperature",
   }),
 });
@@ -154,7 +205,7 @@ const agent = createDeepFactorAgent({
 });
 ```
 
-Multiple conditions can be combined  the first one that triggers ends the loop.
+Multiple conditions can be combined the first one that triggers ends the loop.
 
 ### Human-in-the-loop
 
@@ -201,10 +252,30 @@ const agent = createDeepFactorAgent({
 });
 ```
 
----
+## Defaults
 
-_Last updated: 2026-03-10 19:28:03_
+| Setting                | Default                                         |
+| ---------------------- | ----------------------------------------------- |
+| `mode`                 | `"yolo"`                                        |
+| `stopWhen`             | `[maxIterations(10)]`                           |
+| `middleware`           | `[todoMiddleware(), errorRecoveryMiddleware()]` |
+| `contextMode`          | `"standard"`                                    |
+| `parallelToolCalls`    | `false`                                         |
+| `streamMode`           | `"final"`                                       |
+| `maxContextTokens`     | `150,000`                                       |
+| `keepRecentIterations` | `3`                                             |
 
-_Current directory: /home/ryaneggz/sandbox/2026/feb/deep-factor-agent_
+See [docs/configuration.md](docs/configuration.md) for the complete reference.
 
-_Hostname: legion-laptop_
+## Documentation
+
+| Document                                         | Description                                                     |
+| ------------------------------------------------ | --------------------------------------------------------------- |
+| [Architecture](docs/architecture.md)             | System design, package relationships, event-driven model        |
+| [Providers](docs/providers.md)                   | ModelAdapter interface, Claude CLI, Codex CLI, Claude Agent SDK |
+| [Unified Log Format](docs/unified-log.md)        | JSONL schema specification 16 event types                       |
+| [Configuration](docs/configuration.md)           | Complete options reference with defaults                        |
+| [TUI Guide](docs/tui-guide.md)                   | CLI flags, keyboard shortcuts, modes, sessions                  |
+| [Context Management](docs/context-management.md) | Summarization, token limits, standard vs XML modes              |
+| [Tools](docs/tools.md)                           | Tool creation, metadata, display, parallel execution            |
+| [Smoke Tests](docs/smoke-tests/README.md)        | Cross-provider log validation suite                             |
