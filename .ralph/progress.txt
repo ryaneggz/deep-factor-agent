@@ -231,3 +231,13 @@ Started: Tue Mar 10 23:40:04 MDT 2026
   - 17 `nextSequence(ctx)` calls in useAgent.ts, 16 `appendUnifiedSession` calls — the extra nextSequence is used in the init entry
   - Status events are written at 7 transition points (not just 4): running x2 (sendPrompt + submitPendingInput), done x2 (plan + normal), pending_input, error x2 (max_errors + catch)
 ---
+
+## 2026-03-11 00:32 - US-016
+- Pushed 15 local commits (US-001 through US-015) to origin/feat/unified-log-and-docs
+- All commits passed pre-commit hooks (typecheck + test) on push
+- git status shows working tree clean after push
+- Files changed: `.ralph/prd.json` (mark US-016 passes: true)
+- **Learnings for future iterations:**
+  - Pre-commit hooks run typecheck and test on every commit — each commit takes ~15s for hooks
+  - Push was clean (no conflicts, no force push needed) — the branch was created fresh for this PRD
+---

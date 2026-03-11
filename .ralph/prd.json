@@ -276,7 +276,7 @@
         "git log --oneline origin/feat/unified-log-and-docs shows all US-001 through US-015 commits"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": "Iteration 4: Push. Simple push — no force push. If remote is ahead, pull --rebase first then push."
     },
     {
