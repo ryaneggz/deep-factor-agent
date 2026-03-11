@@ -241,3 +241,14 @@ Started: Tue Mar 10 23:40:04 MDT 2026
   - Pre-commit hooks run typecheck and test on every commit — each commit takes ~15s for hooks
   - Push was clean (no conflicts, no force push needed) — the branch was created fresh for this PRD
 ---
+
+## 2026-03-11 00:34 - US-017
+- Found existing PR #20: "Add unified log format, log mappers, and comprehensive docs" (OPEN state)
+- PR URL: https://github.com/ryaneggz/deep-factor-agent/pull/20
+- PR is from feat/unified-log-and-docs to master — matches PRD branchName
+- No new PR creation needed — existing PR already covers this branch
+- Files changed: `.ralph/prd.json` (mark US-017 passes: true)
+- **Learnings for future iterations:**
+  - PR #20 was created in a prior iteration — always check for existing PRs before creating new ones
+  - The PR title may need updating if it doesn't reflect the full scope of TUI integration work
+---

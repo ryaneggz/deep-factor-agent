@@ -291,7 +291,7 @@
         "Log the final PR URL in progress.txt"
       ],
       "priority": 17,
-      "passes": false,
+      "passes": true,
       "notes": "Iteration 4: PR. Use gh CLI. Draft PR so it's not auto-merged. PR body should reference the 4 phases and 10 gaps (G1-G10) addressed."
     },
     {
