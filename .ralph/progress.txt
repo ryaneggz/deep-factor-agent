@@ -265,3 +265,16 @@ Started: Tue Mar 10 23:40:04 MDT 2026
   - `gh pr edit --body` fails with GraphQL error about Projects (classic) deprecation — use `gh api repos/.../pulls/N --method PATCH -f body=...` as workaround
   - Keep PR body text simple (no backticks in heredoc, no special chars) when using `gh api -f body=`
 ---
+
+## 2026-03-11 00:38 - US-019
+- Posted PR comment with 12 prioritized next steps on PR #20 (comment URL: https://github.com/ryaneggz/deep-factor-agent/pull/20#issuecomment-4036867998)
+- Synthesized from 32 learnings across 18 iterations, cross-referenced with SMOKE_TEST_PLAN.md known failures/limitations
+- Priorities: 2 critical (Claude CLI raw JSON, Codex CLI dropped results), 3 high (costUsd, file_change, durationMs), 4 medium (parallelGroup, token accuracy, display metadata, legacy overhead), 3 low (approve mode tests, visual regression, PR title)
+- No "Open Questions" section found in specs/unified-log-tui-gaps.md — all gaps addressed by implementation
+- Used `gh pr comment` (not `gh pr edit`) to post as a separate comment per acceptance criteria
+- Files changed: `.ralph/prd.json` (mark US-019 passes: true)
+- **Learnings for future iterations:**
+  - `gh pr comment` works without the Projects (classic) GraphQL error that affects `gh pr edit`
+  - The SMOKE_TEST_PLAN.md known failures (S8, S9) are the most impactful next priorities — they affect real provider scenarios
+  - All 8 known limitations from SMOKE_TEST_PLAN.md were captured as next priorities with impact ratings
+---

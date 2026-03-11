@@ -335,7 +335,7 @@
         "Log that the comment was posted in progress.txt"
       ],
       "priority": 19,
-      "passes": false,
+      "passes": true,
       "notes": "Iteration 4: FINAL story. Closes the feedback loop — learnings from THIS implementation become input for the NEXT sprint. The comment lives on the PR so it's discoverable during review and planning. Rank by impact not effort. Use 'gh pr comment' NOT 'gh pr edit'. Cross-reference: progress.txt learnings + SMOKE_TEST_PLAN.md known failures/limitations + unified-log-tui-gaps.md open questions."
     }
   ]
