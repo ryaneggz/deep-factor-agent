@@ -434,6 +434,16 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
         setError(new Error(detail));
         setPendingUiState(null);
+        // Write error entry for max_errors stop condition
+        appendUnifiedSession({
+          type: "error",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          error: detail,
+          recoverable: false,
+          iteration: ctx.currentIteration,
+        });
         appendUnifiedSession({
           type: "status",
           sessionId: ctx.sessionId,
@@ -465,6 +475,16 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   const handleError = useCallback((err: unknown) => {
     setError(err instanceof Error ? err : new Error(String(err)));
     const ctx = mapperCtxRef.current;
+    // Write error entry before status transition
+    appendUnifiedSession({
+      type: "error",
+      sessionId: ctx.sessionId,
+      timestamp: Date.now(),
+      sequence: nextSequence(ctx),
+      error: err instanceof Error ? err.stack || err.message : String(err),
+      recoverable: false,
+      iteration: ctx.currentIteration,
+    });
     appendUnifiedSession({
       type: "status",
       sessionId: ctx.sessionId,
