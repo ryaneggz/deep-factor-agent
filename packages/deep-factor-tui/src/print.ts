@@ -3,6 +3,9 @@ import {
   maxIterations,
   isPlanResult,
   isPendingResult,
+  mapAgentEvent,
+  serializeLogEntry,
+  nextSequence,
 } from "deep-factor-agent";
 import type {
   AgentResult,
@@ -10,12 +13,15 @@ import type {
   PlanResult,
   AgentMode,
   AgentExecutionUpdate,
+  UnifiedLogEntry,
 } from "deep-factor-agent";
+import type { MapperContext } from "deep-factor-agent";
 import type { SandboxMode } from "./tools/bash.js";
 import { createDefaultTools } from "./tools/default-tools.js";
 import { resolveProviderModel } from "./provider-resolution.js";
 import type { ProviderType } from "./types.js";
 import { DEFAULT_TUI_AGENT_INSTRUCTIONS } from "./default-agent-instructions.js";
+import { randomUUID } from "node:crypto";
 
 export type OutputFormat = "text" | "stream-json";
 
@@ -29,8 +35,8 @@ export interface PrintModeOptions {
   outputFormat?: OutputFormat;
 }
 
-function writeJsonLine(data: Record<string, unknown>): void {
-  process.stdout.write(JSON.stringify(data) + "\n");
+function writeUnifiedLine(entry: UnifiedLogEntry): void {
+  process.stdout.write(serializeLogEntry(entry) + "\n");
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<void> {
@@ -39,36 +45,75 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
 
   try {
     const tools = createDefaultTools(sandbox);
-    const resolvedModel = resolveProviderModel({ provider, model, mode });
+    const resolvedModel = resolveProviderModel({
+      provider,
+      model,
+      mode,
+      liveUpdates: isStreamJson,
+    });
+
+    const sessionId = randomUUID();
+
+    const mapperCtx: MapperContext = {
+      sessionId,
+      sequence: 0,
+      currentIteration: 0,
+      provider: provider as "langchain" | "claude" | "codex",
+      model,
+      mode,
+    };
+
+    // All entries share the single MapperContext.sequence counter
+    function buildEntry<T extends UnifiedLogEntry["type"]>(
+      type: T,
+      fields: Omit<
+        Extract<UnifiedLogEntry, { type: T }>,
+        "type" | "sessionId" | "timestamp" | "sequence"
+      >,
+    ): Extract<UnifiedLogEntry, { type: T }> {
+      return {
+        type,
+        sessionId,
+        timestamp: Date.now(),
+        sequence: nextSequence(mapperCtx),
+        ...fields,
+      } as Extract<UnifiedLogEntry, { type: T }>;
+    }
+
+    let lastStatusKey: string | undefined;
 
     const onUpdate = isStreamJson
       ? (update: AgentExecutionUpdate) => {
-          const { lastEvent, usage, iterations, status, stopReason } = update;
+          const { lastEvent, usage, iterations, status } = update;
           if (lastEvent) {
-            writeJsonLine({
-              type: "event",
-              event: lastEvent,
-              usage,
-              iterations,
-              status,
-              ...(stopReason ? { stopReason } : {}),
-            });
+            for (const entry of mapAgentEvent(lastEvent, mapperCtx)) {
+              writeUnifiedLine(entry);
+            }
           } else {
-            writeJsonLine({ type: "status", usage, iterations, status });
+            // Deduplicate consecutive identical status-only updates
+            const key = `${status}|${iterations}|${usage.inputTokens}|${usage.outputTokens}`;
+            if (key === lastStatusKey) return;
+            lastStatusKey = key;
+            writeUnifiedLine(
+              buildEntry("status", {
+                status: status as "running" | "pending_input" | "done" | "error",
+                usage,
+                iterations,
+              }),
+            );
           }
         }
       : undefined;
 
     if (isStreamJson) {
-      writeJsonLine({
-        type: "init",
-        provider,
-        model,
-        mode,
-        maxIter,
-        sandbox,
-        timestamp: Date.now(),
-      });
+      writeUnifiedLine(
+        buildEntry("init", {
+          provider: provider as "langchain" | "claude" | "codex",
+          model,
+          mode,
+          settings: { maxIter, sandbox },
+        }),
+      );
     }
 
     const agent = createDeepFactorAgent({
@@ -92,10 +137,12 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
 
     if (finalResult.stopReason === "human_input_needed") {
       if (isStreamJson) {
-        writeJsonLine({
-          type: "error",
-          error: "Agent requested human input in non-interactive print mode.",
-        });
+        writeUnifiedLine(
+          buildEntry("error", {
+            error: "Agent requested human input in non-interactive print mode.",
+            recoverable: false,
+          }),
+        );
       }
       process.stderr.write("Error: Agent requested human input in non-interactive print mode.\n");
       process.exit(1);
@@ -104,7 +151,12 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
     if (finalResult.stopReason === "max_errors") {
       const detail = finalResult.stopDetail ?? "Agent stopped due to repeated errors";
       if (isStreamJson) {
-        writeJsonLine({ type: "error", error: detail });
+        writeUnifiedLine(
+          buildEntry("error", {
+            error: detail,
+            recoverable: false,
+          }),
+        );
       }
       process.stderr.write(`Error: ${detail}\n`);
       process.exit(1);
@@ -113,13 +165,14 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
     const finalText = isPlanResult(finalResult) ? finalResult.plan : finalResult.response;
 
     if (isStreamJson) {
-      writeJsonLine({
-        type: "result",
-        content: finalText,
-        stopReason: finalResult.stopReason,
-        usage: finalResult.usage,
-        iterations: finalResult.iterations,
-      });
+      writeUnifiedLine(
+        buildEntry("result", {
+          content: finalText,
+          stopReason: finalResult.stopReason,
+          usage: finalResult.usage,
+          iterations: finalResult.iterations,
+        }),
+      );
     } else {
       process.stdout.write(finalText);
     }
@@ -128,7 +181,14 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (isStreamJson) {
-      writeJsonLine({ type: "error", error: message });
+      writeUnifiedLine({
+        type: "error",
+        sessionId: randomUUID(),
+        timestamp: Date.now(),
+        sequence: 0,
+        error: message,
+        recoverable: false,
+      } as UnifiedLogEntry);
     }
     process.stderr.write(`Error: ${message}\n`);
     process.exit(1);

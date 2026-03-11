@@ -90,6 +90,52 @@ export {
   getToolMetadata,
 } from "./tool-adapter.js";
 
+// Unified log format
+export type {
+  UnifiedLogType,
+  UnifiedLogBase,
+  UnifiedLogEntry,
+  InitLog,
+  MessageLog,
+  ThinkingLog,
+  ToolCallLog,
+  ToolResultLog,
+  FileChangeLog,
+  ErrorLog,
+  ApprovalLog,
+  HumanInputRequestedLog,
+  HumanInputReceivedLog,
+  PlanLog as UnifiedPlanLog,
+  SummaryLog as UnifiedSummaryLog,
+  StatusLog,
+  RateLimitLog,
+  CompletionLog,
+  ResultLog,
+  ProviderType as UnifiedProviderType,
+} from "./unified-log.js";
+
+export {
+  createLogEntry,
+  parseLogLine,
+  parseLogLines,
+  serializeLogEntry,
+  resetSequence,
+} from "./unified-log.js";
+
+// Log mappers
+export {
+  mapClaudeEvent,
+  mapCodexEvent,
+  mapLangchainEvent,
+  mapAgentEvent,
+  replayLog,
+  logToThread,
+  logToChatMessages,
+  nextSequence,
+} from "./log-mappers/index.js";
+
+export type { MapperContext } from "./log-mappers/index.js";
+
 // XML thread serializer
 export { serializeThreadToXml, escapeXml } from "./xml-serializer.js";
 export type { XmlSerializerOptions } from "./xml-serializer.js";

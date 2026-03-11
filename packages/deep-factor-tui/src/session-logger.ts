@@ -9,7 +9,8 @@ import {
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
-import type { AgentThread, AgentEvent } from "deep-factor-agent";
+import type { AgentThread, AgentEvent, UnifiedLogEntry } from "deep-factor-agent";
+import { serializeLogEntry } from "deep-factor-agent";
 import { DEFAULT_MODELS, DEFAULT_PROVIDER, normalizeProvider } from "./types.js";
 import type { ProviderType, ProviderInput } from "./types.js";
 import type { ToolDisplayMetadata } from "deep-factor-agent";
@@ -18,6 +19,10 @@ const SESSIONS_DIR = join(homedir(), ".deepfactor", "sessions");
 
 let currentSessionId: string | undefined;
 
+/**
+ * @deprecated Use UnifiedLogEntry from deep-factor-agent instead.
+ * Kept for backward compatibility with existing session files.
+ */
 export interface SessionEntry {
   timestamp: string;
   sessionId: string;
@@ -27,6 +32,7 @@ export interface SessionEntry {
   toolArgs?: Record<string, unknown>;
   toolCallId?: string;
   toolDisplay?: ToolDisplayMetadata;
+  parallelGroup?: string;
   model?: string;
   provider?: ProviderInput;
 }
@@ -53,18 +59,234 @@ function sessionFilePath(id: string): string {
   return join(SESSIONS_DIR, `${id}.jsonl`);
 }
 
-export function appendSession(entry: Omit<SessionEntry, "sessionId">): void {
+let _sessionSequence = 0;
+
+/**
+ * Append a unified log entry to the session file.
+ */
+export function appendUnifiedSession(entry: UnifiedLogEntry): void {
   ensureSessionsDir();
   const id = getSessionId();
-  const fullEntry: SessionEntry = { ...entry, sessionId: id };
-  appendFileSync(sessionFilePath(id), JSON.stringify(fullEntry) + "\n");
+  // Ensure the entry uses the current session ID
+  const withSession = { ...entry, sessionId: id };
+  appendFileSync(sessionFilePath(id), serializeLogEntry(withSession) + "\n");
 }
 
+/**
+ * Append a legacy SessionEntry, converting it to a unified log entry.
+ */
+export function appendSession(entry: Omit<SessionEntry, "sessionId">): void {
+  const id = getSessionId();
+  const ts = new Date(entry.timestamp).getTime() || Date.now();
+
+  let unified: UnifiedLogEntry;
+
+  switch (entry.role) {
+    case "user":
+      unified = {
+        type: "message",
+        sessionId: id,
+        timestamp: ts,
+        sequence: _sessionSequence++,
+        role: "user",
+        content: entry.content,
+        iteration: 0,
+        providerMeta: {
+          model: entry.model,
+          provider: entry.provider,
+        },
+      };
+      break;
+
+    case "assistant":
+      unified = {
+        type: "message",
+        sessionId: id,
+        timestamp: ts,
+        sequence: _sessionSequence++,
+        role: "assistant",
+        content: entry.content,
+        iteration: 0,
+        providerMeta: {
+          model: entry.model,
+          provider: entry.provider,
+        },
+      };
+      break;
+
+    case "tool_call":
+      unified = {
+        type: "tool_call",
+        sessionId: id,
+        timestamp: ts,
+        sequence: _sessionSequence++,
+        toolCallId: entry.toolCallId ?? randomUUID(),
+        toolName: entry.toolName ?? "unknown",
+        args: entry.toolArgs ?? {},
+        display: entry.toolDisplay,
+        parallelGroup: entry.parallelGroup,
+        iteration: 0,
+      };
+      break;
+
+    case "tool_result":
+      unified = {
+        type: "tool_result",
+        sessionId: id,
+        timestamp: ts,
+        sequence: _sessionSequence++,
+        toolCallId: entry.toolCallId ?? randomUUID(),
+        result: entry.content,
+        isError: false,
+        display: entry.toolDisplay,
+        parallelGroup: entry.parallelGroup,
+        iteration: 0,
+      };
+      break;
+  }
+
+  appendUnifiedSession(unified);
+}
+
+/**
+ * Load a session file. Handles both legacy SessionEntry and unified log formats.
+ */
 export function loadSession(id: string): SessionEntry[] {
   const filePath = sessionFilePath(id);
   if (!existsSync(filePath)) return [];
   const lines = readFileSync(filePath, "utf-8").trim().split("\n");
-  return lines.filter(Boolean).map((line) => JSON.parse(line) as SessionEntry);
+  return lines.filter(Boolean).map((line) => {
+    const parsed = JSON.parse(line);
+    // If it's already a unified log entry, convert to legacy format
+    if (parsed.type && !parsed.role && parsed.sessionId && parsed.sequence !== undefined) {
+      return unifiedToSessionEntry(parsed as UnifiedLogEntry);
+    }
+    return parsed as SessionEntry;
+  });
+}
+
+/**
+ * Load a session as unified log entries.
+ */
+export function loadUnifiedSession(id: string): UnifiedLogEntry[] {
+  const filePath = sessionFilePath(id);
+  if (!existsSync(filePath)) return [];
+  const lines = readFileSync(filePath, "utf-8").trim().split("\n");
+  return lines.filter(Boolean).map((line) => {
+    const parsed = JSON.parse(line);
+    // If it's a legacy SessionEntry, convert to unified
+    if (parsed.role && !parsed.sequence) {
+      return sessionEntryToUnified(parsed as SessionEntry);
+    }
+    return parsed as UnifiedLogEntry;
+  });
+}
+
+function unifiedToSessionEntry(entry: UnifiedLogEntry): SessionEntry {
+  const base: SessionEntry = {
+    timestamp: new Date(entry.timestamp).toISOString(),
+    sessionId: entry.sessionId,
+    role: "assistant",
+    content: "",
+    model: (entry.providerMeta?.model as string) ?? undefined,
+    provider: (entry.providerMeta?.provider as ProviderInput) ?? undefined,
+  };
+
+  switch (entry.type) {
+    case "message":
+      return {
+        ...base,
+        role: entry.role === "system" ? "assistant" : entry.role,
+        content: entry.content,
+      };
+
+    case "tool_call":
+      return {
+        ...base,
+        role: "tool_call",
+        content: JSON.stringify(entry.args),
+        toolName: entry.toolName,
+        toolArgs: entry.args,
+        toolCallId: entry.toolCallId,
+        toolDisplay: entry.display,
+        parallelGroup: entry.parallelGroup,
+      };
+
+    case "tool_result":
+      return {
+        ...base,
+        role: "tool_result",
+        content: typeof entry.result === "string" ? entry.result : JSON.stringify(entry.result),
+        toolCallId: entry.toolCallId,
+        toolDisplay: entry.display,
+        parallelGroup: entry.parallelGroup,
+      };
+
+    case "completion":
+      return {
+        ...base,
+        role: "assistant",
+        content: entry.result,
+      };
+
+    default:
+      return base;
+  }
+}
+
+function sessionEntryToUnified(entry: SessionEntry): UnifiedLogEntry {
+  const ts = new Date(entry.timestamp).getTime() || Date.now();
+  const base = {
+    sessionId: entry.sessionId,
+    timestamp: ts,
+    sequence: 0,
+  };
+
+  switch (entry.role) {
+    case "user":
+      return {
+        ...base,
+        type: "message" as const,
+        role: "user" as const,
+        content: entry.content,
+        iteration: 0,
+        providerMeta: { model: entry.model, provider: entry.provider },
+      };
+
+    case "assistant":
+      return {
+        ...base,
+        type: "message" as const,
+        role: "assistant" as const,
+        content: entry.content,
+        iteration: 0,
+        providerMeta: { model: entry.model, provider: entry.provider },
+      };
+
+    case "tool_call":
+      return {
+        ...base,
+        type: "tool_call" as const,
+        toolCallId: entry.toolCallId ?? randomUUID(),
+        toolName: entry.toolName ?? "unknown",
+        args: entry.toolArgs ?? {},
+        display: entry.toolDisplay,
+        parallelGroup: entry.parallelGroup,
+        iteration: 0,
+      };
+
+    case "tool_result":
+      return {
+        ...base,
+        type: "tool_result" as const,
+        toolCallId: entry.toolCallId ?? randomUUID(),
+        result: entry.content,
+        isError: false,
+        display: entry.toolDisplay,
+        parallelGroup: entry.parallelGroup,
+        iteration: 0,
+      };
+  }
 }
 
 export function resolveSessionSettings(args: {
@@ -147,6 +369,7 @@ export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
           toolCallId: tcId,
           args: entry.toolArgs ?? {},
           display: entry.toolDisplay,
+          parallelGroup: entry.parallelGroup,
           timestamp: ts,
           iteration,
         });
@@ -158,6 +381,7 @@ export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
           toolCallId: entry.toolCallId ?? (lastToolCallId || randomUUID()),
           result: entry.content,
           display: entry.toolDisplay,
+          parallelGroup: entry.parallelGroup,
           timestamp: ts,
           iteration,
         });
@@ -173,4 +397,22 @@ export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
     createdAt: events[0]?.timestamp ?? now,
     updatedAt: events[events.length - 1]?.timestamp ?? now,
   };
+}
+
+/**
+ * Build an AgentThread from unified log entries.
+ */
+export function buildThreadFromUnifiedSession(entries: UnifiedLogEntry[]): AgentThread {
+  // Convert to legacy format and reuse existing logic
+  const sessionEntries = entries
+    .filter(
+      (e) =>
+        e.type === "message" ||
+        e.type === "tool_call" ||
+        e.type === "tool_result" ||
+        e.type === "completion",
+    )
+    .map(unifiedToSessionEntry);
+
+  return buildThreadFromSession(sessionEntries);
 }

@@ -314,6 +314,22 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
     };
   }
 
+  function stripToolCallJsonBlock(text: string): string {
+    return text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
+  }
+
+  function addToolCallFromParsed(
+    tc: { name: string; args: Record<string, unknown>; id: string },
+    state: ClaudeCliStreamState,
+    onUpdate?: (update: ModelInvocationUpdate) => void,
+  ): void {
+    if (state.toolCalls.some((existing) => existing.id === tc.id)) {
+      return; // dedup
+    }
+    state.toolCalls.push(tc);
+    onUpdate?.({ type: "tool_call", toolCall: tc });
+  }
+
   function addToolCallFromBlock(
     block: Record<string, unknown>,
     state: ClaudeCliStreamState,
@@ -351,10 +367,21 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
 
     state.sawAssistantBlock = true;
     state.textBlocks.push(normalized);
-    onUpdate?.({
-      type: "assistant_message",
-      content: normalized,
-    });
+
+    // Parse tool calls from text; if found, emit them as tool_call updates
+    // and strip the JSON block before emitting assistant_message
+    const toolCalls = parseToolCalls(normalized);
+    if (toolCalls.length > 0) {
+      for (const toolCall of toolCalls) {
+        addToolCallFromParsed(toolCall, state, onUpdate);
+      }
+      const stripped = stripToolCallJsonBlock(normalized);
+      if (stripped) {
+        onUpdate?.({ type: "assistant_message", content: stripped });
+      }
+    } else {
+      onUpdate?.({ type: "assistant_message", content: normalized });
+    }
   }
 
   function readNestedProperty(record: Record<string, unknown>, path: string[]): unknown {

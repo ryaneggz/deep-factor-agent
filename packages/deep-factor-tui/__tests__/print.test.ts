@@ -24,16 +24,22 @@ const {
   };
 });
 
-vi.mock("deep-factor-agent", () => ({
-  createDeepFactorAgent: mockCreateAgent,
-  createClaudeCliProvider: mockCreateClaudeCliProvider,
-  createCodexCliProvider: mockCreateCodexCliProvider,
-  maxIterations: vi.fn((n: number) => ({ name: "maxIterations", maxIter: n })),
-  isPlanResult: vi.fn((result: { mode?: string }) => result.mode === "plan"),
-  isPendingResult: vi.fn(
-    (result: { stopReason?: string }) => result.stopReason === "human_input_needed",
-  ),
-}));
+vi.mock("deep-factor-agent", () => {
+  const _seq = 0;
+  return {
+    createDeepFactorAgent: mockCreateAgent,
+    createClaudeCliProvider: mockCreateClaudeCliProvider,
+    createCodexCliProvider: mockCreateCodexCliProvider,
+    maxIterations: vi.fn((n: number) => ({ name: "maxIterations", maxIter: n })),
+    isPlanResult: vi.fn((result: { mode?: string }) => result.mode === "plan"),
+    isPendingResult: vi.fn(
+      (result: { stopReason?: string }) => result.stopReason === "human_input_needed",
+    ),
+    nextSequence: vi.fn((ctx: { sequence: number }) => ctx.sequence++),
+    mapAgentEvent: vi.fn((event: Record<string, unknown>) => [event]),
+    serializeLogEntry: vi.fn((entry: unknown) => JSON.stringify(entry)),
+  };
+});
 
 vi.mock("../src/tools/default-tools.js", () => ({
   createDefaultTools: () => [

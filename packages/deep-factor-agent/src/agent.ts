@@ -1142,6 +1142,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       const appendToolCallIfNew = (
         tc: { name: string; args?: Record<string, unknown>; id?: string },
         timestamp = Date.now(),
+        parallelGroup?: string,
       ): void => {
         const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
         if (emittedToolCallIds.has(toolCallId)) {
@@ -1156,6 +1157,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
             toolCallId,
             args: (tc.args ?? {}) as Record<string, unknown>,
             display: buildToolCallDisplay(tc.name, (tc.args ?? {}) as Record<string, unknown>),
+            parallelGroup,
             timestamp,
             iteration,
           },
@@ -1268,7 +1270,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
 
             // Record ToolCallEvents for parallel batch upfront
             for (const tc of parallelBatch) {
-              appendToolCallIfNew(tc, now);
+              appendToolCallIfNew(tc, now, groupId);
             }
 
             // Execute parallel batch via Promise.all with per-tool timing

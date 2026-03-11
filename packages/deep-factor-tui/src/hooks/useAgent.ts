@@ -179,6 +179,7 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           toolName: event.toolName,
           toolArgs: event.args,
           toolCallId: event.toolCallId,
+          parallelGroup: event.parallelGroup,
           toolDisplay: event.display,
         });
         break;

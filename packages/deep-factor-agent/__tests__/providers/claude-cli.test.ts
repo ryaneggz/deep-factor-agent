@@ -501,6 +501,63 @@ describe("createClaudeCliProvider", () => {
     expect(result.tool_calls).toEqual([]);
   });
 
+  it("strips JSON-in-text tool calls from assistant_message updates in stream-json mode", async () => {
+    const textWithToolJson = `I'll run that command for you.
+
+\`\`\`json
+{
+  "tool_calls": [
+    {
+      "name": "bash",
+      "args": { "command": "echo hello" },
+      "id": "call_1"
+    }
+  ]
+}
+\`\`\``;
+
+    simulateSpawnStream([
+      `${JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [{ type: "text", text: textWithToolJson }],
+          usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+        },
+      })}\n`,
+      `${JSON.stringify({
+        type: "result",
+        subtype: "success",
+        result: "I'll run that command for you.",
+        usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      })}\n`,
+    ]);
+    const provider = createClaudeCliProvider({ outputFormat: "stream-json" });
+    const updates: Array<{ type: string; content?: string; toolCall?: unknown }> = [];
+
+    await provider.invokeWithUpdates!([new HumanMessage("Run echo hello")], (update) =>
+      updates.push(update),
+    );
+
+    // tool_call should come before assistant_message
+    const types = updates.map((u) => u.type);
+    expect(types).toContain("tool_call");
+
+    // assistant_message should NOT contain the JSON block
+    const assistantMsgs = updates.filter((u) => u.type === "assistant_message");
+    for (const msg of assistantMsgs) {
+      expect(msg.content).not.toContain("```json");
+      expect(msg.content).not.toContain("tool_calls");
+    }
+
+    // tool_call update should have the parsed tool call
+    const toolCallUpdate = updates.find((u) => u.type === "tool_call");
+    expect(toolCallUpdate?.toolCall).toEqual({
+      name: "bash",
+      args: { command: "echo hello" },
+      id: "call_1",
+    });
+  });
+
   it("surfaces malformed stream-json lines as provider errors immediately", async () => {
     simulateSpawnStream([
       '{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}\n',

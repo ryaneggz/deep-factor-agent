@@ -69,6 +69,7 @@ export interface ToolCallEvent extends BaseEvent {
   toolCallId: string;
   args: Record<string, unknown>;
   display?: ToolDisplayMetadata;
+  parallelGroup?: string;
 }
 
 export interface ApprovalEvent extends BaseEvent {

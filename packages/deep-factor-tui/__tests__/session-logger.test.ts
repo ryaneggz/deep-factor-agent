@@ -130,6 +130,59 @@ describe("resolveSessionSettings", () => {
     });
   });
 
+  it("preserves parallelGroup on tool_call and tool_result when rebuilding a thread", () => {
+    const thread = buildThreadFromSession([
+      {
+        timestamp: "2026-03-08T10:00:00.000Z",
+        sessionId: "abc",
+        role: "tool_call",
+        content: "bash",
+        toolName: "bash",
+        toolArgs: { command: "ls" },
+        toolCallId: "tc-1",
+        parallelGroup: "pg_batch_1",
+      },
+      {
+        timestamp: "2026-03-08T10:00:00.000Z",
+        sessionId: "abc",
+        role: "tool_call",
+        content: "read_file",
+        toolName: "read_file",
+        toolArgs: { path: "/tmp/a" },
+        toolCallId: "tc-2",
+        parallelGroup: "pg_batch_1",
+      },
+      {
+        timestamp: "2026-03-08T10:00:01.000Z",
+        sessionId: "abc",
+        role: "tool_result",
+        content: "file.txt",
+        toolCallId: "tc-1",
+        parallelGroup: "pg_batch_1",
+      },
+      {
+        timestamp: "2026-03-08T10:00:01.000Z",
+        sessionId: "abc",
+        role: "tool_result",
+        content: "contents",
+        toolCallId: "tc-2",
+        parallelGroup: "pg_batch_1",
+      },
+    ]);
+
+    const tcs = thread.events.filter((e) => e.type === "tool_call");
+    const trs = thread.events.filter((e) => e.type === "tool_result");
+
+    expect(tcs).toHaveLength(2);
+    expect(trs).toHaveLength(2);
+    for (const tc of tcs) {
+      expect((tc as { parallelGroup?: string }).parallelGroup).toBe("pg_batch_1");
+    }
+    for (const tr of trs) {
+      expect((tr as { parallelGroup?: string }).parallelGroup).toBe("pg_batch_1");
+    }
+  });
+
   it("round-trips stored file-read metadata when rebuilding a thread", () => {
     const thread = buildThreadFromSession([
       {
