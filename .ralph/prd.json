@@ -313,7 +313,7 @@
         "Log the updated PR URL in progress.txt"
       ],
       "priority": 18,
-      "passes": false,
+      "passes": true,
       "notes": "Iteration 4: Smoke tests from learnings. DO NOT use pre-canned smoke tests. READ .ralph/progress.txt to find what actually broke, what was tricky, what edge cases were discovered. Build the smoke test checklist FROM those real learnings. Use 'gh pr edit <PR_NUMBER> --body' to update. Format: checkbox per test, cite the learning that motivates it."
     },
     {

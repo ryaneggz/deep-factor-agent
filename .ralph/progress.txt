@@ -252,3 +252,16 @@ Started: Tue Mar 10 23:40:04 MDT 2026
   - PR #20 was created in a prior iteration — always check for existing PRs before creating new ones
   - The PR title may need updating if it doesn't reflect the full scope of TUI integration work
 ---
+
+## 2026-03-11 00:36 - US-018
+- Updated PR #20 body with comprehensive Human Smoke Tests section derived from progress.txt learnings
+- 15 smoke test checkboxes covering: structural validation, init/result schemas, iteration tracking, status/error events, legacy compat, user messages, TUI components (4), LangChain thinking, and smoke matrix (2)
+- Added "Gotchas Found During Implementation" subsection with 5 critical learnings
+- Added reference links to spec, validator, and smoke test plan
+- Used `gh api` REST endpoint because `gh pr edit` failed with "Projects (classic) deprecation" GraphQL error
+- PR URL: https://github.com/ryaneggz/deep-factor-agent/pull/20
+- Files changed: `.ralph/prd.json` (mark US-018 passes: true)
+- **Learnings for future iterations:**
+  - `gh pr edit --body` fails with GraphQL error about Projects (classic) deprecation — use `gh api repos/.../pulls/N --method PATCH -f body=...` as workaround
+  - Keep PR body text simple (no backticks in heredoc, no special chars) when using `gh api -f body=`
+---
