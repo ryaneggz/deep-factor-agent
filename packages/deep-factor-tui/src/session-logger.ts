@@ -20,10 +20,10 @@ const SESSIONS_DIR = join(homedir(), ".deepfactor", "sessions");
 let currentSessionId: string | undefined;
 
 /**
- * @deprecated Use UnifiedLogEntry from deep-factor-agent instead.
- * Kept for backward compatibility with existing session files.
+ * @internal Legacy format kept only for reading old session files.
+ * Not exported — use UnifiedLogEntry for all new code.
  */
-export interface SessionEntry {
+interface SessionEntry {
   timestamp: string;
   sessionId: string;
   role: "user" | "assistant" | "tool_call" | "tool_result";
@@ -59,9 +59,6 @@ function sessionFilePath(id: string): string {
   return join(SESSIONS_DIR, `${id}.jsonl`);
 }
 
-/** @deprecated Legacy sequence counter used only by appendSession(). Will be removed with US-012. */
-let _sessionSequence = 0;
-
 /**
  * Append a unified log entry to the session file.
  */
@@ -71,82 +68,6 @@ export function appendUnifiedSession(entry: UnifiedLogEntry): void {
   // Ensure the entry uses the current session ID
   const withSession = { ...entry, sessionId: id };
   appendFileSync(sessionFilePath(id), serializeLogEntry(withSession) + "\n");
-}
-
-/**
- * Append a legacy SessionEntry, converting it to a unified log entry.
- */
-export function appendSession(entry: Omit<SessionEntry, "sessionId">): void {
-  const id = getSessionId();
-  const ts = new Date(entry.timestamp).getTime() || Date.now();
-
-  let unified: UnifiedLogEntry;
-
-  switch (entry.role) {
-    case "user":
-      unified = {
-        type: "message",
-        sessionId: id,
-        timestamp: ts,
-        sequence: _sessionSequence++,
-        role: "user",
-        content: entry.content,
-        iteration: 0,
-        providerMeta: {
-          model: entry.model,
-          provider: entry.provider,
-        },
-      };
-      break;
-
-    case "assistant":
-      unified = {
-        type: "message",
-        sessionId: id,
-        timestamp: ts,
-        sequence: _sessionSequence++,
-        role: "assistant",
-        content: entry.content,
-        iteration: 0,
-        providerMeta: {
-          model: entry.model,
-          provider: entry.provider,
-        },
-      };
-      break;
-
-    case "tool_call":
-      unified = {
-        type: "tool_call",
-        sessionId: id,
-        timestamp: ts,
-        sequence: _sessionSequence++,
-        toolCallId: entry.toolCallId ?? randomUUID(),
-        toolName: entry.toolName ?? "unknown",
-        args: entry.toolArgs ?? {},
-        display: entry.toolDisplay,
-        parallelGroup: entry.parallelGroup,
-        iteration: 0,
-      };
-      break;
-
-    case "tool_result":
-      unified = {
-        type: "tool_result",
-        sessionId: id,
-        timestamp: ts,
-        sequence: _sessionSequence++,
-        toolCallId: entry.toolCallId ?? randomUUID(),
-        result: entry.content,
-        isError: false,
-        display: entry.toolDisplay,
-        parallelGroup: entry.parallelGroup,
-        iteration: 0,
-      };
-      break;
-  }
-
-  appendUnifiedSession(unified);
 }
 
 /**
