@@ -220,12 +220,13 @@ describe("useAgent", () => {
     });
     await flush();
 
-    expect(appendUnifiedSessionMock).toHaveBeenCalledTimes(4);
+    expect(appendUnifiedSessionMock).toHaveBeenCalledTimes(5);
     expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
       "init",
+      "message", // user message logged at submit time
       "tool_call",
       "tool_result",
-      "message",
+      "message", // assistant message
     ]);
   });
 
@@ -621,10 +622,11 @@ describe("useAgent", () => {
 
     expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
       "init",
-      "message",
+      "message", // user message logged at submit time
+      "message", // assistant envelope message
       "tool_call",
       "tool_result",
-      "message",
+      "message", // assistant message
     ]);
   });
 });

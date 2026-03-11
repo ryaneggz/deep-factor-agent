@@ -41,10 +41,7 @@ vi.mock("deep-factor-agent", () => ({
   createCodexCliProvider: createCodexCliProviderMock,
 }));
 
-const appendSessionMock = vi.fn();
-vi.mock("../src/session-logger.js", () => ({
-  appendSession: appendSessionMock,
-}));
+vi.mock("../src/session-logger.js", () => ({}));
 
 // Import after mocks are set up
 const { TuiApp } = await import("../src/app.js");
@@ -87,7 +84,6 @@ describe("TuiApp integration", () => {
       submitPendingInput: vi.fn(),
       pendingUiState: null,
     };
-    appendSessionMock.mockReset();
     useAgentMock.mockClear();
     createClaudeCliProviderMock.mockClear();
     createCodexCliProviderMock.mockClear();
@@ -130,29 +126,18 @@ describe("TuiApp integration", () => {
     stdin.write("a");
 
     expect(submitPendingInput).toHaveBeenCalledWith({ kind: "approve" });
-    expect(appendSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        role: "user",
-        content: "approve",
-        provider: "langchain",
-        model: "gpt-4",
-      }),
-    );
+    // User message logging now happens inside useAgent (not app.tsx)
   });
 
   it("logs the initial prompt with provider and model", () => {
+    const sendPrompt = vi.fn();
+    mockUseAgent = { ...mockUseAgent, sendPrompt };
     render(
       <TuiApp prompt="Hello" provider="langchain" model="gpt-4" maxIter={10} sandbox="workspace" />,
     );
 
-    expect(appendSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        role: "user",
-        content: "Hello",
-        provider: "langchain",
-        model: "gpt-4",
-      }),
-    );
+    // User message logging now happens inside useAgent.ts sendPrompt()
+    expect(sendPrompt).toHaveBeenCalledWith("Hello");
   });
 
   it("does not resolve the Claude CLI provider for langchain runs", () => {

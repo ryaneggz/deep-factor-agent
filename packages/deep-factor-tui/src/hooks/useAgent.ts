@@ -425,6 +425,21 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         });
       }
 
+      // Log user message at submit time
+      {
+        const ctx = mapperCtxRef.current;
+        appendUnifiedSession({
+          type: "message",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          role: "user",
+          content: prompt,
+          iteration: ctx.currentIteration,
+          providerMeta: { model: options.modelLabel, provider: options.provider },
+        });
+      }
+
       const agent = createDeepFactorAgent({
         model: options.model,
         tools,
@@ -469,6 +484,37 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       pendingRef.current = null;
       usageBaseRef.current = usage;
 
+      // Log user message for pending input at submit time
+      {
+        const ctx = mapperCtxRef.current;
+        let content: string;
+        switch (submission.kind) {
+          case "approve":
+            content = "approve";
+            break;
+          case "reject":
+            content = "reject";
+            break;
+          case "edit":
+            content = submission.feedback;
+            break;
+          case "choice":
+          case "text":
+            content = submission.value;
+            break;
+        }
+        appendUnifiedSession({
+          type: "message",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          role: "user",
+          content,
+          iteration: ctx.currentIteration,
+          providerMeta: { model: options.modelLabel, provider: options.provider },
+        });
+      }
+
       let resumeInput: string | { decision?: "approve" | "reject" | "edit"; response?: string };
       switch (submission.kind) {
         case "approve":
@@ -488,7 +534,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
       pending.resume(resumeInput).then(handleResult).catch(handleError);
     },
-    [handleResult, handleError, usage],
+    [handleResult, handleError, usage, options.modelLabel, options.provider],
   );
 
   return {

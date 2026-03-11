@@ -13,22 +13,7 @@ import type {
   TranscriptTurn as TranscriptTurnData,
   PendingSubmission,
 } from "./types.js";
-import { appendSession } from "./session-logger.js";
 import { groupMessagesIntoTurns } from "./transcript.js";
-
-function formatPendingSubmission(submission: PendingSubmission): string {
-  switch (submission.kind) {
-    case "approve":
-      return "approve";
-    case "reject":
-      return "reject";
-    case "edit":
-      return submission.feedback;
-    case "choice":
-    case "text":
-      return submission.value;
-  }
-}
 
 export function TuiApp({
   prompt,
@@ -88,30 +73,16 @@ export function TuiApp({
 
   const handleSubmit = useCallback(
     (value: string) => {
-      appendSession({
-        timestamp: new Date().toISOString(),
-        role: "user",
-        content: value,
-        model,
-        provider,
-      });
       sendPrompt(value);
     },
-    [model, provider, sendPrompt],
+    [sendPrompt],
   );
 
   const handlePendingSubmit = useCallback(
     (submission: PendingSubmission) => {
-      appendSession({
-        timestamp: new Date().toISOString(),
-        role: "user",
-        content: formatPendingSubmission(submission),
-        model,
-        provider,
-      });
       submitPendingInput(submission);
     },
-    [model, provider, submitPendingInput],
+    [submitPendingInput],
   );
 
   useEffect(() => {
