@@ -7,6 +7,7 @@ import {
   formatToolLabel,
   formatToolResultPreview,
 } from "../transcript.js";
+import { ThinkingBlock } from "./ThinkingBlock.js";
 
 interface TranscriptSegmentProps {
   block: TranscriptRenderBlock;
@@ -168,6 +169,10 @@ function renderFileReadGroup(
 export function TranscriptSegment({ block, expandFileReadGroups = false }: TranscriptSegmentProps) {
   if (block.kind === "assistant_block") {
     return renderAssistantBlock(block.segment.content, block.segment.id);
+  }
+
+  if (block.kind === "thinking_block") {
+    return <ThinkingBlock content={block.segment.content} />;
   }
 
   if (block.kind === "file_read_group_block") {

@@ -176,6 +176,15 @@ export function buildTranscriptRenderBlocks(
       continue;
     }
 
+    if (segment.kind === "thinking") {
+      blocks.push({
+        kind: "thinking_block",
+        id: segment.id,
+        segment,
+      });
+      continue;
+    }
+
     if (!isGroupedFileReadSegment(segment)) {
       const toolSegment = segment as ToolTranscriptSegment;
       blocks.push({
@@ -279,6 +288,15 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
         kind: "assistant",
         id: message.id,
         content: message.content,
+      });
+      continue;
+    }
+
+    if (message.role === "thinking") {
+      currentTurn.segments.push({
+        kind: "thinking",
+        id: message.id,
+        content: message.thinking ?? message.content,
       });
       continue;
     }

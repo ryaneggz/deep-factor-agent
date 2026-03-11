@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { ToolCallBlock } from "./ToolCallBlock.js";
+import { ThinkingBlock } from "./ThinkingBlock.js";
 import { formatToolResultPreview } from "../transcript.js";
 import type { ChatMessage } from "../types.js";
 
@@ -25,6 +26,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <Text>{message.content}</Text>
         </Box>
       );
+
+    case "thinking":
+      return <ThinkingBlock content={message.thinking ?? message.content} />;
 
     case "tool_call":
       return (
