@@ -1,20 +1,23 @@
 import { describe, expect, it } from "vitest";
+import type { UnifiedLogEntry } from "deep-factor-agent";
 import { buildThreadFromSession, resolveSessionSettings } from "../src/session-logger.js";
 
 describe("resolveSessionSettings", () => {
-  it("reuses stored provider and model when flags are absent", () => {
+  it("reuses stored provider and model from init entry when flags are absent", () => {
+    const entries: UnifiedLogEntry[] = [
+      {
+        type: "init",
+        sessionId: "abc",
+        timestamp: new Date("2026-03-08T10:00:00.000Z").getTime(),
+        sequence: 0,
+        provider: "claude",
+        model: "sonnet",
+        mode: "agentic",
+      },
+    ];
     expect(
       resolveSessionSettings({
-        entries: [
-          {
-            timestamp: "2026-03-08T10:00:00.000Z",
-            sessionId: "abc",
-            role: "user",
-            content: "Hello",
-            provider: "claude-sdk",
-            model: "sonnet",
-          },
-        ],
+        entries,
         hasProviderFlag: false,
         hasModelFlag: false,
       }),
@@ -24,18 +27,21 @@ describe("resolveSessionSettings", () => {
     });
   });
 
-  it("falls back to defaults for older sessions without provider metadata", () => {
+  it("falls back to defaults for sessions without provider metadata", () => {
+    const entries: UnifiedLogEntry[] = [
+      {
+        type: "message",
+        sessionId: "abc",
+        timestamp: new Date("2026-03-08T10:00:00.000Z").getTime(),
+        sequence: 0,
+        role: "user",
+        content: "Hello",
+        iteration: 0,
+      },
+    ];
     expect(
       resolveSessionSettings({
-        entries: [
-          {
-            timestamp: "2026-03-08T10:00:00.000Z",
-            sessionId: "abc",
-            role: "user",
-            content: "Hello",
-            model: "some-old-model",
-          },
-        ],
+        entries,
         hasProviderFlag: false,
         hasModelFlag: false,
       }),
@@ -46,18 +52,20 @@ describe("resolveSessionSettings", () => {
   });
 
   it("lets explicit flags win over stored session metadata", () => {
+    const entries: UnifiedLogEntry[] = [
+      {
+        type: "init",
+        sessionId: "abc",
+        timestamp: new Date("2026-03-08T10:00:00.000Z").getTime(),
+        sequence: 0,
+        provider: "claude",
+        model: "sonnet",
+        mode: "agentic",
+      },
+    ];
     expect(
       resolveSessionSettings({
-        entries: [
-          {
-            timestamp: "2026-03-08T10:00:00.000Z",
-            sessionId: "abc",
-            role: "user",
-            content: "Hello",
-            provider: "claude-sdk",
-            model: "sonnet",
-          },
-        ],
+        entries,
         hasProviderFlag: true,
         providerFlag: "langchain",
         hasModelFlag: false,
@@ -69,18 +77,20 @@ describe("resolveSessionSettings", () => {
   });
 
   it("round-trips stored codex provider metadata", () => {
+    const entries: UnifiedLogEntry[] = [
+      {
+        type: "init",
+        sessionId: "abc",
+        timestamp: new Date("2026-03-08T10:00:00.000Z").getTime(),
+        sequence: 0,
+        provider: "codex",
+        model: "gpt-5.4",
+        mode: "agentic",
+      },
+    ];
     expect(
       resolveSessionSettings({
-        entries: [
-          {
-            timestamp: "2026-03-08T10:00:00.000Z",
-            sessionId: "abc",
-            role: "user",
-            content: "Hello",
-            provider: "codex",
-            model: "gpt-5.4",
-          },
-        ],
+        entries,
         hasProviderFlag: false,
         hasModelFlag: false,
       }),

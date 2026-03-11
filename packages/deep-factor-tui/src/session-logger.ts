@@ -71,35 +71,21 @@ export function appendUnifiedSession(entry: UnifiedLogEntry): void {
 }
 
 /**
- * Load a session file. Handles both legacy SessionEntry and unified log formats.
+ * Load a session file as unified log entries.
+ * Handles both unified (new) and legacy SessionEntry formats transparently.
+ * Legacy lines are detected by 'role' field without 'sequence' and converted inline.
  */
-export function loadSession(id: string): SessionEntry[] {
+export function loadSession(id: string): UnifiedLogEntry[] {
   const filePath = sessionFilePath(id);
   if (!existsSync(filePath)) return [];
   const lines = readFileSync(filePath, "utf-8").trim().split("\n");
   return lines.filter(Boolean).map((line) => {
     const parsed = JSON.parse(line);
-    // If it's already a unified log entry, convert to legacy format
-    if (parsed.type && !parsed.role && parsed.sessionId && parsed.sequence !== undefined) {
-      return unifiedToSessionEntry(parsed as UnifiedLogEntry);
+    // Detect legacy format: has 'role' but no 'sequence' field
+    if (parsed.role && parsed.sequence === undefined) {
+      return _convertLegacyEntry(parsed as SessionEntry);
     }
-    return parsed as SessionEntry;
-  });
-}
-
-/**
- * Load a session as unified log entries.
- */
-export function loadUnifiedSession(id: string): UnifiedLogEntry[] {
-  const filePath = sessionFilePath(id);
-  if (!existsSync(filePath)) return [];
-  const lines = readFileSync(filePath, "utf-8").trim().split("\n");
-  return lines.filter(Boolean).map((line) => {
-    const parsed = JSON.parse(line);
-    // If it's a legacy SessionEntry, convert to unified
-    if (parsed.role && !parsed.sequence) {
-      return sessionEntryToUnified(parsed as SessionEntry);
-    }
+    // Already unified format — no conversion needed
     return parsed as UnifiedLogEntry;
   });
 }
@@ -156,7 +142,11 @@ function unifiedToSessionEntry(entry: UnifiedLogEntry): SessionEntry {
   }
 }
 
-function sessionEntryToUnified(entry: SessionEntry): UnifiedLogEntry {
+/**
+ * Convert a legacy SessionEntry to UnifiedLogEntry.
+ * Used as a read-path fallback for pre-migration session files.
+ */
+function _convertLegacyEntry(entry: SessionEntry): UnifiedLogEntry {
   const ts = new Date(entry.timestamp).getTime() || Date.now();
   const base = {
     sessionId: entry.sessionId,
@@ -212,7 +202,7 @@ function sessionEntryToUnified(entry: SessionEntry): UnifiedLogEntry {
 }
 
 export function resolveSessionSettings(args: {
-  entries: SessionEntry[];
+  entries: UnifiedLogEntry[];
   hasProviderFlag: boolean;
   providerFlag?: ProviderType;
   hasModelFlag: boolean;
@@ -220,14 +210,25 @@ export function resolveSessionSettings(args: {
 }): ResolvedSessionSettings {
   const { entries, hasProviderFlag, providerFlag, hasModelFlag, modelFlag } = args;
 
-  const latestProviderEntry = [...entries]
-    .reverse()
-    .find((entry) => normalizeProvider(entry.provider));
+  // Extract provider from init entries or providerMeta on any entry
+  const latestProviderEntry = [...entries].reverse().find((entry) => {
+    if (entry.type === "init") {
+      return normalizeProvider(entry.provider as string);
+    }
+    return normalizeProvider(entry.providerMeta?.provider as string);
+  });
 
-  const sessionProvider = normalizeProvider(latestProviderEntry?.provider);
-  const sessionModel = sessionProvider
-    ? (latestProviderEntry?.model ?? DEFAULT_MODELS[sessionProvider])
-    : undefined;
+  const rawProvider =
+    latestProviderEntry?.type === "init"
+      ? (latestProviderEntry.provider as string)
+      : (latestProviderEntry?.providerMeta?.provider as string);
+  const rawModel =
+    latestProviderEntry?.type === "init"
+      ? (latestProviderEntry.model as string)
+      : (latestProviderEntry?.providerMeta?.model as string);
+
+  const sessionProvider = normalizeProvider(rawProvider);
+  const sessionModel = sessionProvider ? (rawModel ?? DEFAULT_MODELS[sessionProvider]) : undefined;
 
   const provider = hasProviderFlag
     ? (providerFlag ?? DEFAULT_PROVIDER)

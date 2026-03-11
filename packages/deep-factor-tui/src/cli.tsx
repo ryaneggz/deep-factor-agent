@@ -156,7 +156,7 @@ if (cli.flags.print) {
     getSessionId,
     loadSession,
     getLatestSessionId,
-    buildThreadFromSession,
+    buildThreadFromUnifiedSession,
     resolveSessionSettings,
   } = await import("./session-logger.js");
 
@@ -180,16 +180,51 @@ if (cli.flags.print) {
       process.stderr.write(`Error: Session "${resumeId}" not found or empty.\n`);
       process.exit(1);
     }
-    resumeMessages = entries.map((entry, i) => ({
-      id: `resume-${i}`,
-      role: entry.role,
-      content: entry.content,
-      ...(entry.toolName ? { toolName: entry.toolName } : {}),
-      ...(entry.toolArgs ? { toolArgs: entry.toolArgs } : {}),
-      ...(entry.toolCallId ? { toolCallId: entry.toolCallId } : {}),
-      ...(entry.toolDisplay ? { toolDisplay: entry.toolDisplay } : {}),
-    }));
-    resumeThread = buildThreadFromSession(entries);
+    resumeMessages = entries
+      .filter(
+        (e) =>
+          e.type === "message" ||
+          e.type === "tool_call" ||
+          e.type === "tool_result" ||
+          e.type === "completion",
+      )
+      .map((entry, i) => {
+        const base: import("./types.js").ChatMessage = {
+          id: `resume-${i}`,
+          role:
+            entry.type === "message"
+              ? entry.role === "system"
+                ? "assistant"
+                : entry.role
+              : entry.type === "completion"
+                ? "assistant"
+                : entry.type,
+          content:
+            entry.type === "message"
+              ? entry.content
+              : entry.type === "tool_call"
+                ? JSON.stringify(entry.args)
+                : entry.type === "tool_result"
+                  ? typeof entry.result === "string"
+                    ? entry.result
+                    : JSON.stringify(entry.result)
+                  : entry.type === "completion"
+                    ? entry.result
+                    : "",
+        };
+        if (entry.type === "tool_call") {
+          base.toolName = entry.toolName;
+          base.toolArgs = entry.args;
+          base.toolCallId = entry.toolCallId;
+          if (entry.display) base.toolDisplay = entry.display;
+        }
+        if (entry.type === "tool_result") {
+          base.toolCallId = entry.toolCallId;
+          if (entry.display) base.toolDisplay = entry.display;
+        }
+        return base;
+      });
+    resumeThread = buildThreadFromUnifiedSession(entries);
     ({ provider, model } = resolveSessionSettings({
       entries,
       hasProviderFlag,
