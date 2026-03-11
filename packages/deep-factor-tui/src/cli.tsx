@@ -25,6 +25,7 @@ const cli = meow(
     --mode           Execution mode: plan, approve, yolo (default: yolo)
     --sandbox, -s    Sandbox mode: workspace (default), local, docker
     --print, -p      Non-interactive print mode (output answer to stdout)
+    --output-format, -o  Output format: text (default), stream-json (JSONL events)
     --resume, -r     Resume a previous session (optionally pass session ID)
 
   Examples
@@ -69,6 +70,11 @@ const cli = meow(
         type: "boolean",
         shortFlag: "p",
         default: false,
+      },
+      outputFormat: {
+        type: "string",
+        shortFlag: "o",
+        default: "text",
       },
       resume: {
         type: "string",
@@ -139,6 +145,7 @@ if (cli.flags.print) {
     maxIter: cli.flags.maxIter,
     sandbox: sandboxMode,
     mode,
+    outputFormat: cli.flags.outputFormat as "text" | "stream-json",
   });
 } else {
   // TUI mode: inline interactive
