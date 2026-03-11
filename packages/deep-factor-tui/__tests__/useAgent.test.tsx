@@ -12,10 +12,13 @@ import type {
 } from "deep-factor-agent";
 import type { UseAgentOptions, UseAgentReturn } from "../src/types.js";
 
-const { createDeepFactorAgentMock, appendSessionMock } = vi.hoisted(() => ({
-  createDeepFactorAgentMock: vi.fn(),
-  appendSessionMock: vi.fn(),
-}));
+const { createDeepFactorAgentMock, appendUnifiedSessionMock, getSessionIdMock } = vi.hoisted(
+  () => ({
+    createDeepFactorAgentMock: vi.fn(),
+    appendUnifiedSessionMock: vi.fn(),
+    getSessionIdMock: vi.fn(() => "test-session-id"),
+  }),
+);
 
 vi.mock("deep-factor-agent", () => ({
   createDeepFactorAgent: createDeepFactorAgentMock,
@@ -36,10 +39,12 @@ vi.mock("deep-factor-agent", () => ({
     cacheReadTokens: (a.cacheReadTokens ?? 0) + (b.cacheReadTokens ?? 0) || undefined,
     cacheWriteTokens: (a.cacheWriteTokens ?? 0) + (b.cacheWriteTokens ?? 0) || undefined,
   }),
+  nextSequence: (ctx: { sequence: number }) => ctx.sequence++,
 }));
 
 vi.mock("../src/session-logger.js", () => ({
-  appendSession: appendSessionMock,
+  appendUnifiedSession: appendUnifiedSessionMock,
+  getSessionId: getSessionIdMock,
 }));
 
 const { useAgent } = await import("../src/hooks/useAgent.js");
@@ -89,7 +94,7 @@ describe("useAgent", () => {
   beforeEach(() => {
     stateRef.current = null;
     createDeepFactorAgentMock.mockReset();
-    appendSessionMock.mockReset();
+    appendUnifiedSessionMock.mockReset();
   });
 
   it("streams langchain updates into UI state and logs final messages once", async () => {
@@ -215,11 +220,11 @@ describe("useAgent", () => {
     });
     await flush();
 
-    expect(appendSessionMock).toHaveBeenCalledTimes(3);
-    expect(appendSessionMock.mock.calls.map(([entry]) => entry.role)).toEqual([
+    expect(appendUnifiedSessionMock).toHaveBeenCalledTimes(3);
+    expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
       "tool_call",
       "tool_result",
-      "assistant",
+      "message",
     ]);
   });
 
@@ -613,11 +618,11 @@ describe("useAgent", () => {
     });
     await flush();
 
-    expect(appendSessionMock.mock.calls.map(([entry]) => entry.content)).toEqual([
-      jsonEnvelope,
-      "bash",
-      "/workspace",
-      "Workspace inspected.",
+    expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
+      "message",
+      "tool_call",
+      "tool_result",
+      "message",
     ]);
   });
 });

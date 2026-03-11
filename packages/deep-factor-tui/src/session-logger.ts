@@ -59,6 +59,7 @@ function sessionFilePath(id: string): string {
   return join(SESSIONS_DIR, `${id}.jsonl`);
 }
 
+/** @deprecated Legacy sequence counter used only by appendSession(). Will be removed with US-012. */
 let _sessionSequence = 0;
 
 /**

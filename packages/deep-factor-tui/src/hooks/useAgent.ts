@@ -7,6 +7,7 @@ import {
   isPendingResult,
   isPlanResult,
   addUsage,
+  nextSequence,
 } from "deep-factor-agent";
 import type {
   AgentResult,
@@ -18,6 +19,7 @@ import type {
   AgentEvent,
   AgentThread,
   HumanInputReceivedEvent,
+  MapperContext,
 } from "deep-factor-agent";
 import type {
   ChatMessage,
@@ -29,7 +31,7 @@ import type {
   PendingSubmission,
   PendingAction,
 } from "../types.js";
-import { appendSession } from "../session-logger.js";
+import { appendUnifiedSession, getSessionId } from "../session-logger.js";
 import { DEFAULT_TUI_AGENT_INSTRUCTIONS } from "../default-agent-instructions.js";
 
 function isPendingAction(value: string): value is PendingAction {
@@ -237,6 +239,14 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   const pendingRef = useRef<PendingResult | null>(null);
   const threadRef = useRef<AgentThread | null>(options.initialThread ?? null);
   const resumedMessagesRef = useRef<ChatMessage[]>(options.initialMessages ?? []);
+  const mapperCtxRef = useRef<MapperContext>({
+    sessionId: getSessionId(),
+    sequence: 0,
+    currentIteration: 0,
+    provider: options.provider,
+    model: options.modelLabel,
+    mode: options.mode,
+  });
   // Track how many chat messages have already been persisted to the session log.
   // Starts at the count of initial/resumed messages so we don't re-log them.
   const loggedMessageCountRef = useRef<number>(options.initialMessages?.length ?? 0);
@@ -302,19 +312,49 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       const alreadyLogged = loggedMessageCountRef.current;
       const messagesToLog = newMessages.slice(alreadyLogged);
       loggedMessageCountRef.current = newMessages.length;
+      const ctx = mapperCtxRef.current;
       for (const msg of messagesToLog) {
         if (msg.role === "user") continue; // user messages logged at submit time
-        appendSession({
-          timestamp: new Date().toISOString(),
-          role: msg.role,
-          content: msg.content,
-          model: options.modelLabel,
-          provider: options.provider,
-          ...(msg.toolName ? { toolName: msg.toolName } : {}),
-          ...(msg.toolArgs ? { toolArgs: msg.toolArgs } : {}),
-          ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
-          ...(msg.toolDisplay ? { toolDisplay: msg.toolDisplay } : {}),
-        });
+        const ts = Date.now();
+        if (msg.role === "assistant") {
+          appendUnifiedSession({
+            type: "message",
+            sessionId: ctx.sessionId,
+            timestamp: ts,
+            sequence: nextSequence(ctx),
+            role: "assistant",
+            content: msg.content,
+            iteration: ctx.currentIteration,
+            providerMeta: { model: options.modelLabel, provider: options.provider },
+          });
+        } else if (msg.role === "tool_call") {
+          appendUnifiedSession({
+            type: "tool_call",
+            sessionId: ctx.sessionId,
+            timestamp: ts,
+            sequence: nextSequence(ctx),
+            toolCallId: msg.toolCallId ?? "",
+            toolName: msg.toolName ?? "unknown",
+            args: msg.toolArgs ?? {},
+            display: msg.toolDisplay,
+            parallelGroup: msg.parallelGroup,
+            iteration: ctx.currentIteration,
+          });
+        } else if (msg.role === "tool_result") {
+          appendUnifiedSession({
+            type: "tool_result",
+            sessionId: ctx.sessionId,
+            timestamp: ts,
+            sequence: nextSequence(ctx),
+            toolCallId: msg.toolCallId ?? "",
+            result: msg.content,
+            isError: false,
+            display: msg.toolDisplay,
+            durationMs: msg.durationMs,
+            parallelGroup: msg.parallelGroup,
+            iteration: ctx.currentIteration,
+          });
+        }
       }
 
       if (isPlanResult(result)) {
