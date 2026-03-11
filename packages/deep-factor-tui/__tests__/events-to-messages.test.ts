@@ -7,7 +7,7 @@ import {
 } from "../src/hooks/useAgent.js";
 
 describe("eventsToChatMessages", () => {
-  it("surfaces error events as tool_result messages", () => {
+  it("surfaces error events as error messages", () => {
     const events: AgentEvent[] = [
       {
         type: "message",
@@ -36,11 +36,11 @@ describe("eventsToChatMessages", () => {
 
     expect(messages).toHaveLength(3);
     expect(messages[1]).toMatchObject({
-      role: "tool_result",
+      role: "error",
       content: "Error: Authentication failed: invalid API key",
     });
     expect(messages[2]).toMatchObject({
-      role: "tool_result",
+      role: "error",
       content: "Error: Authentication failed: invalid API key",
     });
   });

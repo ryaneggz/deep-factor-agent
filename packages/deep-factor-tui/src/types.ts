@@ -35,9 +35,26 @@ export function normalizeProvider(value: string | undefined): ProviderType | und
   return undefined;
 }
 
+/** Roles supported by ChatMessage — original 4 plus unified log event types. */
+export type ChatMessageRole =
+  | "user"
+  | "assistant"
+  | "tool_call"
+  | "tool_result"
+  | "thinking"
+  | "plan"
+  | "summary"
+  | "status"
+  | "error"
+  | "rate_limit"
+  | "file_change"
+  | "approval"
+  | "human_input"
+  | "completion";
+
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "tool_call" | "tool_result";
+  role: ChatMessageRole;
   content: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
@@ -45,6 +62,14 @@ export interface ChatMessage {
   durationMs?: number;
   parallelGroup?: string;
   toolDisplay?: ToolDisplayMetadata;
+  /** Extended thinking content (role === 'thinking') */
+  thinking?: string;
+  /** Plan content (role === 'plan') */
+  planContent?: string;
+  /** Status metadata (role === 'status') */
+  statusInfo?: { status: string; usage?: Record<string, unknown>; iterations?: number };
+  /** Rate limit metadata (role === 'rate_limit') */
+  rateLimitInfo?: { retryAfterMs?: number; message?: string };
 }
 
 export type TranscriptSegment =

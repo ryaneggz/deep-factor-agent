@@ -200,9 +200,43 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
       case "error":
         messages.push({
           id: `msg-${messages.length}`,
-          role: "tool_result",
+          role: "error",
           content: `Error: ${event.error}`,
           toolCallId: event.toolCallId,
+        });
+        break;
+      case "plan":
+        messages.push({
+          id: `msg-${messages.length}`,
+          role: "plan",
+          content: event.content,
+          planContent: event.content,
+        });
+        break;
+      case "summary":
+        messages.push({
+          id: `msg-${messages.length}`,
+          role: "summary",
+          content: event.summary,
+        });
+        break;
+      case "completion":
+        // completion events duplicate the final assistant message — skip for display
+        break;
+      case "approval":
+        messages.push({
+          id: `msg-${messages.length}`,
+          role: "approval",
+          content: `${event.decision}: ${event.toolName}`,
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+        });
+        break;
+      case "human_input_requested":
+        messages.push({
+          id: `msg-${messages.length}`,
+          role: "human_input",
+          content: event.question,
         });
         break;
     }

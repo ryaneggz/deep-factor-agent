@@ -134,7 +134,11 @@ export {
   nextSequence,
 } from "./log-mappers/index.js";
 
-export type { MapperContext } from "./log-mappers/index.js";
+export type {
+  MapperContext,
+  ReplayChatMessage,
+  ReplayChatMessageRole,
+} from "./log-mappers/index.js";
 
 // XML thread serializer
 export { serializeThreadToXml, escapeXml } from "./xml-serializer.js";

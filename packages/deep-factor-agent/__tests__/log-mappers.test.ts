@@ -788,7 +788,7 @@ describe("replay utilities", () => {
       expect(messages[1].role).toBe("tool_call");
       expect(messages[1].toolName).toBe("bash");
       expect(messages[2].role).toBe("tool_result");
-      expect(messages[3].role).toBe("assistant");
+      expect(messages[3].role).toBe("completion");
       expect(messages[3].content).toBe("Done");
     });
   });

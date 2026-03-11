@@ -35,12 +35,26 @@ export function logToThread(entries: UnifiedLogEntry[]): AgentThread {
   };
 }
 
-/**
- * Convert unified log entries to ChatMessage-compatible objects for TUI display.
- */
-export function logToChatMessages(entries: UnifiedLogEntry[]): Array<{
+/** Role types supported by logToChatMessages output. */
+export type ReplayChatMessageRole =
+  | "user"
+  | "assistant"
+  | "tool_call"
+  | "tool_result"
+  | "thinking"
+  | "plan"
+  | "summary"
+  | "status"
+  | "error"
+  | "rate_limit"
+  | "file_change"
+  | "approval"
+  | "human_input"
+  | "completion";
+
+export interface ReplayChatMessage {
   id: string;
-  role: "user" | "assistant" | "tool_call" | "tool_result";
+  role: ReplayChatMessageRole;
   content: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
@@ -48,34 +62,32 @@ export function logToChatMessages(entries: UnifiedLogEntry[]): Array<{
   durationMs?: number;
   parallelGroup?: string;
   toolDisplay?: ToolDisplayMetadata;
-}> {
-  const messages: Array<{
-    id: string;
-    role: "user" | "assistant" | "tool_call" | "tool_result";
-    content: string;
-    toolName?: string;
-    toolArgs?: Record<string, unknown>;
-    toolCallId?: string;
-    durationMs?: number;
-    parallelGroup?: string;
-    toolDisplay?: ToolDisplayMetadata;
-  }> = [];
+  thinking?: string;
+  planContent?: string;
+  statusInfo?: { status: string; usage?: Record<string, unknown>; iterations?: number };
+  rateLimitInfo?: { retryAfterMs?: number; message?: string };
+}
+
+/**
+ * Convert unified log entries to ChatMessage-compatible objects for TUI display.
+ * Handles all 16 unified log types (excluding init and result which are session-level).
+ */
+export function logToChatMessages(entries: UnifiedLogEntry[]): ReplayChatMessage[] {
+  const messages: ReplayChatMessage[] = [];
 
   for (const entry of entries) {
+    const id = `${entry.sessionId}-${entry.sequence}`;
+
     switch (entry.type) {
       case "message":
         if (entry.role === "user" || entry.role === "assistant") {
-          messages.push({
-            id: `${entry.sessionId}-${entry.sequence}`,
-            role: entry.role,
-            content: entry.content,
-          });
+          messages.push({ id, role: entry.role, content: entry.content });
         }
         break;
 
       case "tool_call":
         messages.push({
-          id: `${entry.sessionId}-${entry.sequence}`,
+          id,
           role: "tool_call",
           content: JSON.stringify(entry.args),
           toolName: entry.toolName,
@@ -88,7 +100,7 @@ export function logToChatMessages(entries: UnifiedLogEntry[]): Array<{
 
       case "tool_result":
         messages.push({
-          id: `${entry.sessionId}-${entry.sequence}`,
+          id,
           role: "tool_result",
           content: typeof entry.result === "string" ? entry.result : JSON.stringify(entry.result),
           toolCallId: entry.toolCallId,
@@ -98,12 +110,112 @@ export function logToChatMessages(entries: UnifiedLogEntry[]): Array<{
         });
         break;
 
+      case "thinking":
+        messages.push({
+          id,
+          role: "thinking",
+          content: entry.content,
+          thinking: entry.content,
+        });
+        break;
+
+      case "plan":
+        messages.push({
+          id,
+          role: "plan",
+          content: entry.content,
+          planContent: entry.content,
+        });
+        break;
+
+      case "summary":
+        messages.push({
+          id,
+          role: "summary",
+          content: entry.summary,
+        });
+        break;
+
+      case "status":
+        messages.push({
+          id,
+          role: "status",
+          content: `Status: ${entry.status}`,
+          statusInfo: {
+            status: entry.status,
+            usage: entry.usage as unknown as Record<string, unknown>,
+            iterations: entry.iterations,
+          },
+        });
+        break;
+
+      case "error":
+        messages.push({
+          id,
+          role: "error",
+          content: entry.error,
+          toolCallId: entry.toolCallId,
+        });
+        break;
+
+      case "rate_limit":
+        messages.push({
+          id,
+          role: "rate_limit",
+          content: entry.message ?? "Rate limited",
+          rateLimitInfo: {
+            retryAfterMs: entry.retryAfterMs,
+            message: entry.message,
+          },
+        });
+        break;
+
+      case "file_change":
+        messages.push({
+          id,
+          role: "file_change",
+          content: entry.changes.map((c) => `${c.change}: ${c.path}`).join("\n"),
+          toolCallId: entry.toolCallId,
+        });
+        break;
+
+      case "approval":
+        messages.push({
+          id,
+          role: "approval",
+          content: `${entry.decision}: ${entry.toolName}`,
+          toolCallId: entry.toolCallId,
+          toolName: entry.toolName,
+        });
+        break;
+
+      case "human_input_requested":
+        messages.push({
+          id,
+          role: "human_input",
+          content: entry.question,
+        });
+        break;
+
+      case "human_input_received":
+        messages.push({
+          id,
+          role: "human_input",
+          content: entry.response,
+        });
+        break;
+
       case "completion":
         messages.push({
-          id: `${entry.sessionId}-${entry.sequence}`,
-          role: "assistant",
+          id,
+          role: "completion",
           content: entry.result,
         });
+        break;
+
+      // init and result are session-level entries, not rendered as chat messages
+      case "init":
+      case "result":
         break;
     }
   }
