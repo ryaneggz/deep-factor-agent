@@ -262,7 +262,7 @@
         "If any check fails, fix the underlying issue and re-run ALL checks until every one passes"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": "Iteration 4: QA. This mirrors the 8-check rigor of docs/smoke-tests/validate-smoke-logs.mjs (base fields, monotonic sequences, bookend events, session consistency, tool matching, no leaked JSON, no duplicate status, provider on init) plus the unit test patterns from __tests__/log-mappers.test.ts. Run builds first, then typechecks, then tests, then structural grep checks. Fix any failures before marking as passing."
     },
     {

@@ -217,3 +217,17 @@ Started: Tue Mar 10 23:40:04 MDT 2026
   - The `message` role union in `UnifiedLogEntry` includes "system" which must be mapped to "assistant" for `AgentEvent` compatibility
   - Test data for `buildThreadFromUnifiedSession` requires all 4 base fields (type, sessionId, timestamp, sequence) plus type-specific fields — more verbose than legacy `SessionEntry` but more explicit
 ---
+
+## 2026-03-11 00:30 - US-015
+- Ran full QA validation suite: builds, typechecks, tests, and 13 structural checks
+- BUILDS: both packages build with zero errors
+- TYPECHECK: both packages pass with zero errors
+- TESTS: agent (351 tests, 25 files), TUI (89 tests, 7 files) — all pass
+- STRUCTURAL CHECKS: all 13 pass (base fields, monotonic sequences, bookend events, session consistency, tool matching, iteration tracking, status events, error events, legacy cleanup x2, type safety, init schema, result schema)
+- No code changes required — all implementation from US-001 through US-014 is correct
+- Files changed: `.ralph/prd.json` (mark US-015 passes: true)
+- **Learnings for future iterations:**
+  - The `_convertLegacyEntry()` function in session-logger.ts intentionally uses `iteration: 0` — this is not a bug, it's legacy fallback behavior
+  - 17 `nextSequence(ctx)` calls in useAgent.ts, 16 `appendUnifiedSession` calls — the extra nextSequence is used in the init entry
+  - Status events are written at 7 transition points (not just 4): running x2 (sendPrompt + submitPendingInput), done x2 (plan + normal), pending_input, error x2 (max_errors + catch)
+---
