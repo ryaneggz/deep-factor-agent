@@ -77,6 +77,8 @@ export type TranscriptSegment =
   | { kind: "thinking"; id: string; content: string }
   | { kind: "plan"; id: string; content: string }
   | { kind: "summary"; id: string; content: string; iterationRange?: string }
+  | { kind: "rate_limit"; id: string; content: string; retryAfterMs?: number; message?: string }
+  | { kind: "error"; id: string; content: string }
   | {
       kind: "tool";
       id: string;
@@ -93,6 +95,8 @@ export type AssistantTranscriptSegment = Extract<TranscriptSegment, { kind: "ass
 export type ThinkingTranscriptSegment = Extract<TranscriptSegment, { kind: "thinking" }>;
 export type PlanTranscriptSegment = Extract<TranscriptSegment, { kind: "plan" }>;
 export type SummaryTranscriptSegment = Extract<TranscriptSegment, { kind: "summary" }>;
+export type RateLimitTranscriptSegment = Extract<TranscriptSegment, { kind: "rate_limit" }>;
+export type ErrorTranscriptSegment = Extract<TranscriptSegment, { kind: "error" }>;
 export type ToolTranscriptSegment = Extract<TranscriptSegment, { kind: "tool" }>;
 
 export type TranscriptRenderBlock =
@@ -100,6 +104,8 @@ export type TranscriptRenderBlock =
   | { kind: "thinking_block"; id: string; segment: ThinkingTranscriptSegment }
   | { kind: "plan_block"; id: string; segment: PlanTranscriptSegment }
   | { kind: "summary_block"; id: string; segment: SummaryTranscriptSegment }
+  | { kind: "rate_limit_block"; id: string; segment: RateLimitTranscriptSegment }
+  | { kind: "error_block"; id: string; segment: ErrorTranscriptSegment }
   | { kind: "tool_block"; id: string; segment: ToolTranscriptSegment }
   | {
       kind: "file_read_group_block";

@@ -50,6 +50,26 @@ export function mapLangchainEvent(
       const iterations = raw.iterations as number | undefined;
       const status = raw.status as string | undefined;
 
+      // Check for thinking blocks in AIMessage content (content can be string or array of content blocks)
+      const rawEvent = raw.event as Record<string, unknown>;
+      if (rawEvent.type === "message" && rawEvent.role === "assistant") {
+        const rawContent = rawEvent.content;
+        if (Array.isArray(rawContent)) {
+          for (const block of rawContent) {
+            const b = block as Record<string, unknown>;
+            if (b.type === "thinking") {
+              entries.push({
+                ...base,
+                type: "thinking",
+                sequence: nextSequence(ctx),
+                content: (b.thinking as string) ?? (b.text as string) ?? "",
+                iteration: event.iteration ?? ctx.currentIteration,
+              });
+            }
+          }
+        }
+      }
+
       entries.push(...mapAgentEvent(event, ctx));
 
       // If there's a stopReason, emit a status update too

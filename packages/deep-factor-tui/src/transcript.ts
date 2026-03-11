@@ -203,6 +203,24 @@ export function buildTranscriptRenderBlocks(
       continue;
     }
 
+    if (segment.kind === "rate_limit") {
+      blocks.push({
+        kind: "rate_limit_block",
+        id: segment.id,
+        segment,
+      });
+      continue;
+    }
+
+    if (segment.kind === "error") {
+      blocks.push({
+        kind: "error_block",
+        id: segment.id,
+        segment,
+      });
+      continue;
+    }
+
     if (!isGroupedFileReadSegment(segment)) {
       const toolSegment = segment as ToolTranscriptSegment;
       blocks.push({
@@ -331,6 +349,26 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
     if (message.role === "summary") {
       currentTurn.segments.push({
         kind: "summary",
+        id: message.id,
+        content: message.content,
+      });
+      continue;
+    }
+
+    if (message.role === "rate_limit") {
+      currentTurn.segments.push({
+        kind: "rate_limit",
+        id: message.id,
+        content: message.content,
+        retryAfterMs: message.rateLimitInfo?.retryAfterMs,
+        message: message.rateLimitInfo?.message,
+      });
+      continue;
+    }
+
+    if (message.role === "error") {
+      currentTurn.segments.push({
+        kind: "error",
         id: message.id,
         content: message.content,
       });

@@ -4,6 +4,7 @@ import { ToolCallBlock } from "./ToolCallBlock.js";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { PlanBlock } from "./PlanBlock.js";
 import { SummaryBlock } from "./SummaryBlock.js";
+import { StatusIndicator } from "./StatusIndicator.js";
 import { formatToolResultPreview } from "../transcript.js";
 import type { ChatMessage } from "../types.js";
 
@@ -37,6 +38,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
     case "summary":
       return <SummaryBlock content={message.content} />;
+
+    case "rate_limit":
+      return (
+        <StatusIndicator
+          role="rate_limit"
+          content={message.content}
+          retryAfterMs={message.rateLimitInfo?.retryAfterMs}
+          message={message.rateLimitInfo?.message}
+        />
+      );
+
+    case "error":
+      return <StatusIndicator role="error" content={message.content} />;
 
     case "tool_call":
       return (

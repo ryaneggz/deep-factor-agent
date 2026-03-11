@@ -10,6 +10,7 @@ import {
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { PlanBlock } from "./PlanBlock.js";
 import { SummaryBlock } from "./SummaryBlock.js";
+import { StatusIndicator } from "./StatusIndicator.js";
 
 interface TranscriptSegmentProps {
   block: TranscriptRenderBlock;
@@ -185,6 +186,21 @@ export function TranscriptSegment({ block, expandFileReadGroups = false }: Trans
     return (
       <SummaryBlock content={block.segment.content} iterationRange={block.segment.iterationRange} />
     );
+  }
+
+  if (block.kind === "rate_limit_block") {
+    return (
+      <StatusIndicator
+        role="rate_limit"
+        content={block.segment.content}
+        retryAfterMs={block.segment.retryAfterMs}
+        message={block.segment.message}
+      />
+    );
+  }
+
+  if (block.kind === "error_block") {
+    return <StatusIndicator role="error" content={block.segment.content} />;
   }
 
   if (block.kind === "file_read_group_block") {
