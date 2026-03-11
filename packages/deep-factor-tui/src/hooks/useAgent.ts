@@ -250,6 +250,8 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   // Track how many chat messages have already been persisted to the session log.
   // Starts at the count of initial/resumed messages so we don't re-log them.
   const loggedMessageCountRef = useRef<number>(options.initialMessages?.length ?? 0);
+  // Track session start time for computing durationMs in result entries
+  const sessionStartRef = useRef<number>(0);
   const usageBaseRef = useRef<TokenUsage>({
     inputTokens: 0,
     outputTokens: 0,
@@ -357,6 +359,41 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         }
       }
 
+      // Write result entry at session end
+      {
+        const resultUsage = addUsage(usageBaseRef.current, result.usage);
+        const durationMs =
+          sessionStartRef.current > 0 ? Date.now() - sessionStartRef.current : undefined;
+        let content: string;
+        let stopReason: string;
+
+        if (isPlanResult(result)) {
+          content = result.plan;
+          stopReason = "plan";
+        } else if (isPendingResult(result)) {
+          content = result.response;
+          stopReason = "pending_input";
+        } else if (result.stopReason === "max_errors") {
+          content = result.response;
+          stopReason = "max_errors";
+        } else {
+          content = result.response;
+          stopReason = result.stopReason;
+        }
+
+        appendUnifiedSession({
+          type: "result",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          content,
+          stopReason,
+          usage: resultUsage,
+          iterations: result.iterations,
+          durationMs,
+        });
+      }
+
       if (isPlanResult(result)) {
         setError(null);
         setPlan(result.plan);
@@ -402,6 +439,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       setPendingUiState(null);
       pendingRef.current = null;
       usageBaseRef.current = usage;
+      sessionStartRef.current = Date.now();
 
       const tools: AgentTools = [...(options.tools ?? []), requestHumanInput];
 
