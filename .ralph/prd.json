@@ -1,0 +1,342 @@
+{
+  "project": "deep-factor",
+  "branchName": "feat/unified-log-and-docs",
+  "description": "Unified Log <> TUI Integration - Close 10 gaps between unified log system and TUI, achieving full logging parity and session replay",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create shared MapperContext in useAgent",
+      "description": "As the agent system, I need a shared MapperContext initialized at session start so that all log entries use a single sequence counter and consistent provider metadata.",
+      "acceptanceCriteria": [
+        "useAgent.ts creates a MapperContext (useRef) when the agent is first initialized with fields: sessionId, sequence: 0, currentIteration: 0, provider, model, mode",
+        "Import MapperContext and nextSequence from deep-factor-agent/log-mappers/types",
+        "Provider comes from options.provider, model from options.modelLabel, mode from options.sandbox",
+        "Remove the _sessionSequence module-level counter in session-logger.ts",
+        "All calls to appendUnifiedSession() use nextSequence(mapperCtx) from the shared context",
+        "pnpm -C packages/deep-factor-tui type-check passes",
+        "pnpm -C packages/deep-factor-tui test passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Iteration 1: Unified Write Path. Files: useAgent.ts, session-logger.ts. MapperContext interface: { sessionId, sequence, currentIteration, provider, model?, mode? }"
+    },
+    {
+      "id": "US-002",
+      "title": "Write init entry at session start",
+      "description": "As a session analyst, I want every TUI session to begin with an init entry so I can identify the provider, model, mode, and tools used.",
+      "acceptanceCriteria": [
+        "An init UnifiedLogEntry is written to the session file when the agent is first created in useAgent.ts",
+        "The init entry includes: provider, model, mode, settings (maxIter, sandbox), cwd (process.cwd()), and tools (list of tool names from options.tools)",
+        "The init entry matches the format used in print.ts (lines 109-117) using buildEntry('init', {...})",
+        "The entry uses nextSequence() from the shared MapperContext created in US-001",
+        "Use appendUnifiedSession() from session-logger.ts to write the entry",
+        "pnpm -C packages/deep-factor-tui type-check passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Iteration 1: Unified Write Path. Reference: print.ts lines 109-117. Write after MapperContext init, before agent invocation."
+    },
+    {
+      "id": "US-003",
+      "title": "Replace appendSession with appendUnifiedSession",
+      "description": "As the logging system, I need the TUI to write unified format directly so that session logs are complete and lossless.",
+      "acceptanceCriteria": [
+        "All appendSession() calls in useAgent.ts (lines 305-318) are replaced with appendUnifiedSession() calls",
+        "assistant messages map to type: 'message', role: 'assistant' with content and iteration",
+        "tool_call messages map to type: 'tool_call' with toolCallId, toolName, args, display, parallelGroup",
+        "tool_result messages map to type: 'tool_result' with toolCallId, result, durationMs, display, parallelGroup",
+        "user messages continue to be skipped (logged at submit time)",
+        "Each entry includes sessionId, timestamp (Date.now()), sequence (nextSequence from shared MapperContext), iteration",
+        "appendSession() function in session-logger.ts is no longer called from any TUI code",
+        "pnpm -C packages/deep-factor-tui type-check passes",
+        "pnpm -C packages/deep-factor-tui test passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Iteration 1: Unified Write Path. handleResult (lines 295-345) iterates messagesToLog. Preserve toolDisplay, parallelGroup, durationMs metadata."
+    },
+    {
+      "id": "US-004",
+      "title": "Write result entry at session end",
+      "description": "As a session analyst, I want every completed TUI session to end with a result entry so I can determine the outcome, total cost, and final answer from the log alone.",
+      "acceptanceCriteria": [
+        "A result UnifiedLogEntry is appended in handleResult() after logging individual messages",
+        "The result entry includes: content (final assistant text), stopReason, usage (token counts), iterations, durationMs, costUsd (if available)",
+        "The result entry matches the format used in print.ts (lines 168-175)",
+        "The entry is written for all result types: AgentResult (stopReason from result), PendingResult (stopReason: 'pending_input'), PlanResult (stopReason: 'plan')",
+        "For max_errors case, stopReason is 'max_errors'",
+        "Track session start time with Date.now() at sendPrompt to compute durationMs",
+        "pnpm -C packages/deep-factor-tui type-check passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Iteration 1: Unified Write Path. content: last assistant message from result.messages. usage: from result.usage or tokenUsage state. iterations: from result.iterations or iterations state."
+    },
+    {
+      "id": "US-005",
+      "title": "Pass iteration numbers to unified entries",
+      "description": "As a session analyst, I want each tool_call and tool_result entry to include the correct iteration number so I can group actions by agent loop iteration.",
+      "acceptanceCriteria": [
+        "In handleUpdate callback, update mapperCtxRef.current.currentIteration = update.iterations (alongside existing state update at line 265)",
+        "All tool_call and tool_result unified entries include the current iteration value from MapperContext (not hardcoded 0)",
+        "All message entries for assistant responses include the current iteration from MapperContext",
+        "The sessionEntryToUnified() function no longer hardcodes iteration: 0 (lines 253, 271) — uses MapperContext instead",
+        "pnpm -C packages/deep-factor-tui type-check passes",
+        "pnpm -C packages/deep-factor-tui test passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Iteration 2: Complete Event Coverage. handleUpdate already receives update.iterations (line 265). Simply sync it to the shared MapperContext ref."
+    },
+    {
+      "id": "US-006",
+      "title": "Persist status events to session log",
+      "description": "As a session analyst, I want agent status transitions logged so that session replay can reconstruct timing and detect when the agent was blocked on human input.",
+      "acceptanceCriteria": [
+        "A status UnifiedLogEntry is written when agentStatus transitions to: running (line 359), done (line 324), pending_input (line 332), error (lines 341, 348)",
+        "The status entry includes: status, usage (current tokenUsage state), iterations (current count), costUsd (if available)",
+        "The format matches print.ts (lines 97-103): buildEntry('status', { status, usage, iterations })",
+        "Status entries appear in the .jsonl output at the correct chronological position relative to message/tool entries",
+        "pnpm -C packages/deep-factor-tui type-check passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Iteration 2: Complete Event Coverage. Write at each transition point in useAgent.ts. Use appendUnifiedSession() with shared MapperContext."
+    },
+    {
+      "id": "US-007",
+      "title": "Persist error events to session log",
+      "description": "As a developer debugging issues, I want agent errors logged to the session file so that session recovery can reconstruct error context without manual reproduction.",
+      "acceptanceCriteria": [
+        "An error UnifiedLogEntry is appended in the catch block (line 348) before setError() and setStatus('error')",
+        "The error entry includes: error (err.stack || err.message or String(err)), recoverable: false, iteration (from MapperContext)",
+        "The format matches print.ts (lines 184-191)",
+        "For max_errors stop condition in handleResult (lines 337-341), a separate error entry is written with recoverable: false",
+        "Error entries include stack trace in the error field when available (err instanceof Error ? err.stack || err.message : String(err))",
+        "pnpm -C packages/deep-factor-tui type-check passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Iteration 2: Complete Event Coverage. Two write sites: catch block (line 348) and max_errors in handleResult (line 337-341)."
+    },
+    {
+      "id": "US-008",
+      "title": "Extend ChatMessage for unified event types",
+      "description": "As the TUI rendering system, I need ChatMessage to support all unified log event types so the UI can render thinking blocks, plans, summaries, and rate limit warnings.",
+      "acceptanceCriteria": [
+        "ChatMessage.role in types.ts (lines 38-48) is extended to include: 'thinking', 'plan', 'summary', 'status', 'error', 'rate_limit', 'file_change', 'approval', 'human_input', 'completion'",
+        "New optional fields added: thinking?: string, planContent?: string, statusInfo?: { status: string; usage?: object; iterations?: number }, rateLimitInfo?: { retryAfterMs?: number; message?: string }",
+        "eventsToChatMessages() or equivalent converter handles all 16 unified log types (excluding init and result which are session-level)",
+        "Existing code checking role === 'assistant', 'user', 'tool_call', 'tool_result' continues to work unchanged",
+        "pnpm -C packages/deep-factor-tui type-check passes",
+        "pnpm -C packages/deep-factor-tui test passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Iteration 3: TUI Rendering. File: packages/deep-factor-tui/src/types.ts. Consider flat interface with optional fields for backward compat."
+    },
+    {
+      "id": "US-009",
+      "title": "Add ThinkingBlock component",
+      "description": "As a user, I want to see the model's extended thinking in a visually distinct collapsible block so I can understand the reasoning process.",
+      "acceptanceCriteria": [
+        "New component ThinkingBlock.tsx in packages/deep-factor-tui/src/components/",
+        "Renders thinking content in dimmed/italic style using Ink Box with borderStyle='single' and dimColor",
+        "Collapsible by default: shows '[Thinking...]' summary, truncates to first 3 lines with '[+N more lines]' indicator",
+        "MessageBubble.tsx or TranscriptTurn.tsx delegates to ThinkingBlock when role === 'thinking'",
+        "Follow existing component patterns (reference: ToolCallBlock.tsx)",
+        "pnpm -C packages/deep-factor-tui type-check passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Iteration 3: TUI Rendering. Use Ink <Box> and <Text> components. Keep it simple — dim border, italic text, truncation."
+    },
+    {
+      "id": "US-010",
+      "title": "Add PlanBlock and SummaryBlock components",
+      "description": "As a user, I want plan output and context summaries rendered as distinct UI elements so I can distinguish them from regular assistant messages.",
+      "acceptanceCriteria": [
+        "New component PlanBlock.tsx: renders plan content with cyan header label and indented bullet style using Box flexDirection='column'",
+        "New component SummaryBlock.tsx: renders context summarization with '[Context summarized: iterations X-Y]' header in dim text with border",
+        "TranscriptTurn.tsx or TranscriptSegment.tsx routes to PlanBlock when role === 'plan' and SummaryBlock when role === 'summary'",
+        "Both components follow existing patterns (Box/Text from Ink, consistent color scheme)",
+        "pnpm -C packages/deep-factor-tui type-check passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Iteration 3: TUI Rendering. PlanBlock: cyan header, numbered steps. SummaryBlock: dim text, show summarized iteration range."
+    },
+    {
+      "id": "US-011",
+      "title": "Add StatusIndicator component and LangChain thinking extraction",
+      "description": "As a user, I want rate limit warnings and errors rendered distinctly. As the logging system, I need the LangChain mapper to extract thinking blocks.",
+      "acceptanceCriteria": [
+        "New component StatusIndicator.tsx: renders rate_limit warnings with yellow text and retryAfterMs countdown, error entries with red styling",
+        "TranscriptTurn.tsx routes to StatusIndicator when role === 'rate_limit' or role === 'error'",
+        "langchain-mapper.ts checks for thinking blocks in AIMessage.content (content blocks with type: 'thinking')",
+        "When thinking blocks found, emits separate thinking UnifiedLogEntry entries before the message entry (same pattern as claude-mapper.ts lines ~60-70)",
+        "When no thinking blocks present, LangChain mapper behavior is unchanged",
+        "pnpm -C packages/deep-factor-tui type-check passes",
+        "pnpm -C packages/deep-factor-agent type-check passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Iteration 3: TUI Rendering. StatusIndicator: red for errors, yellow for rate limits. LangChain mapper: AIMessage.content can be string or array of content blocks."
+    },
+    {
+      "id": "US-012",
+      "title": "Remove legacy SessionEntry write path",
+      "description": "As a maintainer, I want to remove the legacy SessionEntry write path so there is a single, canonical logging format.",
+      "acceptanceCriteria": [
+        "appendSession() function in session-logger.ts is removed entirely",
+        "SessionEntry type is removed from session-logger.ts",
+        "sessionEntryToUnified() conversion function is removed",
+        "_sessionSequence module-level counter is removed (if not already removed in US-001)",
+        "No remaining imports or references to appendSession anywhere in the codebase (grep confirms)",
+        "pnpm -r type-check passes",
+        "pnpm -r test passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Iteration 4: Deprecation. Verify all appendSession imports were migrated in Iteration 1. Keep appendUnifiedSession() as sole write API."
+    },
+    {
+      "id": "US-013",
+      "title": "Update loadSession with legacy read fallback",
+      "description": "As the session system, I need loadSession() to read unified format natively while maintaining a fallback for old-format sessions.",
+      "acceptanceCriteria": [
+        "loadSession() reads .jsonl files and parses each line as UnifiedLogEntry",
+        "Detection: check for 'type' field (unified) vs 'role' field (legacy) on each parsed JSON line",
+        "Legacy lines are converted inline using a private helper with the same mapping logic from sessionEntryToUnified()",
+        "Old sessions (pre-migration) can still be loaded and displayed in the TUI",
+        "New sessions are read without any conversion overhead",
+        "pnpm -C packages/deep-factor-tui type-check passes",
+        "pnpm -C packages/deep-factor-tui test passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "Iteration 4: Deprecation. Keep a private _convertLegacyEntry() helper for backward compat. Do NOT remove old session reading ability."
+    },
+    {
+      "id": "US-014",
+      "title": "Clean up unused legacy conversion functions",
+      "description": "As a maintainer, I want to remove all dead code related to the legacy format so the codebase is clean and unambiguous.",
+      "acceptanceCriteria": [
+        "Remove or update eventsToChatMessages() to handle unified-only format",
+        "Remove any SessionEntry-to-ChatMessage conversion helpers no longer referenced",
+        "Remove test fixtures or mocks that only test legacy format writing",
+        "Update tests to verify unified format output",
+        "Keep tests that validate legacy fallback reading (US-013)",
+        "Grep for SessionEntry across codebase — no non-test, non-fallback references remain",
+        "pnpm -r type-check passes",
+        "pnpm -r test passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "Iteration 4: Deprecation. Final cleanup. Run type-check to find unused imports. Preserve legacy read fallback from US-013."
+    },
+    {
+      "id": "US-015",
+      "title": "Rigorous QA: build, typecheck, tests, and structural log validation",
+      "description": "As the QA process, I need to run the complete validation suite matching the rigor of validate-smoke-logs.mjs (8-check structural validation) and the log-mappers.test.ts unit test patterns, plus build/typecheck/test across both packages.",
+      "acceptanceCriteria": [
+        "BUILDS: pnpm -C packages/deep-factor-agent build succeeds with zero errors",
+        "BUILDS: pnpm -C packages/deep-factor-tui build succeeds with zero errors",
+        "TYPECHECK: pnpm -C packages/deep-factor-agent type-check passes with zero errors",
+        "TYPECHECK: pnpm -C packages/deep-factor-tui type-check passes with zero errors",
+        "TESTS: pnpm -C packages/deep-factor-agent test passes with zero failures",
+        "TESTS: pnpm -C packages/deep-factor-tui test passes with zero failures",
+        "STRUCTURAL CHECK 1 (base fields): Every UnifiedLogEntry written by TUI has type, sessionId, timestamp (number in ms), and sequence (number) — grep changed files to confirm all appendUnifiedSession calls include these 4 fields",
+        "STRUCTURAL CHECK 2 (monotonic sequences): All entries use nextSequence(mapperCtx) from the shared MapperContext — no manual sequence assignment, no _sessionSequence counter remains",
+        "STRUCTURAL CHECK 3 (bookend events): init entry is written before any other entry (first call to appendUnifiedSession), result entry is written after all message entries in handleResult — verify call order in useAgent.ts",
+        "STRUCTURAL CHECK 4 (session consistency): All entries share the same sessionId from the MapperContext ref — grep for appendUnifiedSession and verify every call passes sessionId from mapperCtxRef.current",
+        "STRUCTURAL CHECK 5 (tool call/result matching): tool_call entries include toolCallId, toolName, args; tool_result entries include matching toolCallId — verify the mapping logic preserves these fields from ChatMessage",
+        "STRUCTURAL CHECK 6 (iteration tracking): tool_call, tool_result, and message entries include iteration from mapperCtxRef.current.currentIteration — no hardcoded 0 values (grep for 'iteration: 0' or 'iteration:0' in session-logger.ts and useAgent.ts)",
+        "STRUCTURAL CHECK 7 (status events): status entries are written at each transition (running, done, pending_input, error) with status, usage, and iterations fields — verify 4 write sites in useAgent.ts",
+        "STRUCTURAL CHECK 8 (error events): error entries are written in catch block and max_errors handler with error (string), recoverable (boolean), and iteration fields — verify 2 write sites in useAgent.ts",
+        "LEGACY CLEANUP: grep -r 'appendSession' across packages/deep-factor-tui/src/ returns zero results (excluding appendUnifiedSession)",
+        "LEGACY CLEANUP: grep -r '_sessionSequence' across packages/deep-factor-tui/src/ returns zero results",
+        "TYPE SAFETY: grep -r ': any' in files changed by US-001 through US-014 returns zero new occurrences (compare against git diff base)",
+        "INIT ENTRY SCHEMA: init entries include provider (string), model (string), mode (string), settings (object with maxIter and sandbox), cwd (string), tools (string array) — verify in code or test",
+        "RESULT ENTRY SCHEMA: result entries include content (string), stopReason (string), usage (object with inputTokens/outputTokens/totalTokens), iterations (number) — verify in code or test",
+        "If any check fails, fix the underlying issue and re-run ALL checks until every one passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "Iteration 4: QA. This mirrors the 8-check rigor of docs/smoke-tests/validate-smoke-logs.mjs (base fields, monotonic sequences, bookend events, session consistency, tool matching, no leaked JSON, no duplicate status, provider on init) plus the unit test patterns from __tests__/log-mappers.test.ts. Run builds first, then typechecks, then tests, then structural grep checks. Fix any failures before marking as passing."
+    },
+    {
+      "id": "US-016",
+      "title": "Push all changes to remote branch",
+      "description": "As the release process, I need all committed changes pushed to the remote branch so they are available for review.",
+      "acceptanceCriteria": [
+        "Current branch is feat/unified-log-and-docs (matching prd.json branchName)",
+        "All local commits are pushed to origin/feat/unified-log-and-docs with git push -u origin feat/unified-log-and-docs",
+        "git status shows working tree clean after push",
+        "git log --oneline origin/feat/unified-log-and-docs shows all US-001 through US-015 commits"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "Iteration 4: Push. Simple push — no force push. If remote is ahead, pull --rebase first then push."
+    },
+    {
+      "id": "US-017",
+      "title": "Validate or create draft PR against master",
+      "description": "As the release process, I need a draft pull request to exist for code review, creating one if it doesn't already exist.",
+      "acceptanceCriteria": [
+        "Check for existing PR from feat/unified-log-and-docs to master using: gh pr list --head feat/unified-log-and-docs --base master",
+        "If a PR exists: verify it is in draft or open state and log the PR URL",
+        "If no PR exists: create a draft PR using gh pr create --draft --base master --title 'Unified Log <> TUI Integration' with a body summarizing all 4 phases and listing completed user stories",
+        "The PR body includes: Summary section with bullet points for each phase, Test Plan section listing validation commands, and link to the spec at specs/unified-log-tui-gaps.md",
+        "Log the final PR URL in progress.txt"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "Iteration 4: PR. Use gh CLI. Draft PR so it's not auto-merged. PR body should reference the 4 phases and 10 gaps (G1-G10) addressed."
+    },
+    {
+      "id": "US-018",
+      "title": "Generate human smoke test checklist from progress.txt learnings and add to PR description",
+      "description": "As a reviewer, I need the PR description to include a human smoke test checklist derived from the actual gotchas, patterns, and learnings discovered during implementation (recorded in .ralph/progress.txt).",
+      "acceptanceCriteria": [
+        "Read .ralph/progress.txt fully — extract ALL 'Learnings for future iterations' sections and 'Codebase Patterns' from every completed story (US-001 through US-017)",
+        "For each learning/gotcha discovered during implementation, generate a targeted smoke test that a human reviewer can run to verify the fix or behavior holds — these are the REAL risks, not generic checks",
+        "Cross-reference learnings against the 8 structural checks in docs/smoke-tests/validate-smoke-logs.mjs (base fields, monotonic sequences, bookend events, session consistency, no leaked JSON, no duplicate status, tool matching, provider on init) — include any check where a learning indicates a specific risk",
+        "Cross-reference learnings against the smoke test matrix in docs/smoke-tests/SMOKE_TEST_PLAN.md (S1-S9) — include commands for any provider/tier where a learning indicates fragility",
+        "Include the validate-smoke-logs.mjs command to run against any TUI-generated session files as a catch-all structural validator",
+        "For any learning about backward compat or legacy fallback, include a specific test: load a pre-migration session .jsonl and verify it renders",
+        "For any learning about new components (ThinkingBlock, PlanBlock, SummaryBlock, StatusIndicator), include a visual verification step only if the component was actually implemented and wired up",
+        "Format each smoke test as a markdown checkbox (- [ ]) with: what to run, what to look for, and WHY (citing the specific learning/gotcha that motivates it)",
+        "Update the PR body (gh pr edit) to append a '## Human Smoke Tests' section derived from the above",
+        "Include a 'Gotchas Found During Implementation' subsection that lists the most critical learnings from progress.txt verbatim — so the reviewer knows what went wrong during development and where to focus",
+        "The PR body ends with references: 'Spec: specs/unified-log-tui-gaps.md | Validator: docs/smoke-tests/validate-smoke-logs.mjs | Smoke Test Plan: docs/smoke-tests/SMOKE_TEST_PLAN.md'",
+        "Log the updated PR URL in progress.txt"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "Iteration 4: Smoke tests from learnings. DO NOT use pre-canned smoke tests. READ .ralph/progress.txt to find what actually broke, what was tricky, what edge cases were discovered. Build the smoke test checklist FROM those real learnings. Use 'gh pr edit <PR_NUMBER> --body' to update. Format: checkbox per test, cite the learning that motivates it."
+    },
+    {
+      "id": "US-019",
+      "title": "Post PR comment with prioritized next steps from implementation insights",
+      "description": "As a project lead, I need a PR comment that synthesizes all implementation learnings into a ranked list of next priorities so the team knows what to tackle after this PR merges.",
+      "acceptanceCriteria": [
+        "Read .ralph/progress.txt fully — collect ALL learnings, gotchas, codebase patterns, and deferred items from every completed story",
+        "Read docs/smoke-tests/SMOKE_TEST_PLAN.md 'Known Failures' and 'Known Limitations' sections — these are acknowledged gaps that may now be addressable or worsened",
+        "Read specs/unified-log-tui-gaps.md 'Open Questions' section — check if any were answered during implementation",
+        "Synthesize into a ranked list of next priorities ordered by IMPACT (user/developer value unblocked) not effort",
+        "Each priority item includes: title, impact rating (critical/high/medium/low), 1-2 sentence rationale citing the specific learning or gap that motivates it, and affected files/areas",
+        "Group priorities into tiers: 'Critical (blocks production use)', 'High (degrades experience)', 'Medium (improves quality)', 'Low (nice to have)'",
+        "Include any TODO items, FIXME comments, or known regressions discovered during implementation",
+        "Include any patterns from progress.txt Codebase Patterns section that suggest architectural debt or refactoring opportunities",
+        "Post as a PR comment using: gh pr comment <PR_NUMBER> --body <content> — this is a COMMENT not a body edit",
+        "Format as markdown with '## Next Priorities' header, tier subheaders, and numbered items per tier",
+        "End the comment with: 'N items total: X critical, Y high, Z medium, W low — derived from N learnings across M iterations'",
+        "Log that the comment was posted in progress.txt"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": "Iteration 4: FINAL story. Closes the feedback loop — learnings from THIS implementation become input for the NEXT sprint. The comment lives on the PR so it's discoverable during review and planning. Rank by impact not effort. Use 'gh pr comment' NOT 'gh pr edit'. Cross-reference: progress.txt learnings + SMOKE_TEST_PLAN.md known failures/limitations + unified-log-tui-gaps.md open questions."
+    }
+  ]
+}

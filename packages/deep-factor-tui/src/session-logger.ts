@@ -90,58 +90,6 @@ export function loadSession(id: string): UnifiedLogEntry[] {
   });
 }
 
-function unifiedToSessionEntry(entry: UnifiedLogEntry): SessionEntry {
-  const base: SessionEntry = {
-    timestamp: new Date(entry.timestamp).toISOString(),
-    sessionId: entry.sessionId,
-    role: "assistant",
-    content: "",
-    model: (entry.providerMeta?.model as string) ?? undefined,
-    provider: (entry.providerMeta?.provider as ProviderInput) ?? undefined,
-  };
-
-  switch (entry.type) {
-    case "message":
-      return {
-        ...base,
-        role: entry.role === "system" ? "assistant" : entry.role,
-        content: entry.content,
-      };
-
-    case "tool_call":
-      return {
-        ...base,
-        role: "tool_call",
-        content: JSON.stringify(entry.args),
-        toolName: entry.toolName,
-        toolArgs: entry.args,
-        toolCallId: entry.toolCallId,
-        toolDisplay: entry.display,
-        parallelGroup: entry.parallelGroup,
-      };
-
-    case "tool_result":
-      return {
-        ...base,
-        role: "tool_result",
-        content: typeof entry.result === "string" ? entry.result : JSON.stringify(entry.result),
-        toolCallId: entry.toolCallId,
-        toolDisplay: entry.display,
-        parallelGroup: entry.parallelGroup,
-      };
-
-    case "completion":
-      return {
-        ...base,
-        role: "assistant",
-        content: entry.result,
-      };
-
-    default:
-      return base;
-  }
-}
-
 /**
  * Convert a legacy SessionEntry to UnifiedLogEntry.
  * Used as a read-path fallback for pre-migration session files.
@@ -255,34 +203,27 @@ export function getLatestSessionId(): string | undefined {
   return files[0].replace(".jsonl", "");
 }
 
-export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
+/**
+ * Build an AgentThread directly from unified log entries.
+ */
+export function buildThreadFromUnifiedSession(entries: UnifiedLogEntry[]): AgentThread {
   const events: AgentEvent[] = [];
   let iteration = 0;
   let lastToolCallId = "";
 
   for (const entry of entries) {
-    const ts = new Date(entry.timestamp).getTime() || Date.now();
+    switch (entry.type) {
+      case "message":
+        if (entry.role === "user") iteration++;
+        events.push({
+          type: "message",
+          role: entry.role === "system" ? "assistant" : entry.role,
+          content: entry.content,
+          timestamp: entry.timestamp,
+          iteration: entry.iteration ?? iteration,
+        });
+        break;
 
-    switch (entry.role) {
-      case "user":
-        iteration++;
-        events.push({
-          type: "message",
-          role: "user",
-          content: entry.content,
-          timestamp: ts,
-          iteration,
-        });
-        break;
-      case "assistant":
-        events.push({
-          type: "message",
-          role: "assistant",
-          content: entry.content,
-          timestamp: ts,
-          iteration,
-        });
-        break;
       case "tool_call": {
         const tcId = entry.toolCallId ?? randomUUID();
         lastToolCallId = tcId;
@@ -290,24 +231,39 @@ export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
           type: "tool_call",
           toolName: entry.toolName ?? "unknown",
           toolCallId: tcId,
-          args: entry.toolArgs ?? {},
-          display: entry.toolDisplay,
+          args: entry.args ?? {},
+          display: entry.display,
           parallelGroup: entry.parallelGroup,
-          timestamp: ts,
-          iteration,
+          timestamp: entry.timestamp,
+          iteration: entry.iteration ?? iteration,
         });
         break;
       }
+
       case "tool_result":
         events.push({
           type: "tool_result",
           toolCallId: entry.toolCallId ?? (lastToolCallId || randomUUID()),
-          result: entry.content,
-          display: entry.toolDisplay,
+          result: typeof entry.result === "string" ? entry.result : JSON.stringify(entry.result),
+          display: entry.display,
           parallelGroup: entry.parallelGroup,
-          timestamp: ts,
-          iteration,
+          timestamp: entry.timestamp,
+          iteration: entry.iteration ?? iteration,
         });
+        break;
+
+      case "completion":
+        events.push({
+          type: "message",
+          role: "assistant",
+          content: entry.result,
+          timestamp: entry.timestamp,
+          iteration: entry.iteration ?? iteration,
+        });
+        break;
+
+      // Skip non-conversation entry types (init, result, status, error, thinking, etc.)
+      default:
         break;
     }
   }
@@ -320,22 +276,4 @@ export function buildThreadFromSession(entries: SessionEntry[]): AgentThread {
     createdAt: events[0]?.timestamp ?? now,
     updatedAt: events[events.length - 1]?.timestamp ?? now,
   };
-}
-
-/**
- * Build an AgentThread from unified log entries.
- */
-export function buildThreadFromUnifiedSession(entries: UnifiedLogEntry[]): AgentThread {
-  // Convert to legacy format and reuse existing logic
-  const sessionEntries = entries
-    .filter(
-      (e) =>
-        e.type === "message" ||
-        e.type === "tool_call" ||
-        e.type === "tool_result" ||
-        e.type === "completion",
-    )
-    .map(unifiedToSessionEntry);
-
-  return buildThreadFromSession(sessionEntries);
 }

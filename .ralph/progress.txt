@@ -1,0 +1,219 @@
+# Ralph Progress Log
+Started: Tue Mar 10 23:40:04 MDT 2026
+---
+
+## Codebase Patterns
+- `MapperContext` and `nextSequence` are exported from `deep-factor-agent` (re-exported from `log-mappers/types.ts`)
+- `appendUnifiedSession()` in session-logger.ts is the canonical write API for unified log entries
+- `getSessionId()` in session-logger.ts returns the current session UUID (creates one if needed)
+- `appendSession()` is legacy, no longer called from any TUI code — function definition remains in session-logger.ts for US-012 removal
+- `_sessionSequence` in session-logger.ts is only used by legacy `appendSession()` — will be removed with US-012
+- `ChatMessageRole` type in TUI types.ts defines all supported roles including unified event types
+- `ReplayChatMessage` and `ReplayChatMessageRole` in agent package replay.ts mirror TUI ChatMessage for log-to-message conversion
+- `completion` events are skipped in `eventsToChatMessages` (live path) since they duplicate assistant messages — handled only in `logToChatMessages` (replay path)
+- `buildThreadFromUnifiedSession()` works directly with `UnifiedLogEntry` — no legacy conversion needed
+- `SessionEntry` is internal to session-logger.ts, used only by `_convertLegacyEntry()` for reading pre-migration files
+- UnifiedLogEntry types are defined in `packages/deep-factor-agent/src/unified-log.ts`
+- Tests mock `deep-factor-agent` and `../src/session-logger.js` using `vi.mock()` with `vi.hoisted()` for mock references
+- Pre-commit hook runs eslint with React Compiler — any `options.*` used inside `useCallback` must be in its dependency array
+
+## 2026-03-10 23:43 - US-001
+- Created shared `MapperContext` via `useRef` in `useAgent.ts` with sessionId, sequence, currentIteration, provider, model, mode
+- Replaced all `appendSession()` calls in `handleResult()` with direct `appendUnifiedSession()` calls using `nextSequence(ctx)`
+- Added `@deprecated` annotation to `_sessionSequence` (kept because `appendSession` in session-logger.ts still uses it for legacy callers in app.tsx)
+- Updated `useAgent.test.tsx` to mock `appendUnifiedSession`/`getSessionId` instead of `appendSession`, and assert on unified entry types
+- Files changed: `packages/deep-factor-tui/src/hooks/useAgent.ts`, `packages/deep-factor-tui/src/session-logger.ts`, `packages/deep-factor-tui/__tests__/useAgent.test.tsx`
+- **Learnings for future iterations:**
+  - `appendSession` is still called from `app.tsx` (user message logging at submit time) — needs migration in US-003 or US-012
+  - The `mode` field in `UseAgentOptions` corresponds to `sandbox` in the PRD but is actually `options.mode` in the code
+  - Test assertions changed from checking `entry.role` to `entry.type` since unified entries use type-based discrimination
+---
+
+## 2026-03-10 23:45 - US-002
+- Added init UnifiedLogEntry write in `sendPrompt()` before agent invocation (only on first call, when no existing thread)
+- Init entry includes: provider, model, mode, settings (maxIter, sandbox), cwd (process.cwd()), tools (list of tool names)
+- Added `options.provider` and `options.modelLabel` to `sendPrompt` useCallback dependency array (required by eslint react-hooks/exhaustive-deps)
+- Updated test assertions to expect the new `init` entry as first logged entry
+- Files changed: `packages/deep-factor-tui/src/hooks/useAgent.ts`, `packages/deep-factor-tui/__tests__/useAgent.test.tsx`
+- **Learnings for future iterations:**
+  - The eslint pre-commit hook enforces React Compiler's `preserve-manual-memoization` rule — any new `options.*` reference inside `useCallback` must be added to the dependency array
+  - Init entry is only written when `threadRef.current` is null (first invocation), not on continued threads
+  - Tool names are extracted via `t.name` for objects with a `name` property
+---
+
+## 2026-03-10 23:49 - US-003
+- Moved user message logging from `app.tsx` into `useAgent.ts` (`sendPrompt` and `submitPendingInput`) using `appendUnifiedSession`
+- Removed `appendSession` import and calls from `app.tsx`, removed unused `formatPendingSubmission` helper
+- Updated `app.test.tsx`: removed `appendSessionMock`, tests now verify `sendPrompt`/`submitPendingInput` are called correctly
+- Updated `useAgent.test.tsx`: test assertions now expect user "message" entries in the log output
+- Files changed: `packages/deep-factor-tui/src/hooks/useAgent.ts`, `packages/deep-factor-tui/src/app.tsx`, `packages/deep-factor-tui/__tests__/useAgent.test.tsx`, `packages/deep-factor-tui/__tests__/app.test.tsx`
+- **Learnings for future iterations:**
+  - User message logging was in `app.tsx` but needed to move to `useAgent.ts` to access `MapperContext` for sequence numbers
+  - `submitPendingInput` dependency array must include `options.modelLabel` and `options.provider` when using them inside the callback (eslint react-hooks enforcement)
+  - `appendSession` is still called from `app.tsx` is no longer true — only `session-logger.ts` retains the function definition (for US-012 removal)
+---
+
+## 2026-03-10 23:52 - US-004
+- Added `sessionStartRef` to track session start time with `Date.now()` at `sendPrompt`
+- Added result UnifiedLogEntry write in `handleResult()` after logging individual messages, before result-type branching
+- Handles all result types: AgentResult (stopReason from result), PendingResult (stopReason: 'pending_input'), PlanResult (stopReason: 'plan'), max_errors (stopReason: 'max_errors')
+- Result entry includes: content, stopReason, usage (computed via addUsage), iterations, durationMs
+- Updated test expectations to account for the new `result` entry in the log output
+- Files changed: `packages/deep-factor-tui/src/hooks/useAgent.ts`, `packages/deep-factor-tui/__tests__/useAgent.test.tsx`
+- **Learnings for future iterations:**
+  - The `addUsage` function from deep-factor-agent combines base usage with result usage — use it for cumulative token counts
+  - `result.response` is available on AgentResult and PendingResult, while `result.plan` is on PlanResult
+  - When adding new entry types to handleResult, always update the test expectations for `appendUnifiedSessionMock` call count and type sequence
+---
+
+## 2026-03-10 23:54 - US-005
+- Added `mapperCtxRef.current.currentIteration = update.iterations` in handleUpdate callback to sync iteration from streaming updates
+- Added `mapperCtxRef.current.currentIteration = result.iterations` in handleResult before logging entries (ensures correct iteration even in non-streaming mode)
+- Added test assertions verifying iteration values: user message has iteration 0 (logged before updates), tool_call/tool_result/assistant messages have iteration 1 (synced from handleUpdate)
+- Files changed: `packages/deep-factor-tui/src/hooks/useAgent.ts`, `packages/deep-factor-tui/__tests__/useAgent.test.tsx`
+- **Learnings for future iterations:**
+  - handleUpdate fires during streaming with `update.iterations` — syncing to MapperContext ensures all subsequent log entries get the correct iteration
+  - handleResult also needs iteration sync because in non-streaming mode (streamMode: "final"), handleUpdate is never called
+  - The sessionEntryToUnified() function in session-logger.ts still hardcodes iteration: 0, but this is for legacy read fallback only — will be addressed in US-012/US-014
+---
+
+## 2026-03-11 00:00 - US-006
+- Added status UnifiedLogEntry writes at all agent status transition points in useAgent.ts
+- Status entries written at: sendPrompt (running), submitPendingInput (running), handleResult (done/pending_input/error per result type), handleError (error)
+- Each status entry includes: status, usage (current TokenUsage), iterations (current count)
+- Updated test expectations to account for new status entries (running at start, done/error at end)
+- Files changed: `packages/deep-factor-tui/src/hooks/useAgent.ts`, `packages/deep-factor-tui/__tests__/useAgent.test.tsx`
+- **Learnings for future iterations:**
+  - When adding new entry types that are written in sendPrompt/handleResult, update test call count AND type sequence assertions
+  - The `iterations` state variable must be added to useCallback dependency arrays when used inside the callback (eslint react-hooks enforcement)
+  - handleError doesn't have access to the current usage/iterations state — uses zero defaults since the error occurred before result was available
+---
+
+## 2026-03-11 00:00 - US-007
+- Added error UnifiedLogEntry writes at two sites in useAgent.ts:
+  1. `handleError` catch callback: writes error entry with `err.stack || err.message` before status transition
+  2. `handleResult` max_errors branch: writes error entry with `stopDetail` message before status transition
+- Both error entries include: error (string with stack trace when available), recoverable: false, iteration from MapperContext
+- Files changed: `packages/deep-factor-tui/src/hooks/useAgent.ts`
+- **Learnings for future iterations:**
+  - Error entries use `err.stack || err.message` pattern for maximum debugging context (stack trace preferred over plain message)
+  - The max_errors branch uses `result.stopDetail` as the error message, with a fallback default string
+  - No test changes needed since existing tests don't exercise the error/max_errors paths — error path tests would need to mock agent.loop() to reject
+---
+
+## 2026-03-11 00:05 - US-008
+- Extended `ChatMessage.role` in types.ts with 10 new roles: thinking, plan, summary, status, error, rate_limit, file_change, approval, human_input, completion
+- Added optional fields to ChatMessage: thinking, planContent, statusInfo, rateLimitInfo
+- Created `ChatMessageRole` type alias for the full role union
+- Updated `logToChatMessages` in replay.ts to handle all 16 unified log types (excluding init/result which are session-level)
+- Created `ReplayChatMessage` and `ReplayChatMessageRole` types in agent package, exported from index
+- Updated `eventsToChatMessages` in useAgent.ts to handle plan, summary, error, approval, human_input_requested events
+- Changed error events from `role: "tool_result"` to `role: "error"` in eventsToChatMessages
+- Kept completion events skipped in eventsToChatMessages (live path) since they duplicate assistant messages
+- Updated tests in events-to-messages.test.ts and log-mappers.test.ts
+- Files changed: `packages/deep-factor-tui/src/types.ts`, `packages/deep-factor-agent/src/log-mappers/replay.ts`, `packages/deep-factor-agent/src/log-mappers/index.ts`, `packages/deep-factor-agent/src/index.ts`, `packages/deep-factor-tui/src/hooks/useAgent.ts`, `packages/deep-factor-tui/__tests__/events-to-messages.test.ts`, `packages/deep-factor-agent/__tests__/log-mappers.test.ts`
+- **Learnings for future iterations:**
+  - `completion` events in AgentEvent duplicate the final assistant message — skip them in eventsToChatMessages (live path) but handle in logToChatMessages (replay path)
+  - `ToolFileChangeSummary` uses `change` field (not `action`) for the change type (created/edited/deleted)
+  - Changing error events from `role: "tool_result"` to `role: "error"` affects both tests and any UI code that routes based on role — transcript.ts falls through gracefully for unrecognized roles
+  - The agent package's `AgentEvent` type has 10 event types (no thinking, status, rate_limit, or file_change) — those exist only in UnifiedLogEntry
+  - `filterDisplayMessages` only filters assistant JSON envelopes — new roles pass through to groupMessagesIntoTurns which falls through gracefully
+- Adding a new transcript segment kind requires updates in 4 places: types.ts (TranscriptSegment + TranscriptRenderBlock), transcript.ts (groupMessagesIntoTurns + buildTranscriptRenderBlocks), and TranscriptSegment.tsx (rendering)
+- Ink `dimColor` is a `Text` prop only — for dim Box borders use `borderColor="gray"`
+---
+
+## 2026-03-11 00:07 - US-009
+- Created `ThinkingBlock.tsx` component with dimmed/italic text inside a `Box` with `borderStyle='single'` and `borderColor='gray'`
+- Shows `[Thinking...]` header, first 3 lines of content, and `[+N more lines]` overflow indicator
+- Added `thinking` segment kind to `TranscriptSegment` type and `thinking_block` to `TranscriptRenderBlock` type
+- Wired up in `groupMessagesIntoTurns` (transcript.ts) to create thinking segments from `role === 'thinking'` messages
+- Wired up in `buildTranscriptRenderBlocks` (transcript.ts) to create thinking render blocks
+- Routed in `TranscriptSegment.tsx` and `MessageBubble.tsx` to render `ThinkingBlock`
+- Files changed: `packages/deep-factor-tui/src/components/ThinkingBlock.tsx` (new), `packages/deep-factor-tui/src/types.ts`, `packages/deep-factor-tui/src/transcript.ts`, `packages/deep-factor-tui/src/components/TranscriptSegment.tsx`, `packages/deep-factor-tui/src/components/MessageBubble.tsx`
+- **Learnings for future iterations:**
+  - `dimColor` is a `Text` prop in Ink, not a `Box` prop — use `borderColor="gray"` on Box for dim border styling
+  - Thinking content uses `message.thinking ?? message.content` since the `thinking` field is the canonical source but `content` is the fallback
+  - Adding a new segment kind requires updates in 4 places: types.ts (TranscriptSegment + TranscriptRenderBlock), transcript.ts (groupMessagesIntoTurns + buildTranscriptRenderBlocks), and the rendering component (TranscriptSegment.tsx)
+  - Manual browser verification needed for visual styling of ThinkingBlock
+---
+
+## 2026-03-11 00:10 - US-010
+- Created `PlanBlock.tsx` component with cyan header and indented content lines
+- Created `SummaryBlock.tsx` component with dim border, `[Context summarized: iterations X-Y]` header, and dim text content
+- Added `plan` and `summary` segment kinds to `TranscriptSegment` type with corresponding `PlanTranscriptSegment` and `SummaryTranscriptSegment` type aliases
+- Added `plan_block` and `summary_block` to `TranscriptRenderBlock` type
+- Wired up in `groupMessagesIntoTurns` (transcript.ts) to create plan/summary segments from matching roles
+- Wired up in `buildTranscriptRenderBlocks` (transcript.ts) to create plan/summary render blocks
+- Routed in `TranscriptSegment.tsx` and `MessageBubble.tsx` to render `PlanBlock` and `SummaryBlock`
+- Files changed: `packages/deep-factor-tui/src/components/PlanBlock.tsx` (new), `packages/deep-factor-tui/src/components/SummaryBlock.tsx` (new), `packages/deep-factor-tui/src/types.ts`, `packages/deep-factor-tui/src/transcript.ts`, `packages/deep-factor-tui/src/components/TranscriptSegment.tsx`, `packages/deep-factor-tui/src/components/MessageBubble.tsx`
+- **Learnings for future iterations:**
+  - Plan content uses `message.planContent ?? message.content` (same pattern as thinking uses `message.thinking ?? message.content`)
+  - Summary segments include an optional `iterationRange` field for displaying which iterations were summarized
+  - Prettier reformats JSX props that exceed line length — `iterationRange={block.segment.iterationRange}` in TranscriptSegment.tsx got reformatted to multi-line
+  - Adding a new segment kind requires updates in 4 places: types.ts (TranscriptSegment + TranscriptRenderBlock), transcript.ts (groupMessagesIntoTurns + buildTranscriptRenderBlocks), TranscriptSegment.tsx (rendering), and optionally MessageBubble.tsx (direct message rendering)
+  - Manual browser verification needed for visual styling of PlanBlock and SummaryBlock
+---
+
+## 2026-03-11 00:14 - US-011
+- Created `StatusIndicator.tsx` component with yellow text for rate_limit warnings (with retryAfterMs countdown) and red text for error entries
+- Extended `TranscriptSegment` union with `rate_limit` and `error` segment kinds, plus corresponding type aliases (`RateLimitTranscriptSegment`, `ErrorTranscriptSegment`)
+- Extended `TranscriptRenderBlock` union with `rate_limit_block` and `error_block` kinds
+- Added routing in `groupMessagesIntoTurns` (transcript.ts) to create rate_limit/error segments from matching ChatMessage roles
+- Added routing in `buildTranscriptRenderBlocks` (transcript.ts) to create rate_limit/error render blocks
+- Routed in `TranscriptSegment.tsx` to render `StatusIndicator` for rate_limit_block and error_block
+- Routed in `MessageBubble.tsx` to render `StatusIndicator` for rate_limit and error roles
+- Added LangChain thinking extraction in `langchain-mapper.ts`: checks raw event content for array-format content blocks with `type: "thinking"`, emits separate thinking UnifiedLogEntry entries before the message entry (same pattern as claude-mapper.ts)
+- Files changed: `packages/deep-factor-tui/src/components/StatusIndicator.tsx` (new), `packages/deep-factor-tui/src/types.ts`, `packages/deep-factor-tui/src/transcript.ts`, `packages/deep-factor-tui/src/components/TranscriptSegment.tsx`, `packages/deep-factor-tui/src/components/MessageBubble.tsx`, `packages/deep-factor-agent/src/log-mappers/langchain-mapper.ts`
+- **Learnings for future iterations:**
+  - LangChain AIMessage.content can be string or array of content blocks — thinking extraction must check the raw event before it's cast to `AgentEvent` (which flattens content to string)
+  - The `mapLangchainEvent` function operates on raw JSONL, so thinking extraction happens there before `mapAgentEvent` is called
+  - Rate limit info is carried on `ChatMessage.rateLimitInfo` (retryAfterMs, message) and propagated to the `rate_limit` TranscriptSegment
+  - Adding new segment kinds requires updates in 4 places: types.ts (TranscriptSegment + TranscriptRenderBlock), transcript.ts (groupMessagesIntoTurns + buildTranscriptRenderBlocks), TranscriptSegment.tsx, and MessageBubble.tsx
+  - Manual browser verification needed for visual styling of StatusIndicator
+---
+
+## 2026-03-11 00:18 - US-012
+- Removed `appendSession()` function entirely from session-logger.ts (82 lines deleted)
+- Removed `_sessionSequence` module-level counter (only used by `appendSession`)
+- Un-exported `SessionEntry` interface (made private with `@internal` annotation, kept for read-path backward compat)
+- `sessionEntryToUnified()` kept as private function (still used by `loadUnifiedSession` for legacy file reading — will be cleaned up in US-014)
+- `appendUnifiedSession()` is now the sole write API for session logs
+- Files changed: `packages/deep-factor-tui/src/session-logger.ts`
+- **Learnings for future iterations:**
+  - `SessionEntry` cannot be fully removed yet because `loadSession()`, `resolveSessionSettings()`, and `buildThreadFromSession()` still use it as a return/parameter type — these will be migrated in US-013/US-014
+  - `sessionEntryToUnified()` is still needed by `loadUnifiedSession()` for converting legacy lines — remove it only after US-013 updates `loadSession` to return `UnifiedLogEntry[]`
+  - `unifiedToSessionEntry()` is still needed by both `loadSession()` (converts unified entries to legacy format for consumers) and `buildThreadFromUnifiedSession()` — will be addressed in US-013/US-014
+  - No external code imports `SessionEntry` by name — cli.tsx and tests use structural typing via function return types
+---
+
+## 2026-03-11 00:22 - US-013
+- Updated `loadSession()` to return `UnifiedLogEntry[]` instead of `SessionEntry[]`, with inline legacy detection/conversion
+- Renamed `sessionEntryToUnified()` to `_convertLegacyEntry()` as private helper for legacy read fallback
+- Removed `loadUnifiedSession()` (merged into `loadSession()` — it was the only definition, never imported elsewhere)
+- Updated `resolveSessionSettings()` to accept `UnifiedLogEntry[]` — extracts provider/model from `init` entries or `providerMeta`
+- Updated `cli.tsx` to use `buildThreadFromUnifiedSession()` and map `UnifiedLogEntry` to `ChatMessage` for resume
+- Updated tests to use `UnifiedLogEntry` format (init entries with provider/model fields)
+- Files changed: `packages/deep-factor-tui/src/session-logger.ts`, `packages/deep-factor-tui/src/cli.tsx`, `packages/deep-factor-tui/__tests__/session-logger.test.ts`
+- **Learnings for future iterations:**
+  - `MessageLog.role` includes `"system"` which is not in `ChatMessageRole` — must map to `"assistant"` when converting to ChatMessage
+  - Legacy detection uses `parsed.role && parsed.sequence === undefined` — the presence of `role` without `sequence` reliably identifies old-format entries
+  - `resolveSessionSettings` now checks both `init` entries (direct `provider`/`model` fields) and regular entries (`providerMeta.provider`/`providerMeta.model`)
+  - `buildThreadFromSession()` still exists and accepts `SessionEntry[]` — it's used internally by `buildThreadFromUnifiedSession()` via `unifiedToSessionEntry()`
+  - `unifiedToSessionEntry()` is still needed by `buildThreadFromUnifiedSession()` — cannot be removed until thread building is rewritten to work directly with unified entries (US-014 scope)
+---
+
+## 2026-03-11 00:27 - US-014
+- Rewrote `buildThreadFromUnifiedSession()` to work directly with `UnifiedLogEntry` — no longer converts through legacy `SessionEntry` format
+- Removed `unifiedToSessionEntry()` function (51 lines) — was only used by `buildThreadFromUnifiedSession()`
+- Removed `buildThreadFromSession()` function (66 lines, exported) — was only used internally by `buildThreadFromUnifiedSession()` and tests
+- Updated 3 tests in `session-logger.test.ts` to use `buildThreadFromUnifiedSession()` with `UnifiedLogEntry` objects instead of `buildThreadFromSession()` with legacy `SessionEntry` objects
+- `SessionEntry` interface kept only for `_convertLegacyEntry()` read-path fallback (US-013 requirement)
+- `eventsToChatMessages()` already handles unified format (AgentEvent, not SessionEntry) — no changes needed
+- Grep confirms: no non-test, non-fallback `SessionEntry` references remain in packages/
+- Files changed: `packages/deep-factor-tui/src/session-logger.ts`, `packages/deep-factor-tui/__tests__/session-logger.test.ts`
+- **Learnings for future iterations:**
+  - `buildThreadFromUnifiedSession` can use `entry.iteration` directly from unified entries instead of tracking iteration manually — but still needs manual tracking as fallback for legacy entries converted by `_convertLegacyEntry` (which sets iteration: 0)
+  - `completion` entries map to `type: "message", role: "assistant"` in the thread (same content as the completion result)
+  - The `message` role union in `UnifiedLogEntry` includes "system" which must be mapped to "assistant" for `AgentEvent` compatibility
+  - Test data for `buildThreadFromUnifiedSession` requires all 4 base fields (type, sessionId, timestamp, sequence) plus type-specific fields — more verbose than legacy `SessionEntry` but more explicit
+---

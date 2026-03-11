@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UnifiedLogEntry } from "deep-factor-agent";
-import { buildThreadFromSession, resolveSessionSettings } from "../src/session-logger.js";
+import { buildThreadFromUnifiedSession, resolveSessionSettings } from "../src/session-logger.js";
 
 describe("resolveSessionSettings", () => {
   it("reuses stored provider and model from init entry when flags are absent", () => {
@@ -100,30 +100,36 @@ describe("resolveSessionSettings", () => {
     });
   });
 
-  it("preserves stored tool display metadata when rebuilding a thread", () => {
-    const thread = buildThreadFromSession([
+  it("preserves stored tool display metadata when rebuilding a thread from unified entries", () => {
+    const ts1 = new Date("2026-03-08T10:00:00.000Z").getTime();
+    const ts2 = new Date("2026-03-08T10:00:01.000Z").getTime();
+    const thread = buildThreadFromUnifiedSession([
       {
-        timestamp: "2026-03-08T10:00:00.000Z",
+        type: "tool_call",
         sessionId: "abc",
-        role: "tool_call",
-        content: "Edit",
-        toolName: "Edit",
-        toolArgs: { path: "src/app.ts" },
+        timestamp: ts1,
+        sequence: 0,
         toolCallId: "tool-1",
-        toolDisplay: { kind: "file_edit", label: "Edit(src/app.ts)" },
+        toolName: "Edit",
+        args: { path: "src/app.ts" },
+        display: { kind: "file_edit", label: "Edit(src/app.ts)" },
+        iteration: 1,
       },
       {
-        timestamp: "2026-03-08T10:00:01.000Z",
+        type: "tool_result",
         sessionId: "abc",
-        role: "tool_result",
-        content: "diff --git a/src/app.ts b/src/app.ts",
+        timestamp: ts2,
+        sequence: 1,
         toolCallId: "tool-1",
-        toolDisplay: {
+        result: "diff --git a/src/app.ts b/src/app.ts",
+        isError: false,
+        display: {
           kind: "file_edit",
           label: "Edit(src/app.ts)",
           fileChanges: [{ path: "src/app.ts", change: "edited" }],
           diffPreviewLines: ["@@ -1 +1 @@"],
         },
+        iteration: 1,
       },
     ]);
 
@@ -140,43 +146,53 @@ describe("resolveSessionSettings", () => {
     });
   });
 
-  it("preserves parallelGroup on tool_call and tool_result when rebuilding a thread", () => {
-    const thread = buildThreadFromSession([
+  it("preserves parallelGroup on tool_call and tool_result when rebuilding a thread from unified entries", () => {
+    const ts1 = new Date("2026-03-08T10:00:00.000Z").getTime();
+    const ts2 = new Date("2026-03-08T10:00:01.000Z").getTime();
+    const thread = buildThreadFromUnifiedSession([
       {
-        timestamp: "2026-03-08T10:00:00.000Z",
+        type: "tool_call",
         sessionId: "abc",
-        role: "tool_call",
-        content: "bash",
+        timestamp: ts1,
+        sequence: 0,
+        toolCallId: "tc-1",
         toolName: "bash",
-        toolArgs: { command: "ls" },
-        toolCallId: "tc-1",
+        args: { command: "ls" },
         parallelGroup: "pg_batch_1",
+        iteration: 1,
       },
       {
-        timestamp: "2026-03-08T10:00:00.000Z",
+        type: "tool_call",
         sessionId: "abc",
-        role: "tool_call",
-        content: "read_file",
+        timestamp: ts1,
+        sequence: 1,
+        toolCallId: "tc-2",
         toolName: "read_file",
-        toolArgs: { path: "/tmp/a" },
-        toolCallId: "tc-2",
+        args: { path: "/tmp/a" },
         parallelGroup: "pg_batch_1",
+        iteration: 1,
       },
       {
-        timestamp: "2026-03-08T10:00:01.000Z",
+        type: "tool_result",
         sessionId: "abc",
-        role: "tool_result",
-        content: "file.txt",
+        timestamp: ts2,
+        sequence: 2,
         toolCallId: "tc-1",
+        result: "file.txt",
+        isError: false,
         parallelGroup: "pg_batch_1",
+        iteration: 1,
       },
       {
-        timestamp: "2026-03-08T10:00:01.000Z",
+        type: "tool_result",
         sessionId: "abc",
-        role: "tool_result",
-        content: "contents",
+        timestamp: ts2,
+        sequence: 3,
         toolCallId: "tc-2",
+        result: "contents",
+        isError: false,
         parallelGroup: "pg_batch_1",
+        iteration: 1,
       },
     ]);
 
@@ -193,25 +209,30 @@ describe("resolveSessionSettings", () => {
     }
   });
 
-  it("round-trips stored file-read metadata when rebuilding a thread", () => {
-    const thread = buildThreadFromSession([
+  it("round-trips stored file-read metadata when rebuilding a thread from unified entries", () => {
+    const ts1 = new Date("2026-03-08T10:00:00.000Z").getTime();
+    const ts2 = new Date("2026-03-08T10:00:01.000Z").getTime();
+    const thread = buildThreadFromUnifiedSession([
       {
-        timestamp: "2026-03-08T10:00:00.000Z",
+        type: "tool_call",
         sessionId: "abc",
-        role: "tool_call",
-        content: "read_file",
-        toolName: "read_file",
-        toolArgs: { path: "src/app.ts" },
+        timestamp: ts1,
+        sequence: 0,
         toolCallId: "tool-2",
-        toolDisplay: { kind: "file_read", label: "Read(src/app.ts)" },
+        toolName: "read_file",
+        args: { path: "src/app.ts" },
+        display: { kind: "file_read", label: "Read(src/app.ts)" },
+        iteration: 1,
       },
       {
-        timestamp: "2026-03-08T10:00:01.000Z",
+        type: "tool_result",
         sessionId: "abc",
-        role: "tool_result",
-        content: "Read src/app.ts\n\n1| export {}",
+        timestamp: ts2,
+        sequence: 1,
         toolCallId: "tool-2",
-        toolDisplay: {
+        result: "Read src/app.ts\n\n1| export {}",
+        isError: false,
+        display: {
           kind: "file_read",
           label: "Read(src/app.ts)",
           fileReads: [
@@ -225,6 +246,7 @@ describe("resolveSessionSettings", () => {
             },
           ],
         },
+        iteration: 1,
       },
     ]);
 
