@@ -396,10 +396,22 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         });
       }
 
+      // Compute final usage for status entries
+      const finalUsage = addUsage(usageBaseRef.current, result.usage);
+
       if (isPlanResult(result)) {
         setError(null);
         setPlan(result.plan);
         setPendingUiState(null);
+        appendUnifiedSession({
+          type: "status",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          status: "done",
+          usage: finalUsage,
+          iterations: result.iterations,
+        });
         setStatus("done");
       } else if (isPendingResult(result)) {
         const nextPlan = findLatestPlan(result.thread.events);
@@ -408,15 +420,42 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         setPlan(req?.kind === "plan_review" ? nextPlan : null);
         pendingRef.current = result;
         setPendingUiState(buildPendingUiState(req, req?.kind === "plan_review" ? nextPlan : null));
+        appendUnifiedSession({
+          type: "status",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          status: "pending_input",
+          usage: finalUsage,
+          iterations: result.iterations,
+        });
         setStatus("pending_input");
       } else if (result.stopReason === "max_errors") {
         const detail = result.stopDetail ?? "Agent stopped due to repeated errors";
         setError(new Error(detail));
         setPendingUiState(null);
+        appendUnifiedSession({
+          type: "status",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          status: "error",
+          usage: finalUsage,
+          iterations: result.iterations,
+        });
         setStatus("error");
       } else {
         setError(null);
         setPendingUiState(null);
+        appendUnifiedSession({
+          type: "status",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          status: "done",
+          usage: finalUsage,
+          iterations: result.iterations,
+        });
         setStatus("done");
       }
     },
@@ -425,6 +464,20 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
   const handleError = useCallback((err: unknown) => {
     setError(err instanceof Error ? err : new Error(String(err)));
+    const ctx = mapperCtxRef.current;
+    appendUnifiedSession({
+      type: "status",
+      sessionId: ctx.sessionId,
+      timestamp: Date.now(),
+      sequence: nextSequence(ctx),
+      status: "error",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+      },
+      iterations: 0,
+    });
     setStatus("error");
   }, []);
 
@@ -442,6 +495,20 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       pendingRef.current = null;
       usageBaseRef.current = usage;
       sessionStartRef.current = Date.now();
+
+      // Log status: running
+      {
+        const ctx = mapperCtxRef.current;
+        appendUnifiedSession({
+          type: "status",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          status: "running",
+          usage,
+          iterations,
+        });
+      }
 
       const tools: AgentTools = [...(options.tools ?? []), requestHumanInput];
 
@@ -511,6 +578,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       handleError,
       handleUpdate,
       usage,
+      iterations,
     ],
   );
 
@@ -523,6 +591,20 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       setPendingUiState(null);
       pendingRef.current = null;
       usageBaseRef.current = usage;
+
+      // Log status: running (pending input resume)
+      {
+        const ctx = mapperCtxRef.current;
+        appendUnifiedSession({
+          type: "status",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          status: "running",
+          usage,
+          iterations,
+        });
+      }
 
       // Log user message for pending input at submit time
       {
@@ -574,7 +656,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
       pending.resume(resumeInput).then(handleResult).catch(handleError);
     },
-    [handleResult, handleError, usage, options.modelLabel, options.provider],
+    [handleResult, handleError, usage, iterations, options.modelLabel, options.provider],
   );
 
   return {

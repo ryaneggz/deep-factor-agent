@@ -220,25 +220,27 @@ describe("useAgent", () => {
     });
     await flush();
 
-    expect(appendUnifiedSessionMock).toHaveBeenCalledTimes(6);
+    expect(appendUnifiedSessionMock).toHaveBeenCalledTimes(8);
     expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
+      "status", // running status at sendPrompt
       "init",
       "message", // user message logged at submit time
       "tool_call",
       "tool_result",
       "message", // assistant message
       "result", // result entry at session end
+      "status", // done status at handleResult
     ]);
     // Verify iteration numbers are passed from MapperContext (synced via handleUpdate)
-    const initEntry = appendUnifiedSessionMock.mock.calls[0][0];
+    const initEntry = appendUnifiedSessionMock.mock.calls[1][0];
     expect(initEntry.type).toBe("init");
-    const userMsgEntry = appendUnifiedSessionMock.mock.calls[1][0];
+    const userMsgEntry = appendUnifiedSessionMock.mock.calls[2][0];
     expect(userMsgEntry.iteration).toBe(0); // user message logged before any updates
-    const toolCallEntry = appendUnifiedSessionMock.mock.calls[2][0];
+    const toolCallEntry = appendUnifiedSessionMock.mock.calls[3][0];
     expect(toolCallEntry.iteration).toBe(1); // iteration synced from handleUpdate
-    const toolResultEntry = appendUnifiedSessionMock.mock.calls[3][0];
+    const toolResultEntry = appendUnifiedSessionMock.mock.calls[4][0];
     expect(toolResultEntry.iteration).toBe(1);
-    const assistantMsgEntry = appendUnifiedSessionMock.mock.calls[4][0];
+    const assistantMsgEntry = appendUnifiedSessionMock.mock.calls[5][0];
     expect(assistantMsgEntry.iteration).toBe(1);
   });
 
@@ -633,6 +635,7 @@ describe("useAgent", () => {
     await flush();
 
     expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
+      "status", // running status at sendPrompt
       "init",
       "message", // user message logged at submit time
       "message", // assistant envelope message
@@ -640,6 +643,7 @@ describe("useAgent", () => {
       "tool_result",
       "message", // assistant message
       "result", // result entry at session end
+      "status", // done status at handleResult
     ]);
   });
 });
