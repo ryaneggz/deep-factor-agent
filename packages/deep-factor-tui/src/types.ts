@@ -75,6 +75,8 @@ export interface ChatMessage {
 export type TranscriptSegment =
   | { kind: "assistant"; id: string; content: string }
   | { kind: "thinking"; id: string; content: string }
+  | { kind: "plan"; id: string; content: string }
+  | { kind: "summary"; id: string; content: string; iterationRange?: string }
   | {
       kind: "tool";
       id: string;
@@ -89,11 +91,15 @@ export type TranscriptSegment =
 
 export type AssistantTranscriptSegment = Extract<TranscriptSegment, { kind: "assistant" }>;
 export type ThinkingTranscriptSegment = Extract<TranscriptSegment, { kind: "thinking" }>;
+export type PlanTranscriptSegment = Extract<TranscriptSegment, { kind: "plan" }>;
+export type SummaryTranscriptSegment = Extract<TranscriptSegment, { kind: "summary" }>;
 export type ToolTranscriptSegment = Extract<TranscriptSegment, { kind: "tool" }>;
 
 export type TranscriptRenderBlock =
   | { kind: "assistant_block"; id: string; segment: AssistantTranscriptSegment }
   | { kind: "thinking_block"; id: string; segment: ThinkingTranscriptSegment }
+  | { kind: "plan_block"; id: string; segment: PlanTranscriptSegment }
+  | { kind: "summary_block"; id: string; segment: SummaryTranscriptSegment }
   | { kind: "tool_block"; id: string; segment: ToolTranscriptSegment }
   | {
       kind: "file_read_group_block";

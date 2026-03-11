@@ -8,6 +8,8 @@ import {
   formatToolResultPreview,
 } from "../transcript.js";
 import { ThinkingBlock } from "./ThinkingBlock.js";
+import { PlanBlock } from "./PlanBlock.js";
+import { SummaryBlock } from "./SummaryBlock.js";
 
 interface TranscriptSegmentProps {
   block: TranscriptRenderBlock;
@@ -173,6 +175,16 @@ export function TranscriptSegment({ block, expandFileReadGroups = false }: Trans
 
   if (block.kind === "thinking_block") {
     return <ThinkingBlock content={block.segment.content} />;
+  }
+
+  if (block.kind === "plan_block") {
+    return <PlanBlock content={block.segment.content} />;
+  }
+
+  if (block.kind === "summary_block") {
+    return (
+      <SummaryBlock content={block.segment.content} iterationRange={block.segment.iterationRange} />
+    );
   }
 
   if (block.kind === "file_read_group_block") {

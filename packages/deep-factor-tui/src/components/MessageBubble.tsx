@@ -2,6 +2,8 @@ import React from "react";
 import { Box, Text } from "ink";
 import { ToolCallBlock } from "./ToolCallBlock.js";
 import { ThinkingBlock } from "./ThinkingBlock.js";
+import { PlanBlock } from "./PlanBlock.js";
+import { SummaryBlock } from "./SummaryBlock.js";
 import { formatToolResultPreview } from "../transcript.js";
 import type { ChatMessage } from "../types.js";
 
@@ -29,6 +31,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
     case "thinking":
       return <ThinkingBlock content={message.thinking ?? message.content} />;
+
+    case "plan":
+      return <PlanBlock content={message.planContent ?? message.content} />;
+
+    case "summary":
+      return <SummaryBlock content={message.content} />;
 
     case "tool_call":
       return (
