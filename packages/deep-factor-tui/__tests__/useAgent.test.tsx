@@ -229,6 +229,17 @@ describe("useAgent", () => {
       "message", // assistant message
       "result", // result entry at session end
     ]);
+    // Verify iteration numbers are passed from MapperContext (synced via handleUpdate)
+    const initEntry = appendUnifiedSessionMock.mock.calls[0][0];
+    expect(initEntry.type).toBe("init");
+    const userMsgEntry = appendUnifiedSessionMock.mock.calls[1][0];
+    expect(userMsgEntry.iteration).toBe(0); // user message logged before any updates
+    const toolCallEntry = appendUnifiedSessionMock.mock.calls[2][0];
+    expect(toolCallEntry.iteration).toBe(1); // iteration synced from handleUpdate
+    const toolResultEntry = appendUnifiedSessionMock.mock.calls[3][0];
+    expect(toolResultEntry.iteration).toBe(1);
+    const assistantMsgEntry = appendUnifiedSessionMock.mock.calls[4][0];
+    expect(assistantMsgEntry.iteration).toBe(1);
   });
 
   it("shows plan review state as soon as a pending update arrives", async () => {

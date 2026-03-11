@@ -275,6 +275,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       applyThreadSnapshot(update.thread);
       setUsage(addUsage(usageBaseRef.current, update.usage));
       setIterations(update.iterations);
+      mapperCtxRef.current.currentIteration = update.iterations;
       setStatus(update.status);
 
       if (update.lastEvent?.type === "plan") {
@@ -309,6 +310,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
       const newMessages = applyThreadSnapshot(result.thread);
       setUsage(addUsage(usageBaseRef.current, result.usage));
       setIterations(result.iterations);
+      mapperCtxRef.current.currentIteration = result.iterations;
 
       // Persist only NEW messages to session log (skip already-logged ones)
       const alreadyLogged = loggedMessageCountRef.current;
