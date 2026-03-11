@@ -220,8 +220,9 @@ describe("useAgent", () => {
     });
     await flush();
 
-    expect(appendUnifiedSessionMock).toHaveBeenCalledTimes(3);
+    expect(appendUnifiedSessionMock).toHaveBeenCalledTimes(4);
     expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
+      "init",
       "tool_call",
       "tool_result",
       "message",
@@ -619,6 +620,7 @@ describe("useAgent", () => {
     await flush();
 
     expect(appendUnifiedSessionMock.mock.calls.map(([entry]) => entry.type)).toEqual([
+      "init",
       "message",
       "tool_call",
       "tool_result",

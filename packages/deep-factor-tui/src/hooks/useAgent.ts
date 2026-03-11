@@ -405,6 +405,26 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
       const tools: AgentTools = [...(options.tools ?? []), requestHumanInput];
 
+      // Write init entry at session start (first invocation only)
+      const existingThread = threadRef.current;
+      if (!existingThread) {
+        const ctx = mapperCtxRef.current;
+        appendUnifiedSession({
+          type: "init",
+          sessionId: ctx.sessionId,
+          timestamp: Date.now(),
+          sequence: nextSequence(ctx),
+          provider: options.provider,
+          model: options.modelLabel,
+          mode: options.mode ?? "yolo",
+          settings: { maxIter: options.maxIter, sandbox: options.mode ?? "yolo" },
+          cwd: process.cwd(),
+          tools: tools.map((t) =>
+            typeof t === "object" && "name" in t ? (t.name as string) : String(t),
+          ),
+        });
+      }
+
       const agent = createDeepFactorAgent({
         model: options.model,
         tools,
@@ -417,7 +437,6 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
         onUpdate: shouldStreamUpdates ? handleUpdate : undefined,
       });
 
-      const existingThread = threadRef.current;
       if (existingThread) {
         agent.continueLoop(existingThread, prompt).then(handleResult).catch(handleError);
       } else {
@@ -426,6 +445,8 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
     },
     [
       options.model,
+      options.modelLabel,
+      options.provider,
       options.maxIter,
       options.tools,
       options.parallelToolCalls,
