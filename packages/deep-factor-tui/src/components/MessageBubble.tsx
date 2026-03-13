@@ -18,7 +18,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     case "user":
       return (
         <Box backgroundColor={colors.userMessageBg} width="100%">
-          <Text bold>{"›  "}</Text>
+          <Text bold>{"> "}</Text>
           <Text bold>{message.content}</Text>
         </Box>
       );
@@ -26,9 +26,6 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     case "assistant":
       return (
         <Box>
-          <Text bold color="blue">
-            AI:{" "}
-          </Text>
           <Text>{message.content}</Text>
         </Box>
       );

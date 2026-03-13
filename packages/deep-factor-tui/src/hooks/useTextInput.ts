@@ -131,8 +131,8 @@ export function useTextInput({
       onEscapeRef.current();
       return;
     }
-    // Alt+Enter inserts a newline
-    if (key.return && key.meta) {
+    // Shift+Enter or Alt+Enter inserts a newline
+    if (key.return && (key.shift || key.meta)) {
       const next = inputRef.current + "\n";
       inputRef.current = next;
       setInput(next);

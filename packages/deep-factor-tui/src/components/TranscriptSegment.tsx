@@ -86,7 +86,7 @@ function renderToolBlock(block: Extract<TranscriptRenderBlock, { kind: "tool_blo
   return (
     <Box flexDirection="column">
       <Box>
-        <Text color="yellow">● </Text>
+        <Text color="yellow">• </Text>
         <Text bold color="yellow">
           {formatToolLabel(segment.toolName, segment.toolArgs, segment.toolDisplay)}
         </Text>
@@ -149,7 +149,7 @@ function renderFileReadGroup(
   return (
     <Box flexDirection="column">
       <Box>
-        <Text>● </Text>
+        <Text>• </Text>
         <Text bold>{block.header}</Text>
       </Box>
       {block.fileReads.map((fileRead, index) => (

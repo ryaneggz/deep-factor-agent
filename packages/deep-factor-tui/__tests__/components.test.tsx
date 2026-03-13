@@ -414,7 +414,7 @@ describe("TranscriptTurn", () => {
     expect(frame).toContain("Sun Mar 8 09:28:54 MDT 2026");
     expect(frame).toContain("... +1 lines");
     expect(frame).toContain("Current system time is Sun Mar 8 09:28:54 MDT 2026.");
-    expect(frame).toContain("● Bash(date)");
+    expect(frame).toContain("• Bash(date)");
     expect(frame).toContain("└ Sun Mar 8 09:28:54 MDT 2026");
     expect(frame).toContain("● Current system time is Sun Mar 8 09:28:54 MDT 2026.");
     expect(frame).not.toContain("|");

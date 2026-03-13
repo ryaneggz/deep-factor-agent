@@ -22,7 +22,7 @@ export function TranscriptTurn({
     <Box flexDirection="column" marginBottom={1}>
       {turn.userMessage ? (
         <Box backgroundColor={colors.userMessageBg} width="100%">
-          <Text bold>{">  "}</Text>
+          <Text bold>{"> "}</Text>
           <Text bold>{turn.userMessage.content}</Text>
         </Box>
       ) : (
