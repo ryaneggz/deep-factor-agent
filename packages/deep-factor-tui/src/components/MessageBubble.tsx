@@ -17,15 +17,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     case "user":
       return (
         <Box>
-          <Text bold>You: </Text>
-          <Text>{message.content}</Text>
+          <Text bold color="green">
+            You:{" "}
+          </Text>
+          <Text color="green">{message.content}</Text>
         </Box>
       );
 
     case "assistant":
       return (
         <Box>
-          <Text bold>AI: </Text>
+          <Text bold color="blue">
+            AI:{" "}
+          </Text>
           <Text>{message.content}</Text>
         </Box>
       );
@@ -73,13 +77,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <Box flexDirection="column">
           {preview.fileChanges?.map((change, index) => (
             <Box key={`${message.id}-change-${index}`}>
-              <Text dimColor>{index === 0 ? "Result" : "      "}</Text>
+              <Text dimColor color="yellow">
+                {index === 0 ? "Result" : "      "}
+              </Text>
               <Text>{` ${change.change} ${change.path}`}</Text>
             </Box>
           ))}
           {preview.lines.map((line, index) => (
             <Box key={`${message.id}-${index}`}>
-              <Text dimColor>{index === 0 ? "Result" : "      "}</Text>
+              <Text dimColor color="yellow">
+                {index === 0 ? "Result" : "      "}
+              </Text>
               <Text>
                 {index === 0 && metadata ? ` ${metadata}: ` : index === 0 ? ": " : "  "}
                 {line}

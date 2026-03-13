@@ -68,7 +68,7 @@ function renderAssistantBlock(content: string, id: string) {
     <Box flexDirection="column">
       {lines.map((line, index) => (
         <Box key={`${id}-assistant-${index}`}>
-          <Text>{index === 0 ? "• " : "  "}</Text>
+          <Text color="blue">{index === 0 ? "• " : "  "}</Text>
           <Text>{line}</Text>
         </Box>
       ))}
@@ -86,13 +86,18 @@ function renderToolBlock(block: Extract<TranscriptRenderBlock, { kind: "tool_blo
   return (
     <Box flexDirection="column">
       <Box>
-        <Text>• </Text>
-        <Text bold>{formatToolLabel(segment.toolName, segment.toolArgs, segment.toolDisplay)}</Text>
+        <Text color="yellow">• </Text>
+        <Text bold color="yellow">
+          {formatToolLabel(segment.toolName, segment.toolArgs, segment.toolDisplay)}
+        </Text>
         <ToolMetadata durationMs={segment.durationMs} parallelGroup={segment.parallelGroup} />
       </Box>
       {changeTotals && (
         <Box>
-          <Text dimColor> └ </Text>
+          <Text dimColor color="yellow">
+            {" "}
+            └{" "}
+          </Text>
           <Text>{changeTotals}</Text>
         </Box>
       )}
@@ -120,7 +125,9 @@ function renderToolBlock(block: Extract<TranscriptRenderBlock, { kind: "tool_blo
       )}
       {preview?.lines.map((line, index) => (
         <Box key={`${segment.id}-result-${index}`}>
-          <Text dimColor>{index === 0 ? "  └ " : "    "}</Text>
+          <Text dimColor color="yellow">
+            {index === 0 ? "  └ " : "    "}
+          </Text>
           <Text>{line}</Text>
         </Box>
       ))}

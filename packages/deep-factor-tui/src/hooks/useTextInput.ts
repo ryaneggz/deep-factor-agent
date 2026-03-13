@@ -1,5 +1,8 @@
 import { useState, useRef } from "react";
 import { useInput } from "ink";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 interface TextInputKey {
   return?: boolean;
@@ -10,6 +13,8 @@ interface TextInputKey {
   ctrl?: boolean;
   tab?: boolean;
   shift?: boolean;
+  upArrow?: boolean;
+  downArrow?: boolean;
 }
 
 interface UseTextInputOptions {
@@ -25,6 +30,33 @@ interface UseTextInputOptions {
 interface UseTextInputReturn {
   input: string;
 }
+
+const MAX_HISTORY = 500;
+const HISTORY_FILE = join(homedir(), ".deepfactor", "input_history.txt");
+
+function loadHistory(): string[] {
+  try {
+    return readFileSync(HISTORY_FILE, "utf-8")
+      .split("\n")
+      .filter((line) => line.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history: string[]): void {
+  try {
+    mkdirSync(join(homedir(), ".deepfactor"), { recursive: true });
+    writeFileSync(HISTORY_FILE, history.join("\n") + "\n");
+  } catch {
+    // Best-effort — don't break input on fs errors
+  }
+}
+
+// Module-level history persists across InputBar mount/unmount cycles
+// (the component unmounts while the agent is processing a query).
+// Loaded from disk at startup so history survives across sessions.
+const globalHistory: string[] = loadHistory();
 
 /**
  * Shared text-input hook used by InputBar and human input prompts.
@@ -44,6 +76,8 @@ export function useTextInput({
 }: UseTextInputOptions): UseTextInputReturn {
   const [input, setInput] = useState("");
   const inputRef = useRef("");
+  const historyIndexRef = useRef(-1);
+  const draftRef = useRef("");
   const onSubmitRef = useRef(onSubmit);
   const onHotkeyMenuRef = useRef(onHotkeyMenu);
   const onCtrlORef = useRef(onCtrlO);
@@ -107,9 +141,44 @@ export function useTextInput({
     if (key.return) {
       const current = inputRef.current.trim();
       if (current.length > 0) {
+        globalHistory.push(current);
+        if (globalHistory.length > MAX_HISTORY) {
+          globalHistory.splice(0, globalHistory.length - MAX_HISTORY);
+        }
+        saveHistory(globalHistory);
+        historyIndexRef.current = -1;
         onSubmitRef.current(current);
         inputRef.current = "";
         setInput("");
+      }
+      return;
+    }
+    if (key.upArrow) {
+      const history = globalHistory;
+      if (history.length === 0) return;
+      if (historyIndexRef.current === -1) {
+        draftRef.current = inputRef.current;
+        historyIndexRef.current = history.length - 1;
+      } else if (historyIndexRef.current > 0) {
+        historyIndexRef.current--;
+      }
+      const entry = history[historyIndexRef.current]!;
+      inputRef.current = entry;
+      setInput(entry);
+      return;
+    }
+    if (key.downArrow) {
+      const history = globalHistory;
+      if (historyIndexRef.current === -1) return;
+      if (historyIndexRef.current < history.length - 1) {
+        historyIndexRef.current++;
+        const entry = history[historyIndexRef.current]!;
+        inputRef.current = entry;
+        setInput(entry);
+      } else {
+        historyIndexRef.current = -1;
+        inputRef.current = draftRef.current;
+        setInput(draftRef.current);
       }
       return;
     }

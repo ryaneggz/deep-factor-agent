@@ -12,7 +12,9 @@ interface ToolCallBlockProps {
 export function ToolCallBlock({ toolName, toolArgs, toolDisplay }: ToolCallBlockProps) {
   return (
     <Text>
-      <Text bold>{formatToolLabel(toolName, toolArgs, toolDisplay)}</Text>
+      <Text bold color="yellow">
+        {formatToolLabel(toolName, toolArgs, toolDisplay)}
+      </Text>
     </Text>
   );
 }

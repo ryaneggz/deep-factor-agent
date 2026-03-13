@@ -21,8 +21,10 @@ export function TranscriptTurn({
     <Box flexDirection="column" marginBottom={1}>
       {turn.userMessage ? (
         <Box>
-          <Text bold>You</Text>
-          <Text>: {turn.userMessage.content}</Text>
+          <Text bold color="green">
+            You
+          </Text>
+          <Text color="green">: {turn.userMessage.content}</Text>
         </Box>
       ) : (
         <Text dimColor>Earlier activity</Text>

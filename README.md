@@ -279,3 +279,5 @@ See [docs/configuration.md](docs/configuration.md) for the complete reference.
 | [Context Management](docs/context-management.md) | Summarization, token limits, standard vs XML modes              |
 | [Tools](docs/tools.md)                           | Tool creation, metadata, display, parallel execution            |
 | [Smoke Tests](docs/smoke-tests/README.md)        | Cross-provider log validation suite                             |
+
+Updated: 2026-03-12 MDT
