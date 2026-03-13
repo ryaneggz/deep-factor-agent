@@ -570,7 +570,7 @@ describe("InputBar", () => {
     );
     const frame = lastFrame()!;
     // Input bar renders the prompt character
-    expect(frame).toContain("›");
+    expect(frame).toContain(">");
   });
 
   it("does not render the old always-on composer hint line", () => {
@@ -707,10 +707,10 @@ describe("LiveSection", () => {
         onCycleMode={noop}
       />,
     );
-    expect(lastFrame()).toContain("›");
+    expect(lastFrame()).toContain(">");
   });
 
-  it("hides InputBar when running", () => {
+  it("shows InputBar when running (but inactive)", () => {
     const { lastFrame } = render(
       <LiveSection
         mode="plan"
@@ -727,8 +727,8 @@ describe("LiveSection", () => {
     );
     const frame = lastFrame()!;
     const lines = frame.split("\n");
-    const hasInputPrompt = lines.some((l) => l.includes(">") && l.includes("_"));
-    expect(hasInputPrompt).toBe(false);
+    const hasInputPrompt = lines.some((l) => l.includes(">"));
+    expect(hasInputPrompt).toBe(true);
   });
 
   it("shows the compact secondary row when usage or iterations are present", () => {

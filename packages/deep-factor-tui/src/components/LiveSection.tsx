@@ -34,9 +34,10 @@ export function LiveSection({
   onCycleMode,
   onToggleFileReadGroups,
 }: LiveSectionProps) {
-  const showInput = (status === "idle" || status === "done") && pendingUiState == null;
+  const inputReady = (status === "idle" || status === "done") && pendingUiState == null;
+  const showInputBar = inputReady || status === "running";
   const [showHotkeyMenu, setShowHotkeyMenu] = useState(false);
-  const canCycleMode = showInput && !showHotkeyMenu;
+  const canCycleMode = inputReady && !showHotkeyMenu;
 
   const handleHotkeyMenu = useCallback(() => {
     setShowHotkeyMenu((prev) => !prev);
@@ -76,17 +77,18 @@ export function LiveSection({
 
       {error && <Text color="red">Error: {error.message}</Text>}
 
-      {showInput && showHotkeyMenu && <HotkeyMenu />}
-      {showInput && (
+      {showInputBar && showHotkeyMenu && <HotkeyMenu />}
+      {showInputBar && (
         <InputBar
           onSubmit={onPromptSubmit}
           onHotkeyMenu={handleHotkeyMenu}
           onCtrlO={onToggleFileReadGroups}
           onEscape={showHotkeyMenu ? handleEscape : undefined}
           onCycleMode={canCycleMode ? onCycleMode : undefined}
+          isActive={inputReady}
         />
       )}
-      {!showInput && showHotkeyMenu && <HotkeyMenu />}
+      {!showInputBar && showHotkeyMenu && <HotkeyMenu />}
       <StatusLine
         mode={mode}
         usage={usage}

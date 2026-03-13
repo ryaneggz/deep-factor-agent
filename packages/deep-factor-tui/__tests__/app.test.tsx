@@ -93,7 +93,7 @@ describe("TuiApp integration", () => {
     const { lastFrame } = renderApp();
     const frame = lastFrame()!;
     expect(frame).toContain("▸▸ bypass permissions");
-    expect(frame).toContain("›");
+    expect(frame).toContain(">");
   });
 
   it('shows "Thinking..." when status is running', () => {
