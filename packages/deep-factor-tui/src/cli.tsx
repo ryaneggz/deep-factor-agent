@@ -154,6 +154,7 @@ if (cli.flags.print) {
   const { TuiApp } = await import("./app.js");
   const {
     getSessionId,
+    hasSessionEntries,
     loadSession,
     getLatestSessionId,
     buildThreadFromUnifiedSession,
@@ -255,6 +256,8 @@ if (cli.flags.print) {
 
   await instance.waitUntilExit();
 
-  const sessionId = getSessionId();
-  process.stderr.write(`\ndeepfactor --resume ${sessionId}\n`);
+  if (hasSessionEntries()) {
+    const sessionId = getSessionId();
+    process.stderr.write(`\ndeepfactor --resume ${sessionId}\n`);
+  }
 }

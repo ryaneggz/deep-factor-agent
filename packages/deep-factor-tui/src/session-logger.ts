@@ -55,6 +55,14 @@ export function getSessionId(): string {
   return currentSessionId;
 }
 
+/**
+ * Returns true if the current session has any logged entries (i.e. the session file exists).
+ */
+export function hasSessionEntries(): boolean {
+  if (!currentSessionId) return false;
+  return existsSync(sessionFilePath(currentSessionId));
+}
+
 function sessionFilePath(id: string): string {
   return join(SESSIONS_DIR, `${id}.jsonl`);
 }
