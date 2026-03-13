@@ -96,7 +96,17 @@ export function TuiApp({
     () => groupMessagesIntoTurns(messages),
     [messages],
   );
-  const staticTurns = useMemo(() => transcriptTurns.slice(0, -1), [transcriptTurns]);
+  type StaticItem =
+    | { kind: "header"; id: "header"; provider: string; model: string }
+    | { kind: "turn"; id: string; turn: TranscriptTurnData };
+
+  const staticItems = useMemo<StaticItem[]>(
+    () => [
+      { kind: "header", id: "header", provider, model },
+      ...transcriptTurns.slice(0, -1).map((turn) => ({ kind: "turn" as const, id: turn.id, turn })),
+    ],
+    [provider, model, transcriptTurns],
+  );
   const activeTurn =
     transcriptTurns.length > 0 ? transcriptTurns[transcriptTurns.length - 1] : null;
 
@@ -114,9 +124,14 @@ export function TuiApp({
 
   return (
     <>
-      <Header provider={provider} model={model} />
-      <Static items={staticTurns}>
-        {(turn) => <TranscriptTurn key={turn.id} turn={turn} isActiveTurn={false} />}
+      <Static items={staticItems}>
+        {(item) =>
+          item.kind === "header" ? (
+            <Header key="header" provider={item.provider} model={item.model} />
+          ) : (
+            <TranscriptTurn key={item.id} turn={item.turn} isActiveTurn={false} />
+          )
+        }
       </Static>
       {activeTurn && (
         <TranscriptTurn
