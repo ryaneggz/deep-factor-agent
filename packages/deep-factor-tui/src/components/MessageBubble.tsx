@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { colors } from "../theme.js";
 import { ToolCallBlock } from "./ToolCallBlock.js";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { PlanBlock } from "./PlanBlock.js";
@@ -16,11 +17,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   switch (message.role) {
     case "user":
       return (
-        <Box>
-          <Text bold color="green">
-            You:{" "}
-          </Text>
-          <Text color="green">{message.content}</Text>
+        <Box backgroundColor={colors.userMessageBg} width="100%">
+          <Text bold>{"›  "}</Text>
+          <Text bold>{message.content}</Text>
         </Box>
       );
 

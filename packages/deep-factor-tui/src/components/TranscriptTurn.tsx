@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import type { TranscriptTurn as TranscriptTurnData } from "../types.js";
 import { buildTranscriptRenderBlocks } from "../transcript.js";
 import { TranscriptSegment } from "./TranscriptSegment.js";
+import { colors } from "../theme.js";
 
 interface TranscriptTurnProps {
   turn: TranscriptTurnData;
@@ -20,11 +21,9 @@ export function TranscriptTurn({
   return (
     <Box flexDirection="column" marginBottom={1}>
       {turn.userMessage ? (
-        <Box>
-          <Text bold color="green">
-            You
-          </Text>
-          <Text color="green">: {turn.userMessage.content}</Text>
+        <Box backgroundColor={colors.userMessageBg} width="100%">
+          <Text bold>{">  "}</Text>
+          <Text bold>{turn.userMessage.content}</Text>
         </Box>
       ) : (
         <Text dimColor>Earlier activity</Text>

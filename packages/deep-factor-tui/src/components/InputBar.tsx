@@ -36,7 +36,7 @@ export function InputBar({
   onEscape,
   isActive = true,
   placeholder,
-  borderColor = "blue",
+  borderColor: _borderColor = "blue",
   onKeyPress,
 }: InputBarProps) {
   const { input } = useTextInput({
@@ -51,18 +51,10 @@ export function InputBar({
   const lines = input.split("\n");
 
   return (
-    <Box
-      borderStyle="round"
-      borderColor={borderColor}
-      flexDirection="column"
-      paddingLeft={1}
-      paddingRight={1}
-    >
+    <Box flexDirection="column">
       {lines.map((line, i) => (
         <Box key={i}>
-          <Text color={borderColor} bold>
-            {i === 0 ? "> " : "  "}
-          </Text>
+          <Text bold>{i === 0 ? "› " : "  "}</Text>
           <Text>
             {line.length > 0 ? (
               line

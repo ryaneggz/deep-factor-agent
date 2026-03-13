@@ -46,7 +46,7 @@ describe("StatusLine", () => {
     );
 
     const frame = lastFrame()!;
-    expect(frame).toContain("• plan mode");
+    expect(frame).toContain("▸▸ plan mode");
     expect(frame).toContain("shift+tab to cycle");
     expect(frame).toContain("Ctrl+/ shortcuts");
     expect(frame).not.toContain("idle");
@@ -59,7 +59,7 @@ describe("StatusLine", () => {
     );
 
     const frame = lastFrame()!;
-    expect(frame).toContain("• approvals required");
+    expect(frame).toContain("▸▸ approvals required");
     expect(frame).toContain("done · 150 tok · 3 iter");
   });
 });
@@ -408,16 +408,15 @@ describe("TranscriptTurn", () => {
     );
 
     const frame = lastFrame()!;
-    expect(frame).toContain("You");
     expect(frame).toContain("Current system time?");
     expect(frame).toContain("Bash(date)");
     expect(frame).toContain("11ms");
     expect(frame).toContain("Sun Mar 8 09:28:54 MDT 2026");
     expect(frame).toContain("... +1 lines");
     expect(frame).toContain("Current system time is Sun Mar 8 09:28:54 MDT 2026.");
-    expect(frame).toContain("• Bash(date)");
+    expect(frame).toContain("● Bash(date)");
     expect(frame).toContain("└ Sun Mar 8 09:28:54 MDT 2026");
-    expect(frame).toContain("• Current system time is Sun Mar 8 09:28:54 MDT 2026.");
+    expect(frame).toContain("● Current system time is Sun Mar 8 09:28:54 MDT 2026.");
     expect(frame).not.toContain("|");
   });
 
@@ -570,8 +569,8 @@ describe("InputBar", () => {
       />,
     );
     const frame = lastFrame()!;
-    // round border uses ╭ and ╮ characters
-    expect(frame).toMatch(/[╭╮╰╯│─]/);
+    // Input bar renders the prompt character
+    expect(frame).toContain("›");
   });
 
   it("does not render the old always-on composer hint line", () => {
@@ -608,7 +607,7 @@ describe("InputBar", () => {
       />,
     );
     const frame = lastFrame()!;
-    expect(frame).toContain("• plan mode (shift+tab to cycle)");
+    expect(frame).toContain("▸▸ plan mode (shift+tab to cycle)");
     expect(frame).toContain("Ctrl+/ shortcuts");
   });
 });
@@ -661,7 +660,7 @@ describe("LiveSection", () => {
     );
     const frame = lastFrame()!;
     expect(frame).toContain("something broke");
-    expect(frame).toContain("• approvals required");
+    expect(frame).toContain("▸▸ approvals required");
   });
 
   it("shows pending panel actions for plan review", () => {
@@ -708,7 +707,7 @@ describe("LiveSection", () => {
         onCycleMode={noop}
       />,
     );
-    expect(lastFrame()).toContain(">");
+    expect(lastFrame()).toContain("›");
   });
 
   it("hides InputBar when running", () => {
@@ -749,7 +748,7 @@ describe("LiveSection", () => {
       />,
     );
     const frame = lastFrame()!;
-    expect(frame).toContain("• bypass permissions");
+    expect(frame).toContain("▸▸ bypass permissions");
     expect(frame).toContain("idle · 15 tok · 2 iter");
   });
 
@@ -770,7 +769,7 @@ describe("LiveSection", () => {
     );
 
     const frame = lastFrame()!;
-    expect(frame).toContain("• plan mode (shift+tab to cycle)");
+    expect(frame).toContain("▸▸ plan mode (shift+tab to cycle)");
     expect(frame).not.toContain("idle ·");
   });
 

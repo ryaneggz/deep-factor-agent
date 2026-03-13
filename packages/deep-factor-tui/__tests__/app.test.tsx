@@ -92,8 +92,8 @@ describe("TuiApp integration", () => {
   it("renders live section in idle state", () => {
     const { lastFrame } = renderApp();
     const frame = lastFrame()!;
-    expect(frame).toContain("• bypass permissions");
-    expect(frame).toContain(">");
+    expect(frame).toContain("▸▸ bypass permissions");
+    expect(frame).toContain("›");
   });
 
   it('shows "Thinking..." when status is running', () => {
@@ -226,19 +226,19 @@ describe("TuiApp integration", () => {
       <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
     );
 
-    expect(lastFrame()).toContain("• plan mode (shift+tab to cycle)");
+    expect(lastFrame()).toContain("▸▸ plan mode (shift+tab to cycle)");
 
     stdin.write("\u001b[Z");
     await flush();
-    expect(lastFrame()).toContain("• approvals required (shift+tab to cycle)");
+    expect(lastFrame()).toContain("▸▸ approvals required (shift+tab to cycle)");
 
     stdin.write("\u001b[Z");
     await flush();
-    expect(lastFrame()).toContain("• bypass permissions (shift+tab to cycle)");
+    expect(lastFrame()).toContain("▸▸ bypass permissions (shift+tab to cycle)");
 
     stdin.write("\u001b[Z");
     await flush();
-    expect(lastFrame()).toContain("• plan mode (shift+tab to cycle)");
+    expect(lastFrame()).toContain("▸▸ plan mode (shift+tab to cycle)");
 
     expect(createClaudeCliProviderMock.mock.calls.map(([args]) => args.permissionMode)).toEqual([
       "plan",
@@ -265,7 +265,7 @@ describe("TuiApp integration", () => {
     await flush();
 
     expect(createClaudeCliProviderMock).toHaveBeenCalledTimes(1);
-    expect(lastFrame()).toContain("• plan mode");
+    expect(lastFrame()).toContain("▸▸ plan mode");
   });
 
   it("ignores Shift+Tab while pending input is active", async () => {
@@ -289,7 +289,7 @@ describe("TuiApp integration", () => {
     await flush();
 
     expect(createClaudeCliProviderMock).toHaveBeenCalledTimes(1);
-    expect(lastFrame()).toContain("• plan mode");
+    expect(lastFrame()).toContain("▸▸ plan mode");
   });
 
   it("ignores Shift+Tab while the hotkey menu is open", async () => {
@@ -305,8 +305,8 @@ describe("TuiApp integration", () => {
     stdin.write("\u001b[Z");
     await flush();
 
-    expect(lastFrame()).toContain("• plan mode");
-    expect(lastFrame()).not.toContain("• approvals required");
+    expect(lastFrame()).toContain("▸▸ plan mode");
+    expect(lastFrame()).not.toContain("▸▸ approvals required");
   });
 
   it("does not restore a previously toggled mode on resume", async () => {
@@ -323,7 +323,7 @@ describe("TuiApp integration", () => {
 
     firstRender.stdin.write("\u001b[Z");
     await flush();
-    expect(firstRender.lastFrame()).toContain("• plan mode (shift+tab to cycle)");
+    expect(firstRender.lastFrame()).toContain("▸▸ plan mode (shift+tab to cycle)");
     firstRender.unmount();
 
     createClaudeCliProviderMock.mockClear();
@@ -340,7 +340,7 @@ describe("TuiApp integration", () => {
       />,
     );
 
-    expect(secondRender.lastFrame()).toContain("• bypass permissions (shift+tab to cycle)");
+    expect(secondRender.lastFrame()).toContain("▸▸ bypass permissions (shift+tab to cycle)");
     expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
       model: "sonnet",
       permissionMode: "bypassPermissions",

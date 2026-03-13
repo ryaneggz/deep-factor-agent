@@ -22,6 +22,17 @@ function formatModeLabel(mode: AgentMode): string {
   }
 }
 
+function modeColor(mode: AgentMode): string {
+  switch (mode) {
+    case "plan":
+      return "cyan";
+    case "approve":
+      return "yellow";
+    case "yolo":
+      return "red";
+  }
+}
+
 function formatStatusLabel(status: AgentStatus): string {
   if (status === "pending_input") {
     return "pending input";
@@ -32,7 +43,7 @@ function formatStatusLabel(status: AgentStatus): string {
 
 export function StatusLine({ mode, usage, iterations, status, canCycleMode }: StatusLineProps) {
   const showSecondary = status !== "idle" || usage.totalTokens > 0 || iterations > 0;
-  const modeText = `• ${formatModeLabel(mode)}${canCycleMode ? " (shift+tab to cycle)" : ""}`;
+  const modeText = `▸▸ ${formatModeLabel(mode)}${canCycleMode ? " (shift+tab to cycle)" : ""}`;
   const statusParts = [formatStatusLabel(status)];
   if (usage.totalTokens > 0) {
     statusParts.push(`${usage.totalTokens} tok`);
@@ -44,7 +55,9 @@ export function StatusLine({ mode, usage, iterations, status, canCycleMode }: St
   return (
     <Box flexDirection="column">
       <Box justifyContent="space-between">
-        <Text dimColor>{modeText}</Text>
+        <Text color={modeColor(mode)} bold>
+          {modeText}
+        </Text>
         <Text dimColor>Ctrl+/ shortcuts</Text>
       </Box>
       {showSecondary && <Text dimColor>{statusParts.join(" · ")}</Text>}
