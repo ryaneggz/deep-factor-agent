@@ -174,3 +174,5 @@ export type {
   SdkErrorType,
   SdkErrorResult,
 } from "./providers/claude-agent-sdk.js";
+export { createRuskaApiProvider } from "./providers/ruska-api.js";
+export type { RuskaApiProviderOptions } from "./providers/ruska-api.js";
