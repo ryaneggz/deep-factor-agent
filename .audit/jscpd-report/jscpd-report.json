@@ -1,0 +1,709 @@
+{
+  "statistics": {
+    "detectionDate": "2026-03-14T21:42:40.498Z",
+    "formats": {
+      "typescript": {
+        "sources": {
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/tools/write-file.ts": {
+            "lines": 17,
+            "tokens": 171,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/tools/read-file.ts": {
+            "lines": 21,
+            "tokens": 244,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/tools/file-utils.ts": {
+            "lines": 246,
+            "tokens": 2449,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/tools/edit-file.ts": {
+            "lines": 20,
+            "tokens": 219,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/tools/default-tools.ts": {
+            "lines": 13,
+            "tokens": 131,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/tools/bash.ts": {
+            "lines": 49,
+            "tokens": 455,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/hooks/useTextInput.ts": {
+            "lines": 198,
+            "tokens": 1685,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/hooks/useAgent.ts": {
+            "lines": 726,
+            "tokens": 6312,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 26,
+            "duplicatedTokens": 182,
+            "percentage": 3.58,
+            "percentageTokens": 2.88,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/types.ts": {
+            "lines": 195,
+            "tokens": 1880,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/transcript.ts": {
+            "lines": 411,
+            "tokens": 3733,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/theme.ts": {
+            "lines": 33,
+            "tokens": 265,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/session-logger.ts": {
+            "lines": 286,
+            "tokens": 2418,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/provider-resolution.ts": {
+            "lines": 56,
+            "tokens": 420,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/print.ts": {
+            "lines": 195,
+            "tokens": 1593,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/default-agent-instructions.ts": {
+            "lines": 6,
+            "tokens": 36,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 2472,
+          "tokens": 22011,
+          "sources": 15,
+          "clones": 1,
+          "duplicatedLines": 13,
+          "duplicatedTokens": 91,
+          "percentage": 0.53,
+          "percentageTokens": 0.41,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "javascript": {
+        "sources": {
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/TranscriptTurn.tsx": {
+            "lines": 16,
+            "tokens": 173,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/TranscriptSegment.tsx": {
+            "lines": 152,
+            "tokens": 1566,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/ThinkingBlock.tsx": {
+            "lines": 7,
+            "tokens": 58,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/SummaryBlock.tsx": {
+            "lines": 1,
+            "tokens": 9,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/StatusLine.tsx": {
+            "lines": 0,
+            "tokens": 6,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/PlanBlock.tsx": {
+            "lines": 5,
+            "tokens": 52,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/PendingInputPanel.tsx": {
+            "lines": 111,
+            "tokens": 965,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/MessageBubble.tsx": {
+            "lines": 63,
+            "tokens": 567,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/LiveSection.tsx": {
+            "lines": 37,
+            "tokens": 270,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/InputBar.tsx": {
+            "lines": 7,
+            "tokens": 61,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/HotkeyMenu.tsx": {
+            "lines": 8,
+            "tokens": 74,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/Header.tsx": {
+            "lines": 0,
+            "tokens": 3,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/app.tsx": {
+            "lines": 27,
+            "tokens": 205,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 434,
+          "tokens": 4009,
+          "sources": 13,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "tsx": {
+        "sources": {
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/TranscriptTurn.tsx": {
+            "lines": 44,
+            "tokens": 384,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/TranscriptSegment.tsx": {
+            "lines": 217,
+            "tokens": 2085,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/ToolCallBlock.tsx": {
+            "lines": 19,
+            "tokens": 164,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/ThinkingBlock.tsx": {
+            "lines": 37,
+            "tokens": 281,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/SummaryBlock.tsx": {
+            "lines": 25,
+            "tokens": 172,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/StatusLine.tsx": {
+            "lines": 65,
+            "tokens": 555,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/StatusIndicator.tsx": {
+            "lines": 36,
+            "tokens": 319,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/PlanBlock.tsx": {
+            "lines": 20,
+            "tokens": 189,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/PendingInputPanel.tsx": {
+            "lines": 286,
+            "tokens": 2596,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/MessageBubble.tsx": {
+            "lines": 99,
+            "tokens": 916,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/LiveSection.tsx": {
+            "lines": 100,
+            "tokens": 830,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/InputBar.tsx": {
+            "lines": 79,
+            "tokens": 602,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/HotkeyMenu.tsx": {
+            "lines": 37,
+            "tokens": 340,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/Header.tsx": {
+            "lines": 17,
+            "tokens": 139,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/cli.tsx": {
+            "lines": 262,
+            "tokens": 1997,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/app.tsx": {
+            "lines": 157,
+            "tokens": 1344,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 1500,
+          "tokens": 12913,
+          "sources": 16,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "css": {
+        "sources": {
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/ThinkingBlock.tsx": {
+            "lines": 0,
+            "tokens": 3,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/SummaryBlock.tsx": {
+            "lines": 0,
+            "tokens": 3,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/PendingInputPanel.tsx": {
+            "lines": 22,
+            "tokens": 178,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/InputBar.tsx": {
+            "lines": 0,
+            "tokens": 3,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/home/ryaneggz/sandbox/2026/feb/deep-factor-agent/packages/deep-factor-tui/src/components/HotkeyMenu.tsx": {
+            "lines": 0,
+            "tokens": 3,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 22,
+          "tokens": 190,
+          "sources": 5,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      }
+    },
+    "total": {
+      "lines": 4428,
+      "tokens": 39123,
+      "sources": 49,
+      "clones": 1,
+      "duplicatedLines": 13,
+      "duplicatedTokens": 91,
+      "percentage": 0.29,
+      "percentageTokens": 0.23,
+      "newDuplicatedLines": 0,
+      "newClones": 0
+    }
+  },
+  "duplicates": [
+    {
+      "format": "typescript",
+      "lines": 14,
+      "fragment": ");\n        setPendingUiState(null);\n        appendUnifiedSession({\n          type: \"status\",\n          sessionId: ctx.sessionId,\n          timestamp: Date.now(),\n          sequence: nextSequence(ctx),\n          status: \"done\",\n          usage: finalUsage,\n          iterations: result.iterations,\n        });\n        setStatus(\"done\");\n      }\n    }",
+      "tokens": 0,
+      "firstFile": {
+        "name": "packages/deep-factor-tui/src/hooks/useAgent.ts",
+        "start": 492,
+        "end": 505,
+        "startLoc": {
+          "line": 492,
+          "column": 5,
+          "position": 4462
+        },
+        "endLoc": {
+          "line": 505,
+          "column": 2,
+          "position": 4553
+        }
+      },
+      "secondFile": {
+        "name": "packages/deep-factor-tui/src/hooks/useAgent.ts",
+        "start": 438,
+        "end": 450,
+        "startLoc": {
+          "line": 438,
+          "column": 5,
+          "position": 3971
+        },
+        "endLoc": {
+          "line": 450,
+          "column": 5,
+          "position": 4061
+        }
+      }
+    }
+  ]
+}
