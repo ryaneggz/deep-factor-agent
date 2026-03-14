@@ -54,29 +54,71 @@ function isSyntheticUserMessage(content: string): boolean {
   );
 }
 
-function extractJsonFence(content: string): string | null {
-  const match = /^\s*```json\s*\n?([\s\S]*?)\n?```\s*$/.exec(content);
-  return match?.[1] ?? null;
+export function containsToolCallBlock(content: string): boolean {
+  // Check fenced JSON blocks (unanchored)
+  for (const match of content.matchAll(/```json\s*\n?([\s\S]*?)\n?\s*```/g)) {
+    try {
+      const parsed = JSON.parse(match[1]) as { tool_calls?: unknown };
+      if (Array.isArray(parsed.tool_calls)) return true;
+    } catch {
+      // not a tool call block
+    }
+  }
+
+  // Check bare JSON objects with tool_calls key
+  const stripped = content.replace(/```[\s\S]*?```/g, "");
+  if (/\{\s*"tool_calls"\s*:\s*\[/.test(stripped)) return true;
+
+  // Check bare JSON arrays that look like tool calls
+  for (const match of stripped.matchAll(/\[\s*\{[\s\S]*?\}\s*\]/g)) {
+    try {
+      const parsed = JSON.parse(match[0]);
+      if (
+        Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        parsed.every(
+          (item: unknown) =>
+            typeof item === "object" &&
+            item !== null &&
+            "name" in item &&
+            typeof (item as Record<string, unknown>).name === "string",
+        )
+      ) {
+        return true;
+      }
+    } catch {
+      // not valid JSON
+    }
+  }
+
+  return false;
 }
 
+/** @deprecated Use containsToolCallBlock instead */
 export function isToolCallEnvelopeMessage(content: string): boolean {
-  const fencedJson = extractJsonFence(content);
-  if (!fencedJson) {
-    return false;
-  }
+  return containsToolCallBlock(content);
+}
 
-  try {
-    const parsed = JSON.parse(fencedJson) as { tool_calls?: unknown };
-    return Array.isArray(parsed.tool_calls);
-  } catch {
-    return false;
-  }
+function stripToolCallBlocks(content: string): string {
+  // Strip fenced JSON blocks containing tool_calls
+  let result = content.replace(/```json\s*\n?[\s\S]*?\n?\s*```/g, "");
+  // Strip bare JSON objects with tool_calls key
+  result = result.replace(/\{\s*"tool_calls"\s*:\s*\[[\s\S]*?\]\s*\}/g, "");
+  // Strip bare JSON arrays that look like tool call arrays
+  result = result.replace(/\[\s*\{\s*"name"\s*:[\s\S]*?\}\s*\]/g, "");
+  return result.trim();
 }
 
 export function filterDisplayMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.filter(
-    (message) => !(message.role === "assistant" && isToolCallEnvelopeMessage(message.content)),
-  );
+  return messages
+    .map((message) => {
+      if (message.role !== "assistant") return message;
+      if (!containsToolCallBlock(message.content)) return message;
+      const stripped = stripToolCallBlocks(message.content);
+      if (!stripped) return null;
+      return { ...message, content: stripped };
+    })
+    .filter((m): m is ChatMessage => m !== null);
 }
 
 function formatHumanInputReceived(event: HumanInputReceivedEvent): string {

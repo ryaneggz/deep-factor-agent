@@ -4,6 +4,7 @@ import {
   eventsToChatMessages,
   filterDisplayMessages,
   isToolCallEnvelopeMessage,
+  containsToolCallBlock,
 } from "../src/hooks/useAgent.js";
 
 describe("eventsToChatMessages", () => {
@@ -134,5 +135,84 @@ describe("eventsToChatMessages", () => {
     expect(filterDisplayMessages(messages)).toEqual([
       { id: "msg-1", role: "assistant", content: "Working on it." },
     ]);
+  });
+
+  it("containsToolCallBlock detects fenced JSON inside mixed prose", () => {
+    const mixed = [
+      "I will list files.",
+      '```json\n{"tool_calls":[{"name":"bash","args":{},"id":"1"}]}\n```',
+      "And more text.",
+    ].join("\n");
+    expect(containsToolCallBlock(mixed)).toBe(true);
+  });
+
+  it("containsToolCallBlock detects bare JSON array tool calls", () => {
+    const bare = 'Some text\n[{"name":"bash","args":{},"id":"1"}]\nMore text';
+    expect(containsToolCallBlock(bare)).toBe(true);
+  });
+
+  it("containsToolCallBlock returns false for plain text", () => {
+    expect(containsToolCallBlock("Just regular text")).toBe(false);
+  });
+
+  it("containsToolCallBlock returns false for non-tool-call JSON arrays", () => {
+    expect(containsToolCallBlock('[{"x": 1}, {"y": 2}]')).toBe(false);
+  });
+
+  it("filterDisplayMessages strips tool call blocks but keeps surrounding prose", () => {
+    const mixed = [
+      "I will list files.",
+      '```json\n{"tool_calls":[{"name":"bash","args":{},"id":"1"}]}\n```',
+      "And then review.",
+    ].join("\n");
+    const messages = eventsToChatMessages([
+      {
+        type: "message",
+        role: "assistant",
+        content: mixed,
+        timestamp: 1,
+        iteration: 1,
+      },
+    ]);
+
+    const filtered = filterDisplayMessages(messages);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].content).toBe("I will list files.\n\nAnd then review.");
+    expect(filtered[0].content).not.toContain("```json");
+  });
+
+  it("filterDisplayMessages removes messages that become empty after stripping", () => {
+    const onlyJson = '```json\n{"tool_calls":[{"name":"bash","args":{},"id":"1"}]}\n```';
+    const messages = eventsToChatMessages([
+      {
+        type: "message",
+        role: "assistant",
+        content: onlyJson,
+        timestamp: 1,
+        iteration: 1,
+      },
+    ]);
+
+    const filtered = filterDisplayMessages(messages);
+    expect(filtered).toHaveLength(0);
+  });
+
+  it("filterDisplayMessages strips bare JSON array tool calls from messages", () => {
+    const bare =
+      'Here are the results:\n[{"name":"bash","args":{"command":"ls"},"id":"call_1"}]\nLet me run that.';
+    const messages = eventsToChatMessages([
+      {
+        type: "message",
+        role: "assistant",
+        content: bare,
+        timestamp: 1,
+        iteration: 1,
+      },
+    ]);
+
+    const filtered = filterDisplayMessages(messages);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].content).not.toContain("[{");
+    expect(filtered[0].content).toContain("Here are the results:");
   });
 });

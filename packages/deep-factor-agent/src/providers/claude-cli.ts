@@ -10,6 +10,7 @@ import {
   messagesToXml,
   messagesToPrompt,
   parseToolCalls,
+  stripAllToolCallBlocks,
 } from "./messages-to-xml.js";
 
 export interface ClaudeCliProviderOptions {
@@ -81,7 +82,13 @@ const TOOL_CALL_FORMAT = `When you need to call a tool, respond with ONLY a JSON
 }
 \`\`\`
 
-If you do not need to call any tools, respond with plain text (no JSON block).`;
+If you do not need to call any tools, respond with plain text (no JSON block).
+
+IMPORTANT:
+- Do NOT repeat or echo previous tool calls in your response.
+- Do NOT fabricate or assume tool results. Wait for actual tool output.
+- Each tool call ID must be unique across the conversation.
+- Only include tool calls you intend to execute NOW, not ones already executed.`;
 
 /**
  * Create a Claude CLI model adapter.
@@ -315,7 +322,7 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
   }
 
   function stripToolCallJsonBlock(text: string): string {
-    return text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
+    return stripAllToolCallBlocks(text);
   }
 
   function addToolCallFromParsed(
@@ -560,8 +567,7 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
       state.toolCalls = toolCalls;
     }
 
-    const content =
-      toolCalls.length > 0 ? text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim() : text;
+    const content = toolCalls.length > 0 ? stripAllToolCallBlocks(text) : text;
 
     return attachClaudeMetadata(
       new AIMessage({
@@ -632,7 +638,7 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
     }
 
     if (toolCalls.length > 0) {
-      const contentOutsideJson = text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
+      const contentOutsideJson = stripAllToolCallBlocks(text);
       return attachClaudeMetadata(
         new AIMessage({
           content: contentOutsideJson || "",
