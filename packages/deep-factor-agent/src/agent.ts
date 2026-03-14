@@ -559,6 +559,47 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     return tool.invoke(args);
   }
 
+  private emitToolResult(
+    toolCallId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    result: string,
+    thread: AgentThread,
+    iteration: number,
+    usage: TokenUsage,
+    status: AgentExecutionUpdate["status"] = "running",
+    durationMs?: number,
+    display?: ToolDisplayMetadata,
+  ): ToolResultEvent {
+    const resultEvent: ToolResultEvent = {
+      type: "tool_result",
+      toolCallId,
+      result,
+      display: display ?? buildToolResultDisplay(toolName, args, result),
+      timestamp: Date.now(),
+      iteration,
+      durationMs,
+    };
+    this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status });
+    return resultEvent;
+  }
+
+  private buildOutcome(
+    kind: ToolOutcome["kind"],
+    resultEvent: ToolResultEvent,
+    pending?: PendingHumanRequest,
+  ): ToolOutcome {
+    return {
+      kind,
+      resultEvent,
+      toolMessage: new ToolMessage({
+        tool_call_id: resultEvent.toolCallId,
+        content: String(resultEvent.result),
+      }),
+      pending,
+    };
+  }
+
   private createPendingResult(
     thread: AgentThread,
     usage: TokenUsage,
@@ -751,10 +792,11 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     usage: TokenUsage,
   ): Promise<ToolOutcome> {
     const toolCallId = tc.id ?? `call_${iteration}_${tc.name}`;
+    const args = (tc.args ?? {}) as Record<string, unknown>;
     const now = Date.now();
 
+    // Guard: human input request
     if (tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT) {
-      const args = (tc.args ?? {}) as Record<string, unknown>;
       const hirEvent: HumanInputRequestedEvent = {
         type: "human_input_requested",
         kind: "question",
@@ -766,47 +808,24 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         timestamp: now,
         iteration,
       };
-      const resultEvent: ToolResultEvent = {
-        type: "tool_result",
-        toolCallId,
-        result: "[Waiting for human input]",
-        display: buildToolResultDisplay(tc.name, args, "[Waiting for human input]"),
-        timestamp: now,
-        iteration,
-      };
       this.appendEvent(thread, hirEvent, { usage, iterations: iteration, status: "pending_input" });
-      this.appendEvent(thread, resultEvent, {
+      const re = this.emitToolResult(
+        toolCallId,
+        tc.name,
+        args,
+        "[Waiting for human input]",
+        thread,
+        iteration,
         usage,
-        iterations: iteration,
-        status: "pending_input",
-      });
-      return {
-        kind: "pending",
-        resultEvent,
-        toolMessage: new ToolMessage({
-          tool_call_id: toolCallId,
-          content: "[Waiting for human input]",
-        }),
-        pending: {
-          detail: "Human input requested",
-          event: hirEvent,
-        },
-      };
+        "pending_input",
+      );
+      return this.buildOutcome("pending", re, { detail: "Human input requested", event: hirEvent });
     }
 
+    // Guard: interruptOn
     if (this.interruptOn.includes(tc.name)) {
-      const resultEvent: ToolResultEvent = {
-        type: "tool_result",
-        toolCallId,
-        result: `[Tool "${tc.name}" not executed — interrupted for human approval]`,
-        display: buildToolResultDisplay(
-          tc.name,
-          (tc.args ?? {}) as Record<string, unknown>,
-          `[Tool "${tc.name}" not executed — interrupted for human approval]`,
-        ),
-        timestamp: now,
-        iteration,
-      };
+      const result = `[Tool "${tc.name}" not executed — interrupted for human approval]`;
+      const re = this.emitToolResult(toolCallId, tc.name, args, result, thread, iteration, usage);
       const hirEvent: HumanInputRequestedEvent = {
         type: "human_input_requested",
         kind: "approval",
@@ -814,63 +833,38 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         approvalRequest: {
           toolName: tc.name,
           toolCallId,
-          args: (tc.args ?? {}) as Record<string, unknown>,
+          args,
           reason: `Tool "${tc.name}" was interrupted for approval.`,
         },
         timestamp: now,
         iteration,
       };
-      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
       this.appendEvent(thread, hirEvent, { usage, iterations: iteration, status: "pending_input" });
-      return {
-        kind: "pending",
-        resultEvent,
-        toolMessage: new ToolMessage({
-          tool_call_id: toolCallId,
-          content: String(resultEvent.result),
-        }),
-        pending: {
-          detail: `Interrupted: tool "${tc.name}" requires approval`,
-          event: hirEvent,
-        },
-      };
+      return this.buildOutcome("pending", re, {
+        detail: `Interrupted: tool "${tc.name}" requires approval`,
+        event: hirEvent,
+      });
     }
 
+    // Guard: mode-based deny
     const decision = this.evaluateToolExecution(tc.name, foundTool);
     if (decision.action === "deny") {
-      const resultEvent: ToolResultEvent = {
-        type: "tool_result",
+      const re = this.emitToolResult(
         toolCallId,
-        result: decision.reason,
-        display: buildToolResultDisplay(
-          tc.name,
-          (tc.args ?? {}) as Record<string, unknown>,
-          decision.reason,
-        ),
-        timestamp: now,
+        tc.name,
+        args,
+        decision.reason,
+        thread,
         iteration,
-      };
-      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
-      return {
-        kind: "continue",
-        resultEvent,
-        toolMessage: new ToolMessage({ tool_call_id: toolCallId, content: decision.reason }),
-      };
+        usage,
+      );
+      return this.buildOutcome("continue", re);
     }
 
+    // Guard: approval required
     if (decision.action === "request_approval") {
-      const resultEvent: ToolResultEvent = {
-        type: "tool_result",
-        toolCallId,
-        result: `[Tool "${tc.name}" not executed — awaiting approval]`,
-        display: buildToolResultDisplay(
-          tc.name,
-          (tc.args ?? {}) as Record<string, unknown>,
-          `[Tool "${tc.name}" not executed — awaiting approval]`,
-        ),
-        timestamp: now,
-        iteration,
-      };
+      const result = `[Tool "${tc.name}" not executed — awaiting approval]`;
+      const re = this.emitToolResult(toolCallId, tc.name, args, result, thread, iteration, usage);
       const hirEvent: HumanInputRequestedEvent = {
         type: "human_input_requested",
         kind: "approval",
@@ -880,103 +874,68 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         approvalRequest: {
           toolName: tc.name,
           toolCallId,
-          args: (tc.args ?? {}) as Record<string, unknown>,
+          args,
           reason: decision.reason,
         },
         timestamp: now,
         iteration,
       };
-      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
       this.appendEvent(thread, hirEvent, { usage, iterations: iteration, status: "pending_input" });
-      return {
-        kind: "pending",
-        resultEvent,
-        toolMessage: new ToolMessage({
-          tool_call_id: toolCallId,
-          content: String(resultEvent.result),
-        }),
-        pending: {
-          detail: `Approval required for tool "${tc.name}"`,
-          event: hirEvent,
-        },
-      };
+      return this.buildOutcome("pending", re, {
+        detail: `Approval required for tool "${tc.name}"`,
+        event: hirEvent,
+      });
     }
 
-    const start = performance.now();
+    // Guard: tool not found
     if (!foundTool) {
-      const resultEvent: ToolResultEvent = {
-        type: "tool_result",
+      const re = this.emitToolResult(
         toolCallId,
-        result: `Tool not found: "${tc.name}"`,
-        display: buildToolResultDisplay(
-          tc.name,
-          (tc.args ?? {}) as Record<string, unknown>,
-          `Tool not found: "${tc.name}"`,
-        ),
-        timestamp: now,
+        tc.name,
+        args,
+        `Tool not found: "${tc.name}"`,
+        thread,
         iteration,
-      };
-      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
-      return {
-        kind: "continue",
-        resultEvent,
-        toolMessage: new ToolMessage({
-          tool_call_id: toolCallId,
-          content: String(resultEvent.result),
-        }),
-      };
+        usage,
+      );
+      return this.buildOutcome("continue", re);
     }
 
+    // Execute the tool
+    const start = performance.now();
     try {
-      const toolResult = await this.invokeTool(
-        foundTool,
-        (tc.args ?? {}) as Record<string, unknown>,
-      );
+      const toolResult = await this.invokeTool(foundTool, args);
       const resultStr = stringifyToolResult(toolResult);
       const durationMs = Math.round(performance.now() - start);
       this.syncTodoMetadata(tc.name, resultStr, thread);
-      const resultEvent: ToolResultEvent = {
-        type: "tool_result",
+      const display = resolveToolResultDisplay(tc.name, args, toolResult);
+      const re = this.emitToolResult(
         toolCallId,
-        result: resultStr,
-        display: resolveToolResultDisplay(
-          tc.name,
-          (tc.args ?? {}) as Record<string, unknown>,
-          toolResult,
-        ),
-        timestamp: now,
+        tc.name,
+        args,
+        resultStr,
+        thread,
         iteration,
+        usage,
+        "running",
         durationMs,
-      };
-      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
-      return {
-        kind: "continue",
-        resultEvent,
-        toolMessage: new ToolMessage({ tool_call_id: toolCallId, content: resultStr }),
-      };
+        display,
+      );
+      return this.buildOutcome("continue", re);
     } catch (error) {
-      const resultEvent: ToolResultEvent = {
-        type: "tool_result",
+      const durationMs = Math.round(performance.now() - start);
+      const re = this.emitToolResult(
         toolCallId,
-        result: `Tool error: ${compactError(error)}`,
-        display: buildToolResultDisplay(
-          tc.name,
-          (tc.args ?? {}) as Record<string, unknown>,
-          `Tool error: ${compactError(error)}`,
-        ),
-        timestamp: now,
+        tc.name,
+        args,
+        `Tool error: ${compactError(error)}`,
+        thread,
         iteration,
-        durationMs: Math.round(performance.now() - start),
-      };
-      this.appendEvent(thread, resultEvent, { usage, iterations: iteration, status: "running" });
-      return {
-        kind: "continue",
-        resultEvent,
-        toolMessage: new ToolMessage({
-          tool_call_id: toolCallId,
-          content: String(resultEvent.result),
-        }),
-      };
+        usage,
+        "running",
+        durationMs,
+      );
+      return this.buildOutcome("continue", re);
     }
   }
 
