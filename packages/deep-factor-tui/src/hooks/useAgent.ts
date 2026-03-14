@@ -33,6 +33,7 @@ import type {
 } from "../types.js";
 import { appendUnifiedSession, getSessionId } from "../session-logger.js";
 import { DEFAULT_TUI_AGENT_INSTRUCTIONS } from "../default-agent-instructions.js";
+import { decodeXmlEntities } from "../sanitize.js";
 
 function isPendingAction(value: string): value is PendingAction {
   return value === "approve" || value === "reject" || value === "edit";
@@ -162,7 +163,9 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
       case "message":
         if (event.role === "user" && isSyntheticUserMessage(event.content)) break;
         if (event.role === "user" || event.role === "assistant") {
-          messages.push({ id: `msg-${messages.length}`, role: event.role, content: event.content });
+          const content =
+            event.role === "assistant" ? decodeXmlEntities(event.content) : event.content;
+          messages.push({ id: `msg-${messages.length}`, role: event.role, content });
         }
         break;
       case "human_input_received": {
