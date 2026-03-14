@@ -4,6 +4,7 @@ import {
   messagesToXml,
   messagesToPrompt,
   parseToolCalls,
+  stripAllToolCallBlocks,
 } from "../../src/providers/messages-to-xml.js";
 
 describe("messagesToXml", () => {
@@ -131,5 +132,84 @@ describe("parseToolCalls", () => {
       '```json\n{"tool_calls": [{"name": "a", "args": {}, "id": "1"}, {"name": "b", "args": {"k": "v"}, "id": "2"}]}\n```';
     const result = parseToolCalls(text);
     expect(result).toHaveLength(2);
+  });
+
+  it("parses bare JSON array tool calls", () => {
+    const text = 'Some text\n[{"name":"bash","args":{"command":"ls"},"id":"call_1"}]\nMore text';
+    const result = parseToolCalls(text);
+    expect(result).toEqual([{ name: "bash", args: { command: "ls" }, id: "call_1" }]);
+  });
+
+  it("parses bare JSON object with tool_calls key", () => {
+    const text = 'Hello\n{"tool_calls":[{"name":"calc","args":{"x":1},"id":"c1"}]}\nBye';
+    const result = parseToolCalls(text);
+    expect(result).toEqual([{ name: "calc", args: { x: 1 }, id: "c1" }]);
+  });
+
+  it("collects tool calls from multiple fenced blocks", () => {
+    const text = [
+      '```json\n{"tool_calls":[{"name":"a","args":{},"id":"1"}]}\n```',
+      "Some text between",
+      '```json\n{"tool_calls":[{"name":"b","args":{},"id":"2"}]}\n```',
+    ].join("\n");
+    const result = parseToolCalls(text);
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe("a");
+    expect(result[1].name).toBe("b");
+  });
+
+  it("deduplicates tool calls by id across multiple blocks", () => {
+    const text = [
+      '```json\n{"tool_calls":[{"name":"a","args":{},"id":"call_1"}]}\n```',
+      '```json\n{"tool_calls":[{"name":"a","args":{},"id":"call_1"}]}\n```',
+    ].join("\n");
+    const result = parseToolCalls(text);
+    expect(result).toHaveLength(1);
+  });
+
+  it("prefers fenced blocks over bare JSON", () => {
+    const text = [
+      '```json\n{"tool_calls":[{"name":"fenced","args":{},"id":"1"}]}\n```',
+      '[{"name":"bare","args":{},"id":"2"}]',
+    ].join("\n");
+    const result = parseToolCalls(text);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("fenced");
+  });
+
+  it("ignores bare arrays that don't look like tool calls", () => {
+    const text = '[{"x": 1}, {"x": 2}]';
+    const result = parseToolCalls(text);
+    expect(result).toEqual([]);
+  });
+});
+
+describe("stripAllToolCallBlocks", () => {
+  it("strips fenced JSON blocks", () => {
+    const text = 'Before\n```json\n{"tool_calls":[{"name":"a","args":{},"id":"1"}]}\n```\nAfter';
+    expect(stripAllToolCallBlocks(text)).toBe("Before\n\nAfter");
+  });
+
+  it("strips multiple fenced blocks", () => {
+    const text = [
+      '```json\n{"tool_calls":[{"name":"a","args":{},"id":"1"}]}\n```',
+      "Middle",
+      '```json\n{"tool_calls":[{"name":"b","args":{},"id":"2"}]}\n```',
+    ].join("\n");
+    expect(stripAllToolCallBlocks(text)).toBe("Middle");
+  });
+
+  it("strips bare JSON tool call arrays", () => {
+    const text = 'Before\n[{"name":"bash","args":{},"id":"1"}]\nAfter';
+    expect(stripAllToolCallBlocks(text)).toBe("Before\n\nAfter");
+  });
+
+  it("strips bare JSON objects with tool_calls key", () => {
+    const text = 'Before\n{"tool_calls":[{"name":"a","args":{},"id":"1"}]}\nAfter';
+    expect(stripAllToolCallBlocks(text)).toBe("Before\n\nAfter");
+  });
+
+  it("returns clean text unchanged", () => {
+    expect(stripAllToolCallBlocks("Just plain text")).toBe("Just plain text");
   });
 });

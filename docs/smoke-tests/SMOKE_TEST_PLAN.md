@@ -383,14 +383,90 @@ process.exit(totalFail > 0 ? 1 : 0);
 
 ---
 
+## Manual Human Review Steps
+
+After running automated validation, a human reviewer must perform the following visual and behavioral checks before signing off on a smoke test run.
+
+### TUI Rendering (Interactive Mode)
+
+Run each provider interactively and verify the output is clean:
+
+1. **Claude CLI — no XML artifacts**
+
+   ```bash
+   CLAUDECODE= deepfactor --provider claude "What does <div> mean in HTML?"
+   ```
+
+   - Verify: No `&lt;`, `&gt;`, `&amp;` entities visible in the response
+   - Verify: No `<event>` or `<thread>` tag fragments in output
+   - Verify: Angle brackets `<` and `>` render as literal characters
+
+2. **Claude CLI — no raw tool call JSON**
+
+   ```bash
+   CLAUDECODE= deepfactor --provider claude "List the files in the current directory and summarize what you see."
+   ```
+
+   - Verify: No raw JSON arrays like `[{"name":"bash",...}]` in assistant text
+   - Verify: No `{"tool_calls":[...]}` blocks visible in assistant messages
+   - Verify: Tool calls render as structured `Bash(...)` blocks, not inline JSON
+   - Verify: Tool results display with truncation preview, not raw output
+
+3. **Codex CLI — no raw tool call JSON**
+
+   ```bash
+   deepfactor --provider codex "Run 'echo hello' and tell me the output."
+   ```
+
+   - Verify: Same checks as step 2 above
+
+4. **LangChain — baseline comparison**
+   ```bash
+   deepfactor --provider langchain "List the files in the current directory."
+   ```
+
+   - Verify: Clean rendering (this is the reference provider)
+   - Verify: Tool calls and results render identically to Claude/Codex output format
+
+### Session Resume (Backward Compatibility)
+
+5. **Resume a session with old XML-encoded history**
+   - Start a session with `--provider claude`, ask a question, wait for response
+   - Exit and resume the session
+   - Verify: Previously stored messages render cleanly (no XML entities from old history)
+
+### Print Mode (JSONL Log Integrity)
+
+6. **Inspect JSONL logs for leaked tool JSON**
+   ```bash
+   CLAUDECODE= deepfactor --provider claude -p -o stream-json \
+     "Use bash to run 'echo hello' and tell me the output." \
+     > /tmp/smoke-check.jsonl
+   ```
+
+   - Open `/tmp/smoke-check.jsonl` and inspect all `message` entries where `role === "assistant"`
+   - Verify: No assistant message `content` contains `"tool_calls"` or `"function_call"` strings
+   - Verify: Tool call/result entries have matching `toolCallId` values
+
+### Expected Human-Observable Results
+
+For all interactive checks above, the reviewer should see:
+
+- Assistant text uses plain characters (`<`, `>`, `&`, `'`, `"`) — never XML entities
+- Tool invocations appear as structured blocks (e.g., `Bash(ls)`) with duration and preview
+- No raw JSON objects or arrays embedded in assistant prose
+- Response content is coherent and directly answers the prompt without artifacts
+
+---
+
 ## Known Failures
 
 The following scenarios currently **fail** validation (confirmed against both archived and fresh runs):
 
-| Scenario | File                         | Issue                                                                                                                                        |
-| -------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| S8       | `smoke-claude-complex.jsonl` | Assistant messages contain raw tool JSON (`"tool_calls"`) — Claude CLI mapper not fully stripping tool call blocks from multi-turn responses |
-| S9       | `smoke-codex-complex.jsonl`  | `tool_call` entries with no matching `tool_result` — Codex CLI mapper drops tool results when the agent terminates mid-sequence              |
+| Scenario | File                         | Status       | Issue                                                                                                                                |
+| -------- | ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| S8       | `smoke-claude-complex.jsonl` | Likely fixed | Raw tool JSON in assistant messages — addressed by `stripAllToolCallBlocks()` and multi-block `parseToolCalls()`. Re-run to confirm. |
+| S9       | `smoke-codex-complex.jsonl`  | Open         | `tool_call` entries with no matching `tool_result` — Codex CLI mapper drops tool results when the agent terminates mid-sequence      |
 
 **Note on Claude CLI**: Running Claude CLI tests from inside a Claude Code session requires unsetting `CLAUDECODE`:
 
@@ -398,7 +474,7 @@ The following scenarios currently **fail** validation (confirmed against both ar
 CLAUDECODE= deepfactor --provider claude -p -o stream-json "prompt" > output.jsonl
 ```
 
-These failures indicate bugs in the CLI provider log mappers that should be fixed in a future phase.
+S9 indicates a bug in the Codex CLI provider log mapper that should be fixed in a future phase. S8 should be re-validated after the tool call parsing fix (`fix/xml-tool-parsing` branch).
 
 ## Known Limitations
 

@@ -558,6 +558,45 @@ describe("createClaudeCliProvider", () => {
     });
   });
 
+  it("parses bare JSON array tool calls in invokeJson mode", async () => {
+    const cliOutput = makeJsonOutput(
+      'I will list files.\n[{"name":"bash","args":{"command":"ls"},"id":"call_1"}]',
+    );
+    simulateExecFile(cliOutput);
+    const provider = createClaudeCliProvider();
+
+    const result = await provider.invoke([new HumanMessage("List files")]);
+
+    expect(result.tool_calls).toHaveLength(1);
+    expect(result.tool_calls![0]).toEqual({
+      name: "bash",
+      args: { command: "ls" },
+      id: "call_1",
+    });
+    // Bare JSON should be stripped from content
+    expect(result.content).not.toContain("[{");
+  });
+
+  it("parses tool calls from multiple fenced blocks in invokeJson mode", async () => {
+    const cliOutput = makeJsonOutput(
+      [
+        "I'll do two things.",
+        '```json\n{"tool_calls":[{"name":"bash","args":{"command":"ls"},"id":"call_1"}]}\n```',
+        "And also:",
+        '```json\n{"tool_calls":[{"name":"read_file","args":{"path":"a.txt"},"id":"call_2"}]}\n```',
+      ].join("\n"),
+    );
+    simulateExecFile(cliOutput);
+    const provider = createClaudeCliProvider();
+
+    const result = await provider.invoke([new HumanMessage("Do two things")]);
+
+    expect(result.tool_calls).toHaveLength(2);
+    expect(result.tool_calls![0].name).toBe("bash");
+    expect(result.tool_calls![1].name).toBe("read_file");
+    expect(result.content).not.toContain("```json");
+  });
+
   it("surfaces malformed stream-json lines as provider errors immediately", async () => {
     simulateSpawnStream([
       '{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}\n',
