@@ -239,6 +239,7 @@ describe("runPrintMode", () => {
       model: "sonnet",
       permissionMode: "bypassPermissions",
       disableBuiltInTools: true,
+      inputEncoding: "text",
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({ model: mockClaudeCliProvider }),
@@ -263,6 +264,7 @@ describe("runPrintMode", () => {
 
     expect(mockCreateCodexCliProvider).toHaveBeenCalledWith({
       model: "gpt-5.4",
+      inputEncoding: "text",
       outputFormat: "text",
       sandbox: "read-only",
       skipGitRepoCheck: true,
@@ -293,6 +295,7 @@ describe("runPrintMode", () => {
       model: "sonnet",
       permissionMode: "plan",
       disableBuiltInTools: true,
+      inputEncoding: "text",
     });
   });
 
@@ -317,6 +320,7 @@ describe("runPrintMode", () => {
       model: "sonnet",
       permissionMode: "acceptEdits",
       disableBuiltInTools: true,
+      inputEncoding: "text",
     });
   });
 

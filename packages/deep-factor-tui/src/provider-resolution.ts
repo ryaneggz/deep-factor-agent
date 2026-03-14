@@ -34,6 +34,7 @@ export function resolveProviderModel(args: {
       model,
       permissionMode: resolveClaudePermissionMode(mode),
       disableBuiltInTools: true,
+      inputEncoding: "text",
       ...(liveUpdates
         ? {
             outputFormat: "stream-json" as const,
@@ -47,6 +48,7 @@ export function resolveProviderModel(args: {
   if (provider === "codex") {
     return createCodexCliProvider({
       model,
+      inputEncoding: "text",
       outputFormat: liveUpdates ? "jsonl" : "text",
       sandbox: "read-only",
       skipGitRepoCheck: true,
