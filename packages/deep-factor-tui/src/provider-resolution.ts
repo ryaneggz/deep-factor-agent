@@ -1,7 +1,11 @@
-import { createClaudeCliProvider, createCodexCliProvider } from "deep-factor-agent";
+import {
+  createClaudeCliProvider,
+  createCodexCliProvider,
+  createRuskaApiProvider,
+} from "deep-factor-agent";
 import type { DeepFactorAgentSettings } from "deep-factor-agent";
 import type { AgentMode } from "deep-factor-agent";
-import type { ProviderType } from "./types.js";
+import type { ProviderType, RuskaCliOptions } from "./types.js";
 
 type ClaudePermissionMode =
   | "acceptEdits"
@@ -27,8 +31,9 @@ export function resolveProviderModel(args: {
   model: string;
   mode?: AgentMode;
   liveUpdates?: boolean;
+  ruska?: RuskaCliOptions;
 }): DeepFactorAgentSettings["model"] {
-  const { provider, model, mode, liveUpdates = false } = args;
+  const { provider, model, mode, liveUpdates = false, ruska } = args;
   if (provider === "claude") {
     return createClaudeCliProvider({
       model,
@@ -50,6 +55,16 @@ export function resolveProviderModel(args: {
       outputFormat: liveUpdates ? "jsonl" : "text",
       sandbox: "read-only",
       skipGitRepoCheck: true,
+    });
+  }
+
+  if (provider === "ruska" && ruska) {
+    return createRuskaApiProvider({
+      baseUrl: ruska.ruskaUrl,
+      model,
+      apiKey: ruska.ruskaKey,
+      bearerToken: ruska.ruskaToken,
+      graphId: ruska.ruskaGraph,
     });
   }
 

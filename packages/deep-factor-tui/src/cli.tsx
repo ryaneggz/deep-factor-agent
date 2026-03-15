@@ -19,7 +19,7 @@ const cli = meow(
     $ deepfactor [prompt]
 
   Options
-    --provider       Provider: langchain, claude, codex (default: langchain)
+    --provider       Provider: langchain, claude, codex, ruska (default: langchain)
     --model, -m      Model identifier (default depends on provider)
     --max-iter, -i   Maximum agent iterations (default: 10)
     --mode           Execution mode: plan, approve, yolo (default: yolo)
@@ -27,15 +27,21 @@ const cli = meow(
     --print, -p      Non-interactive print mode (output answer to stdout)
     --output-format, -o  Output format: text (default), stream-json (JSONL events)
     --resume, -r     Resume a previous session (optionally pass session ID)
+    --ruska-url      Ruska API base URL (default: ~/.ruska/auth.json "host")
+    --ruska-key      Ruska API key (default: ~/.ruska/auth.json "apiKey")
+    --ruska-token    Ruska bearer token (default: ~/.ruska/auth.json "bearerToken")
+    --ruska-graph    Ruska graph ID: react, deepagent (default: ~/.ruska/auth.json "graph")
 
   Examples
     $ deepfactor
     $ deepfactor "Explain how React hooks work"
     $ deepfactor --provider claude
     $ deepfactor --provider codex
+    $ deepfactor --provider ruska
     $ deepfactor -p "What is 2+2?"
     $ deepfactor --provider claude -p "What is 2+2?"
     $ deepfactor --provider codex -p "What is 2+2?"
+    $ deepfactor --provider ruska -p "What is 2+2?"
     $ deepfactor -p "List files in the current directory"
     $ deepfactor -s local "Run system commands"
     $ cat PROMPT.md | deepfactor -p
@@ -80,13 +86,42 @@ const cli = meow(
         type: "string",
         shortFlag: "r",
       },
+      ruskaUrl: {
+        type: "string",
+      },
+      ruskaKey: {
+        type: "string",
+      },
+      ruskaToken: {
+        type: "string",
+      },
+      ruskaGraph: {
+        type: "string",
+      },
     },
   },
 );
 
+import { readFileSync } from "node:fs";
 import type { SandboxMode } from "./tools/bash.js";
 import type { AgentMode } from "deep-factor-agent";
 import { DEFAULT_MODELS, DEFAULT_PROVIDER, normalizeProvider } from "./types.js";
+
+interface RuskaAuthFile {
+  host?: string;
+  apiKey?: string;
+  bearerToken?: string;
+  graph?: "react" | "deepagent";
+}
+
+function loadRuskaAuth(): RuskaAuthFile {
+  try {
+    const raw = readFileSync(join(homedir(), ".ruska", "auth.json"), "utf-8");
+    return JSON.parse(raw) as RuskaAuthFile;
+  } catch {
+    return {};
+  }
+}
 
 const validSandboxModes = ["workspace", "local", "docker"] as const;
 const sandboxMode = cli.flags.sandbox as SandboxMode;
@@ -105,8 +140,27 @@ if (!validModes.includes(mode)) {
 const providerFlag = normalizeProvider(cli.flags.provider);
 if (cli.flags.provider && !providerFlag) {
   process.stderr.write(
-    `Error: Invalid provider "${cli.flags.provider}". Use: langchain, claude, codex\n`,
+    `Error: Invalid provider "${cli.flags.provider}". Use: langchain, claude, codex, ruska\n`,
   );
+  process.exit(1);
+}
+
+// Load ~/.ruska/auth.json defaults, CLI flags take precedence
+const ruskaAuth = providerFlag === "ruska" ? loadRuskaAuth() : {};
+const ruskaUrl = cli.flags.ruskaUrl ?? ruskaAuth.host;
+const ruskaKey = cli.flags.ruskaKey ?? ruskaAuth.apiKey;
+const ruskaToken = cli.flags.ruskaToken ?? ruskaAuth.bearerToken;
+const ruskaGraph = (cli.flags.ruskaGraph ?? ruskaAuth.graph) as "react" | "deepagent" | undefined;
+
+if (providerFlag === "ruska" && !ruskaUrl) {
+  process.stderr.write(
+    "Error: --ruska-url is required when using --provider ruska\n" +
+      '       (or set "host" in ~/.ruska/auth.json)\n',
+  );
+  process.exit(1);
+}
+if (ruskaGraph && ruskaGraph !== "react" && ruskaGraph !== "deepagent") {
+  process.stderr.write(`Error: Invalid ruska graph "${ruskaGraph}". Use: react, deepagent\n`);
   process.exit(1);
 }
 
@@ -114,6 +168,8 @@ const hasProviderFlag = process.argv.includes("--provider");
 const hasModelFlag = process.argv.includes("--model") || process.argv.includes("-m");
 let provider = providerFlag ?? DEFAULT_PROVIDER;
 let model = cli.flags.model ?? DEFAULT_MODELS[provider];
+
+const ruskaOptions = ruskaUrl ? { ruskaUrl, ruskaKey, ruskaToken, ruskaGraph } : undefined;
 
 let prompt = cli.input.join(" ") || undefined;
 
@@ -146,6 +202,7 @@ if (cli.flags.print) {
     sandbox: sandboxMode,
     mode,
     outputFormat: cli.flags.outputFormat as "text" | "stream-json",
+    ruska: ruskaOptions,
   });
 } else {
   // TUI mode: inline interactive
@@ -251,6 +308,7 @@ if (cli.flags.print) {
       mode,
       resumeMessages,
       resumeThread,
+      ruska: ruskaOptions,
     }),
   );
 

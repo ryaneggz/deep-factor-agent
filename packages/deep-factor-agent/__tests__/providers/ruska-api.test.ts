@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { HumanMessage, SystemMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
@@ -459,6 +459,7 @@ describe("createRuskaApiProvider — invoke()", () => {
     expect(body.metadata.graph_id).toBe("deepagent");
     expect(body.input.messages).toBeDefined();
     expect(body.input.messages.some((m: { role: string }) => m.role === "user")).toBe(true);
+    expect(body.stream_mode).toEqual(["values", "updates"]);
   });
 
   it("includes system prompt in request messages", async () => {
@@ -570,6 +571,96 @@ describe("createRuskaApiProvider — invokeWithUpdates()", () => {
     const toolCallUpdates = updates.filter((u) => u.type === "tool_call");
     expect(toolCallUpdates).toHaveLength(1);
     expect((toolCallUpdates[0] as { toolCall: { name: string } }).toolCall.name).toBe("calculator");
+  });
+
+  it("emits updates from LangGraph updates events", async () => {
+    mockTwoPhaseFlow("t1", "r1", [
+      [
+        "updates",
+        {
+          agent: {
+            messages: [
+              {
+                type: "ai",
+                content: "Here is my response.",
+                tool_calls: [{ name: "bash", args: { cmd: "ls" }, id: "call_2" }],
+                usage_metadata: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+              },
+            ],
+          },
+        },
+      ],
+      [
+        "values",
+        {
+          messages: [
+            {
+              type: "ai",
+              content: "Here is my response.",
+              tool_calls: [{ name: "bash", args: { cmd: "ls" }, id: "call_2", type: "tool_call" }],
+              usage_metadata: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+            },
+          ],
+        },
+      ],
+      "DONE",
+    ]);
+
+    const provider = createRuskaApiProvider({
+      baseUrl: "http://localhost:8000",
+      model: "test-model",
+    });
+
+    const updates: ModelInvocationUpdate[] = [];
+    await provider.invokeWithUpdates!([new HumanMessage("test")], (u) => updates.push(u));
+
+    const types = updates.map((u) => u.type);
+    expect(types).toContain("assistant_message");
+    expect(types).toContain("tool_call");
+    expect(types).toContain("usage");
+
+    const assistantUpdates = updates.filter((u) => u.type === "assistant_message");
+    expect(assistantUpdates).toHaveLength(1);
+    expect((assistantUpdates[0] as { content: string }).content).toBe("Here is my response.");
+
+    const toolUpdates = updates.filter((u) => u.type === "tool_call");
+    expect(toolUpdates).toHaveLength(1);
+    expect((toolUpdates[0] as { toolCall: { name: string } }).toolCall.name).toBe("bash");
+
+    // Usage emitted from updates event + from DONE/values extraction
+    const usageUpdates = updates.filter((u) => u.type === "usage");
+    expect(usageUpdates.length).toBeGreaterThanOrEqual(1);
+    expect((usageUpdates[0] as { usage: { totalTokens: number } }).usage.totalTokens).toBe(120);
+  });
+
+  it("skips non-AI messages in updates events", async () => {
+    mockTwoPhaseFlow("t1", "r1", [
+      [
+        "updates",
+        {
+          agent: {
+            messages: [
+              { type: "human", content: "ignored" },
+              { type: "ai", content: "kept" },
+            ],
+          },
+        },
+      ],
+      ["values", { messages: [{ type: "ai", content: "kept", tool_calls: [] }] }],
+      "DONE",
+    ]);
+
+    const provider = createRuskaApiProvider({
+      baseUrl: "http://localhost:8000",
+      model: "test-model",
+    });
+
+    const updates: ModelInvocationUpdate[] = [];
+    await provider.invokeWithUpdates!([new HumanMessage("test")], (u) => updates.push(u));
+
+    const assistantUpdates = updates.filter((u) => u.type === "assistant_message");
+    expect(assistantUpdates).toHaveLength(1);
+    expect((assistantUpdates[0] as { content: string }).content).toBe("kept");
   });
 });
 
@@ -766,6 +857,123 @@ describe("createRuskaApiProvider — error handling", () => {
     await expect(provider.invoke([new HumanMessage("test")])).rejects.toThrow(
       "SSE stream ended with no response",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Distributed retry behavior
+// ---------------------------------------------------------------------------
+
+describe("createRuskaApiProvider — distributed retry", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("retries GET on 404 when distributed=true and succeeds", async () => {
+    const fetchMock = vi.fn();
+
+    // POST returns distributed: true
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ thread_id: "t1", run_id: "r1", distributed: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    // First GET: 404
+    fetchMock.mockResolvedValueOnce(new Response("Not Found", { status: 404 }));
+
+    // Second GET: success
+    fetchMock.mockResolvedValueOnce(
+      makeResponse(
+        makeSSEBody([
+          ["values", { messages: [{ type: "ai", content: "Hello!", tool_calls: [] }] }],
+          "DONE",
+        ]),
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = createRuskaApiProvider({
+      baseUrl: "http://localhost:8000",
+      model: "test-model",
+    });
+
+    const invokePromise = provider.invoke([new HumanMessage("Hi")]);
+    await vi.runAllTimersAsync();
+    const result = await invokePromise;
+
+    expect(result).toBeInstanceOf(AIMessage);
+    expect(result.content).toBe("Hello!");
+    // POST + 2 GETs = 3 fetch calls
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("fails after max retries on persistent 404", async () => {
+    const fetchMock = vi.fn();
+
+    // POST returns distributed: true
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ thread_id: "t1", run_id: "r1", distributed: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    // All GETs return 404 (initial + 8 retries = 9)
+    for (let i = 0; i < 9; i++) {
+      fetchMock.mockResolvedValueOnce(new Response("Not Found", { status: 404 }));
+    }
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = createRuskaApiProvider({
+      baseUrl: "http://localhost:8000",
+      model: "test-model",
+    });
+
+    const invokePromise = provider.invoke([new HumanMessage("test")]);
+    // Prevent unhandled rejection warning while timers advance
+    invokePromise.catch(() => {});
+    await vi.runAllTimersAsync();
+
+    await expect(invokePromise).rejects.toThrow("GET /api/threads/t1/stream failed (404)");
+    // POST + 9 GETs = 10 fetch calls
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+  });
+
+  it("does not retry GET on 404 when distributed=false", async () => {
+    const fetchMock = vi.fn();
+
+    // POST returns distributed: false
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ thread_id: "t1", run_id: "r1", distributed: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    // GET returns 404
+    fetchMock.mockResolvedValueOnce(new Response("Not Found", { status: 404 }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = createRuskaApiProvider({
+      baseUrl: "http://localhost:8000",
+      model: "test-model",
+    });
+
+    await expect(provider.invoke([new HumanMessage("test")])).rejects.toThrow(
+      "GET /api/threads/t1/stream failed (404)",
+    );
+    // POST + 1 GET = 2 fetch calls (no retries)
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

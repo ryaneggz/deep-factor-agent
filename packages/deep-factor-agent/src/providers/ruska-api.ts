@@ -320,6 +320,7 @@ export function createRuskaApiProvider(opts: RuskaApiProviderOptions): ModelAdap
           model: options.model,
           input: { messages: requestMessages },
           metadata: { graph_id: graphId },
+          stream_mode: ["values", "updates"],
         };
 
         if (boundTools.length > 0) {
@@ -364,19 +365,36 @@ export function createRuskaApiProvider(opts: RuskaApiProviderOptions): ModelAdap
           currentThreadId = threadId;
 
           // Phase 2: GET /api/threads/{thread_id}/stream?run_id={run_id} → SSE
-          const sseResponse = await fetch(
-            `${options.baseUrl}/api/threads/${threadId}/stream?run_id=${runId}`,
-            {
-              method: "GET",
-              headers: { ...headers, Accept: "text/event-stream" },
-              signal: controller.signal,
-            },
-          );
+          // When distributed=true, the stream may not be ready immediately.
+          const maxRetries = 8;
+          const baseDelayMs = 2000;
+          const maxDelayMs = 10_000;
+          let sseResponse: Response | undefined;
 
-          if (!sseResponse.ok) {
-            const errorBody = await sseResponse.text().catch(() => "");
+          for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            if (attempt > 0 && postData.distributed) {
+              const delay = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
+              await new Promise((r) => setTimeout(r, delay));
+            }
+
+            sseResponse = await fetch(
+              `${options.baseUrl}/api/threads/${threadId}/stream?run_id=${runId}`,
+              {
+                method: "GET",
+                headers: { ...headers, Accept: "text/event-stream" },
+                signal: controller.signal,
+              },
+            );
+
+            if (sseResponse.ok || !postData.distributed || sseResponse.status !== 404) {
+              break;
+            }
+          }
+
+          if (!sseResponse!.ok) {
+            const errorBody = await sseResponse!.text().catch(() => "");
             throw new Error(
-              `Ruska API GET /api/threads/${threadId}/stream failed (${sseResponse.status}): ${errorBody}`,
+              `Ruska API GET /api/threads/${threadId}/stream failed (${sseResponse!.status}): ${errorBody}`,
             );
           }
 
@@ -384,7 +402,7 @@ export function createRuskaApiProvider(opts: RuskaApiProviderOptions): ModelAdap
           let lastValuesPayload: RuskaValuesPayload | undefined;
           let accumulatedContent = "";
 
-          for await (const [eventType, payload] of parseSSEStream(sseResponse)) {
+          for await (const [eventType, payload] of parseSSEStream(sseResponse!)) {
             switch (eventType) {
               case "initializing":
                 // Store run_id if needed (already have it from POST)
@@ -430,6 +448,66 @@ export function createRuskaApiProvider(opts: RuskaApiProviderOptions): ModelAdap
                           name: tc.name,
                           id: tc.id ?? "",
                           args: tc.args ?? {},
+                        },
+                      });
+                    }
+                  }
+                }
+                break;
+              }
+
+              case "updates": {
+                // LangGraph updates: { nodeName: { messages: [...] } }
+                if (typeof payload !== "object" || payload === null) break;
+                for (const nodeOutput of Object.values(payload as Record<string, unknown>)) {
+                  if (typeof nodeOutput !== "object" || nodeOutput === null) continue;
+                  const nodeMessages = (nodeOutput as Record<string, unknown>).messages as
+                    | Array<{
+                        type?: string;
+                        content?: string;
+                        tool_calls?: Array<{
+                          name: string;
+                          args: Record<string, unknown>;
+                          id: string;
+                        }>;
+                        usage_metadata?: {
+                          input_tokens: number;
+                          output_tokens: number;
+                          total_tokens: number;
+                        };
+                      }>
+                    | undefined;
+                  if (!Array.isArray(nodeMessages)) continue;
+                  for (const msg of nodeMessages) {
+                    if (msg.type !== "ai" && msg.type !== "AIMessageChunk") continue;
+                    if (msg.content) {
+                      accumulatedContent += msg.content;
+                      onUpdate({
+                        type: "assistant_message",
+                        content: msg.content,
+                      });
+                    }
+                    if (msg.tool_calls && msg.tool_calls.length > 0) {
+                      for (const tc of msg.tool_calls) {
+                        if (tc.name) {
+                          onUpdate({
+                            type: "tool_call",
+                            toolCall: {
+                              name: tc.name,
+                              id: tc.id ?? "",
+                              args: tc.args ?? {},
+                            },
+                          });
+                        }
+                      }
+                    }
+                    if (msg.usage_metadata) {
+                      onUpdate({
+                        type: "usage",
+                        usage: {
+                          inputTokens: msg.usage_metadata.input_tokens,
+                          outputTokens: msg.usage_metadata.output_tokens,
+                          totalTokens: msg.usage_metadata.total_tokens,
                         },
                       });
                     }
