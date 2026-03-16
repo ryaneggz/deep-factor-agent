@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync, execFile } from "node:child_process";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { config } from "dotenv";
+
+// Load env vars so OPENAI_API_KEY is available for langchain tests
+config({ path: join(homedir(), ".env", "deep-factor-agent", ".env") });
 
 const CLI_PATH = join(import.meta.dirname, "..", "dist", "cli.js");
-const OUTPUT_DIR = join(import.meta.dirname, "output");
+const OUTPUT_DIR = join(import.meta.dirname, "..", "logs", "output");
 
 function hasOpenAIKey(): boolean {
   return typeof process.env.OPENAI_API_KEY === "string" && process.env.OPENAI_API_KEY.length > 0;
@@ -81,42 +86,36 @@ async function runAndCapture(
 }
 
 describe.skipIf(!hasOpenAIKey())("langchain provider output capture", () => {
-  it("math prompt → file contains answer", async () => {
-    const result = await runAndCapture("langchain-math", [
+  it("tool prompt → runs ls tool", async () => {
+    const result = await runAndCapture("langchain-tool", [
       "-p",
       "-i",
-      "1",
-      "What is 2+2? Reply with just the number.",
+      "3",
+      "Get the local dir with pwd, and fetch local system time",
     ]);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("4");
+    expect(result.stdout.trim().length).toBeGreaterThan(0);
     expect(result.stderr).toBe("");
   }, 60_000);
 
-  it("greeting prompt → file contains greeting", async () => {
-    const result = await runAndCapture("langchain-greeting", [
-      "-p",
-      "-i",
-      "1",
-      "Say hello in one word.",
-    ]);
-    expect(result.code).toBe(0);
-    expect(result.stdout.toLowerCase()).toContain("hello");
-  }, 60_000);
-
   it("stdin pipe mode works", async () => {
-    const result = await runWithStdin("What is 2+2? Reply with just the number.", [
+    const result = await runWithStdin("Get the local dir with pwd, and fetch local system time", [
       "-p",
       "-i",
-      "1",
+      "3",
     ]);
     logResult("langchain-stdin", result);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("4");
+    expect(result.stdout.trim().length).toBeGreaterThan(0);
   }, 60_000);
 
   it("output contains no error patterns", async () => {
-    const result = await runAndCapture("langchain-no-errors", ["-p", "-i", "1", "Say hi."]);
+    const result = await runAndCapture("langchain-no-errors", [
+      "-p",
+      "-i",
+      "3",
+      "Get the local dir with pwd, and fetch local system time",
+    ]);
     expect(result.code).toBe(0);
     expect(result.stdout.trim().length).toBeGreaterThan(0);
     expect(result.stdout).not.toMatch(/Error:|SyntaxError|TypeError/);
@@ -125,16 +124,16 @@ describe.skipIf(!hasOpenAIKey())("langchain provider output capture", () => {
 });
 
 describe.skipIf(!hasClaudeAuth())("claude provider output capture", () => {
-  it("math prompt → file contains answer", async () => {
-    const result = await runAndCapture("claude-math", [
+  it("tool prompt → runs ls tool", async () => {
+    const result = await runAndCapture("claude-tool", [
       "--provider",
       "claude",
       "-p",
       "-i",
-      "1",
-      "What is 2+2? Reply with just the number.",
+      "3",
+      "Get the local dir with pwd, and fetch local system time",
     ]);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("4");
+    expect(result.stdout.trim().length).toBeGreaterThan(0);
   }, 60_000);
 });

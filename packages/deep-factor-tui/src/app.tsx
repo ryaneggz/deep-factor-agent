@@ -25,6 +25,7 @@ export function TuiApp({
   mode,
   resumeMessages,
   resumeThread,
+  ruska,
 }: TuiAppProps) {
   const hasRun = useRef(false);
   const [activeMode, setActiveMode] = useState<AgentMode>(mode ?? "yolo");
@@ -32,8 +33,8 @@ export function TuiApp({
 
   const tools = useMemo<AgentTools>(() => createDefaultTools(sandbox), [sandbox]);
   const resolvedModel = useMemo<DeepFactorAgentSettings["model"]>(
-    () => resolveProviderModel({ provider, model, mode: activeMode, liveUpdates: true }),
-    [provider, model, activeMode],
+    () => resolveProviderModel({ provider, model, mode: activeMode, liveUpdates: true, ruska }),
+    [provider, model, activeMode, ruska],
   );
 
   const {

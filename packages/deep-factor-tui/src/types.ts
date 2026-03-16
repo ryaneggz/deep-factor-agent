@@ -11,7 +11,7 @@ import type {
 export type AgentTools = NonNullable<DeepFactorAgentSettings["tools"]>;
 
 export type AgentStatus = "idle" | "running" | "done" | "error" | "pending_input";
-export type ProviderType = "langchain" | "claude" | "codex";
+export type ProviderType = "langchain" | "claude" | "codex" | "ruska";
 export type LegacyProviderType = "claude-sdk";
 export type ProviderInput = ProviderType | LegacyProviderType;
 
@@ -21,10 +21,11 @@ export const DEFAULT_MODELS: Record<ProviderType, string> = {
   langchain: "gpt-4.1-mini",
   claude: "sonnet",
   codex: "gpt-5.4",
+  ruska: "openai:gpt-4.1-nano",
 };
 
 export function isProviderType(value: string): value is ProviderType {
-  return value === "langchain" || value === "claude" || value === "codex";
+  return value === "langchain" || value === "claude" || value === "codex" || value === "ruska";
 }
 
 export function normalizeProvider(value: string | undefined): ProviderType | undefined {
@@ -32,6 +33,7 @@ export function normalizeProvider(value: string | undefined): ProviderType | und
   if (value === "langchain") return "langchain";
   if (value === "claude" || value === "claude-sdk") return "claude";
   if (value === "codex") return "codex";
+  if (value === "ruska") return "ruska";
   return undefined;
 }
 
@@ -183,6 +185,13 @@ export interface UseAgentReturn {
   pendingUiState: PendingUiState | null;
 }
 
+export interface RuskaCliOptions {
+  ruskaUrl: string;
+  ruskaKey?: string;
+  ruskaToken?: string;
+  ruskaGraph?: "react" | "deepagent";
+}
+
 export interface TuiAppProps {
   prompt?: string;
   provider: ProviderType;
@@ -193,4 +202,5 @@ export interface TuiAppProps {
   mode?: AgentMode;
   resumeMessages?: ChatMessage[];
   resumeThread?: AgentThread;
+  ruska?: RuskaCliOptions;
 }

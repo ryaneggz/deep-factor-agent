@@ -19,7 +19,7 @@ import type { MapperContext } from "deep-factor-agent";
 import type { SandboxMode } from "./tools/bash.js";
 import { createDefaultTools } from "./tools/default-tools.js";
 import { resolveProviderModel } from "./provider-resolution.js";
-import type { ProviderType } from "./types.js";
+import type { ProviderType, RuskaCliOptions } from "./types.js";
 import { DEFAULT_TUI_AGENT_INSTRUCTIONS } from "./default-agent-instructions.js";
 import { randomUUID } from "node:crypto";
 
@@ -33,6 +33,7 @@ export interface PrintModeOptions {
   sandbox: SandboxMode;
   mode: AgentMode;
   outputFormat?: OutputFormat;
+  ruska?: RuskaCliOptions;
 }
 
 function writeUnifiedLine(entry: UnifiedLogEntry): void {
@@ -40,7 +41,7 @@ function writeUnifiedLine(entry: UnifiedLogEntry): void {
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<void> {
-  const { prompt, provider, model, maxIter, sandbox, mode, outputFormat = "text" } = options;
+  const { prompt, provider, model, maxIter, sandbox, mode, outputFormat = "text", ruska } = options;
   const isStreamJson = outputFormat === "stream-json";
 
   try {
@@ -50,6 +51,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
       model,
       mode,
       liveUpdates: isStreamJson,
+      ruska,
     });
 
     const sessionId = randomUUID();
@@ -58,7 +60,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
       sessionId,
       sequence: 0,
       currentIteration: 0,
-      provider: provider as "langchain" | "claude" | "codex",
+      provider,
       model,
       mode,
     };
@@ -108,7 +110,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
     if (isStreamJson) {
       writeUnifiedLine(
         buildEntry("init", {
-          provider: provider as "langchain" | "claude" | "codex",
+          provider,
           model,
           mode,
           settings: { maxIter, sandbox },

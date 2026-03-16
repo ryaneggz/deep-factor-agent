@@ -94,8 +94,14 @@ describe("DeepFactorAgent update streaming", () => {
     expect(updates[0]?.lastEvent).toMatchObject({
       type: "message",
       role: "user",
-      content: "Search the repo",
     });
+    // User message content is the full serialized XML context window
+    expect(updates[0]?.lastEvent?.type === "message" && updates[0].lastEvent.content).toContain(
+      "<thread>",
+    );
+    expect(updates[0]?.lastEvent?.type === "message" && updates[0].lastEvent.content).toContain(
+      "Search the repo",
+    );
 
     const eventTypes = updates
       .map((update) => update.lastEvent?.type)

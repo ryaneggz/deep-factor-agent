@@ -977,6 +977,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         iteration: nextIteration,
       },
       { usage: createZeroUsage(), iterations: nextIteration, status: "running" },
+      false, // suppress emission — runLoop will emit with full XML context
     );
     return this.runLoop(thread, prompt, nextIteration);
   }
@@ -1000,6 +1001,7 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
           iteration: 0,
         },
         { usage: createZeroUsage(), iterations: startIteration, status: "running" },
+        false, // suppress emission — we'll emit with full XML context after build
       );
     }
 
@@ -1038,6 +1040,24 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
       // Build messages from thread
       const messages =
         this.contextMode === "xml" ? this.buildXmlMessages(thread) : this.buildMessages(thread);
+
+      // Emit the user message with the full serialized XML context window
+      if (iteration === startIteration) {
+        const xmlContext = serializeThreadToXml(thread.events);
+        this.emitUpdate({
+          thread,
+          usage: createZeroUsage(),
+          iterations: iteration,
+          status: "running",
+          lastEvent: {
+            type: "message",
+            role: "user",
+            content: xmlContext,
+            timestamp: Date.now(),
+            iteration: startIteration === 1 ? 0 : startIteration,
+          },
+        });
+      }
 
       let liveErrorMessage: string | null = null;
       let iterationUsage: TokenUsage = createZeroUsage();
