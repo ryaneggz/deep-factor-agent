@@ -27,11 +27,23 @@
           "For handler-map refactors (Pattern 3), write the handler type signature first before extracting functions"
         ]
       }
+    },
+    {
+      "id": "20260323",
+      "date": "2026-03-23",
+      "branch": "refactor/complexity-audit-20260323",
+      "patterns_total": 5,
+      "patterns_applied": [1, 2, 3],
+      "patterns_deferred": [4, 5],
+      "baseline_cc": 700,
+      "result_cc": 700,
+      "test_count": 440,
+      "verdict": "PASS"
     }
   ],
   "current_baseline": {
     "snapshot": ".audit/benchmarks/snapshots/baseline.json",
-    "total_cc": 636,
+    "total_cc": 700,
     "test_count": 440
   }
 }
