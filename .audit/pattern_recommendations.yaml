@@ -48,7 +48,7 @@
     - packages/deep-factor-agent/src/providers/claude-cli.ts (remove duplicates)
     - packages/deep-factor-agent/src/providers/codex-cli.ts (remove duplicates)
   risk: LOW — pure utility functions with identical behavior, existing test coverage validates both providers
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 2 — events-to-messages.ts: Handler map for simple event types
@@ -96,7 +96,7 @@
   files_affected:
     - packages/deep-factor-tui/src/events-to-messages.ts (refactor eventsToChatMessages)
   risk: LOW — mechanical replacement of simple switch cases; test coverage verifies behavior
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 3 — tool-display.ts: Unified tool name → kind map
@@ -132,7 +132,7 @@
   files_affected:
     - packages/deep-factor-agent/src/tool-display.ts (refactor normalizeToolKind)
   risk: LOW — mechanical replacement; same lookup semantics (Set.has → Map.get)
-  status: pending
+  status: applied
 # =============================================================================
 # PRIORITIZATION NOTE
 # =============================================================================
