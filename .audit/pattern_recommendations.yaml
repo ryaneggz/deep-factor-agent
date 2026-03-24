@@ -1,54 +1,61 @@
-# Pattern Recommendations — Complexity Audit 2026-03-14
+# Pattern Recommendations — Complexity Audit 2026-03-23
 # Ordered by composite score (highest first)
 # Only actionable patterns with measurable impact
 
 # =============================================================================
-# PATTERN 1 — agent.ts: Extract Method for runLoop
+# PATTERN 1 — agent.ts: Extract tool execution from runLoop
 # =============================================================================
 - target: packages/deep-factor-agent/src/agent.ts
   rank: 1
   composite_score: 86.6
   root_cause: >
-    The runLoop method (lines 1025–1639) is 615 lines with 10-level nesting.
-    It handles: model invocation, message building, tool execution (parallel + sequential),
-    error recovery, plan parsing, human-input-the-loop flow, verification, stop conditions,
-    middleware hooks, and usage accumulation — all in a single method.
+    runLoop (lines ~990–1599, ~600 lines) contains the inner tool-calling
+    while-loop (lines 1137–1334) with parallel and sequential execution paths,
+    each deeply nested (8+ levels). This single method handles: model invocation,
+    stream update dispatch, parallel tool batching, sequential tool fallback,
+    tool result emission, and ToolMessage construction.
   pattern: Extract Method
   description: |
-    Extract the inner tool-calling while-loop (lines 1168–1375) into a dedicated
-    private method `executeToolStep()` that returns a structured result indicating
-    whether to continue, break with a pending request, or accumulate usage.
+    Extract the inner while-loop body (lines 1137–1334) into a private method
+    `executeToolCalls(toolCalls, messages, thread, iteration, ...)` that:
+    - Accepts the tool calls array, message accumulator, thread, and iteration
+    - Contains the parallel/sequential partitioning logic
+    - Returns { pendingRequest, stepCount } so runLoop can make its control-flow decision
+    - Keeps appendToolCallIfNew and the parallel execution as internal details
 
-    Extract the post-iteration logic (stop conditions, verification, plan handling,
-    lines 1419–1584) into `evaluateIterationResult()`.
-
-    This reduces runLoop from ~615 lines to ~80 lines of orchestration, with
-    each extracted method being independently testable.
+    This removes ~200 lines from runLoop and flattens nesting by 2 levels.
+    The extracted method is independently testable.
   estimated_impact:
-    cc_reduction: "-40%"
-    cognitive_reduction: "-55%"
+    cc_reduction: "-30%"
+    cognitive_reduction: "-45%"
     coupling_reduction: "0%"
   files_affected:
     - packages/deep-factor-agent/src/agent.ts (refactor, no new files)
   risk: LOW — internal method extraction, no public API change
+  status: pending
 
 # =============================================================================
-# PATTERN 2 — agent.ts: Extract Method for executeToolCall
+# PATTERN 2 — agent.ts: Extract post-iteration evaluation from runLoop
 # =============================================================================
 - target: packages/deep-factor-agent/src/agent.ts
   rank: 1
   composite_score: 86.6
   root_cause: >
-    executeToolCall (lines 746–981, 235 lines) has 5 nearly identical branches
-    that each: create a ToolResultEvent, call appendEvent, and return a ToolOutcome.
-    The only variation is the result string and whether it's pending.
-  pattern: Guard Clauses + Helper extraction
+    After the tool-calling while-loop, runLoop has ~260 lines (1336–1598) of
+    post-iteration evaluation: stop condition checks, pending request handling,
+    verification callback, plan mode logic, completion events, and error recovery.
+    This section has 5-level nesting with multiple early-return paths.
+  pattern: Extract Method
   description: |
-    Extract a `buildToolOutcome()` helper that encapsulates the repeated pattern of
-    creating ToolResultEvent + ToolMessage + ToolOutcome. Use early returns (guard clauses)
-    for the HITL, interruptOn, deny, and request_approval cases.
+    Extract lines 1336–1598 into a private method
+    `evaluateIterationResult(context)` that takes a structured context object
+    containing thread, usage, iteration, lastResponse, parsedPlan, pendingRequest,
+    and returns either an AgentResult (to exit) or null (to continue the loop).
 
-    This collapses 5 blocks of ~30 lines each into 5 guard clause calls of ~5 lines each.
+    This reduces runLoop to ~80 lines of pure orchestration:
+    setup → middleware → model invoke → executeToolCalls → evaluateIterationResult → loop.
+
+    Each extracted method has a clear contract and is independently testable.
   estimated_impact:
     cc_reduction: "-25%"
     cognitive_reduction: "-35%"
@@ -56,24 +63,32 @@
   files_affected:
     - packages/deep-factor-agent/src/agent.ts (refactor, no new files)
   risk: LOW — internal method extraction, no public API change
+  status: pending
 
 # =============================================================================
-# PATTERN 3 — claude-cli.ts: Extract Method for stream processing
+# PATTERN 3 — claude-cli.ts: Event Handler Map for processStreamLine
 # =============================================================================
 - target: packages/deep-factor-agent/src/providers/claude-cli.ts
   rank: 2
-  composite_score: 47.2
+  composite_score: 47.9
   root_cause: >
-    invokeStream/invokeWithUpdates methods contain inline Promise construction
-    with deeply nested event parsing callbacks. processStreamLine handles 15+
-    event types in a single switch statement.
-  pattern: Extract Method + Event Handler Map
+    processStreamLine (lines 408–551, 143 lines) dispatches on event.type via
+    a chain of if-statements: "assistant", "stream_event", "result", "error",
+    plus a default path. Each branch is 15–40 lines with 3–5 levels of nesting.
+    The "assistant" branch further dispatches on content block types.
+  pattern: Event Handler Map
   description: |
-    Replace the monolithic processStreamLine switch with a Record<string, handler>
-    dispatch map. Each event type handler becomes a small pure function.
+    1. Define a handler type: `type StreamEventHandler = (event, state, onUpdate) => void`
+    2. Create a `Record<string, StreamEventHandler>` mapping event types to handlers:
+       - handleAssistantEvent (lines 465–493)
+       - handleStreamEvent (lines 495–501)
+       - handleResultEvent (lines 503–533)
+       - handleErrorEvent (lines 535–548)
+    3. Replace the if-chain with: `handlers[type]?.(event, state, onUpdate)`
+    4. Keep the metadata extraction (lines 438–463) before dispatch — it's shared.
 
-    This eliminates the 15-branch switch, makes each handler independently testable,
-    and reduces nesting by 2 levels.
+    Per prior reflection: define the StreamEventHandler type signature FIRST
+    before extracting any functions.
   estimated_impact:
     cc_reduction: "-35%"
     cognitive_reduction: "-40%"
@@ -81,53 +96,48 @@
   files_affected:
     - packages/deep-factor-agent/src/providers/claude-cli.ts (refactor)
   risk: LOW — internal refactor, ModelAdapter interface unchanged
+  status: pending
 
 # =============================================================================
-# PATTERN 4 — useAgent.ts: Extract utility functions
+# PATTERN 4 — claude-agent-sdk.ts: Extract response parsing
 # =============================================================================
-- target: packages/deep-factor-tui/src/hooks/useAgent.ts
+- target: packages/deep-factor-agent/src/providers/claude-agent-sdk.ts
   rank: 3
-  composite_score: 43.7
+  composite_score: 42.5
   root_cause: >
-    468-line hook with 15 imports, 10 functions, and the only code duplication
-    in the codebase (2.6%). High churn (20 commits) indicates ongoing instability.
-    Event-to-message conversion, session logging, and agent lifecycle are all mixed.
-  pattern: Extract Method (utility extraction)
+    The invoke method contains inline response parsing that maps SDK content
+    blocks to AIMessage, tool_calls, and usage metadata. The parsing logic
+    (content block iteration, tool call extraction, usage normalization)
+    is mixed with invocation control flow.
+  pattern: Extract Method
   description: |
-    Extract `eventsToChatMessages()` into a standalone utility module
-    (it's already a pure function with no hook dependencies). This also
-    removes the duplicated handler blocks.
-
-    Move session persistence logic (save/load) to session-logger.ts which
-    already handles session I/O.
+    Extract response-to-AIMessage conversion into a pure function
+    `parseClaudeAgentResponse(response)` that returns { content, toolCalls, usage }.
+    This separates invocation from parsing and makes the parser independently testable.
   estimated_impact:
     cc_reduction: "-20%"
     cognitive_reduction: "-25%"
-    coupling_reduction: "-30%"
+    coupling_reduction: "0%"
   files_affected:
-    - packages/deep-factor-tui/src/hooks/useAgent.ts (reduce)
-    - packages/deep-factor-tui/src/session-logger.ts (may absorb some logic)
-  risk: LOW — utility extraction, no component API change
+    - packages/deep-factor-agent/src/providers/claude-agent-sdk.ts (refactor)
+  risk: LOW — internal method extraction, no public API change
+  status: pending
 
 # =============================================================================
-# PATTERN 5 — log-mappers: Template Method for event dispatch
+# PATTERN 5 — log-mappers: Strategy Pattern for event dispatch
 # =============================================================================
 - target: packages/deep-factor-agent/src/log-mappers/
-  rank: 7-9-13-19
-  composite_score: 28.1 / 27.1 / 24.4 / 21.6 (avg 25.3)
+  rank: 9-11-13-19
+  composite_score: 28.2 / 28.0 / 27.0 / 22.7 (avg 26.5)
   root_cause: >
     Four mapper files (replay.ts, langchain-mapper.ts, claude-mapper.ts,
-    codex-mapper.ts) each implement event-type dispatch via large switch
-    statements. They share the same structural pattern but for different
-    event source formats.
+    codex-mapper.ts) each implement event-type dispatch via switch/if chains.
+    They share the same structural pattern but for different event source formats.
   pattern: Strategy Pattern (event handler registry)
   description: |
     Define a MapperStrategy interface with per-event-type handler methods.
     Each mapper implements the strategy for its source format.
     A shared dispatch function iterates events and delegates to the strategy.
-
-    This is a structural improvement for maintainability but the CC reduction
-    per file is moderate since each switch case is already fairly simple.
   estimated_impact:
     cc_reduction: "-15%"
     cognitive_reduction: "-20%"
@@ -139,14 +149,14 @@
     - packages/deep-factor-agent/src/log-mappers/codex-mapper.ts
     - packages/deep-factor-agent/src/log-mappers/types.ts (extend)
   risk: MEDIUM — touches 5 files, requires careful type alignment
-
+  status: pending
 # =============================================================================
 # PRIORITIZATION NOTE
 # =============================================================================
 # Patterns 1-2 target agent.ts (composite 86.6) and yield the largest ROI.
 # Pattern 3 targets the #2 file and is self-contained.
-# Pattern 4 addresses the only duplication in the codebase.
+# Pattern 4 targets the #3 file.
 # Pattern 5 is structural but lower impact per file.
 #
-# Recommended execution order: 1 → 2 → 3 → 4
-# Pattern 5 is optional — defer if audit time budget is constrained.
+# Recommended execution order for this cycle: 1 → 2 → 3
+# Patterns 4-5 are deferred to next cycle.

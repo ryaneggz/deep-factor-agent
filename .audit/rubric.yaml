@@ -1,0 +1,38 @@
+# Complexity Scoring Rubric
+# Project: deep-factor-agent + deep-factor-tui
+# Date: 2026-03-23 (fresh audit)
+# Methodology: McCabe CC (control-flow decision points only)
+
+project: deep-factor-agent
+date: "2026-03-23"
+paradigm: mixed (OOP agent core + functional React TUI)
+type_system: TypeScript (strict)
+
+metrics:
+  cyclomatic_complexity:
+    weight: 0.30
+    method: "McCabe CC — count if, for, while, case, catch per file"
+    justification: "Primary complexity driver; agent.ts alone holds 16% of total CC"
+
+  cognitive_complexity:
+    weight: 0.25
+    method: "CC * (1 + max_nesting_depth / 3)"
+    justification: "Agent core has deep nesting (10 levels); penalizes hard-to-read deeply nested code"
+
+  coupling_instability:
+    weight: 0.20
+    method: "Ce / (Ce + Ca_estimate) where Ce = import count, Ca = churn / 3"
+    justification: "Provider files have high efferent coupling (8 imports); barrel exports mask afferent coupling"
+
+  churn_x_cc:
+    weight: 0.15
+    method: "git log --since='6 months' commit count * CC"
+    justification: "agent.ts (19 commits * CC 111 = 2109) and useAgent.ts (21 * 31 = 651) are active hot spots"
+
+  duplication:
+    weight: 0.10
+    method: "jscpd with min-lines=5, min-tokens=50; manual verification"
+    justification: "Duplication was 2.6% in useAgent (now resolved). Near zero across codebase."
+
+composite_formula: "SUM(metric_normalized * weight)"
+normalization: "Divide by max value across all scanned files (0-100 scale)"
