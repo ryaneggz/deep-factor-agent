@@ -1,4 +1,4 @@
-# Complexity Ranking — 2026-03-23 Fresh Audit
+# Complexity Ranking — 2026-03-23 Fresh Audit #2
 
 ## Project Profile
 
@@ -50,9 +50,9 @@ RANK | FILE / MODULE                                  | COMPOSITE |  CC  | COG  
 
 ## Key Observations
 
-1. **agent.ts dominates** — CC=111 (16% of total 700), cognitive=481, highest churn×CC=2109. The runLoop method alone is ~600 lines with 10 levels of nesting.
-2. **Provider files cluster in top 4** — claude-cli.ts, claude-agent-sdk.ts, codex-cli.ts share similar stream-parsing patterns.
-3. **TUI complexity is distributed** — No single TUI file exceeds composite 32, but 6 files rank in top 15.
-4. **Type safety is excellent** — Only 5 `any` usages across 57 files.
-5. **Duplication is near zero** — Prior audit's 2.6% in useAgent.ts was resolved.
-6. **Total CC increased from 636 to 700** since last audit due to new feature code (events-to-messages.ts, PendingInputPanel.tsx, expanded codex-cli.ts).
+1. **agent.ts still dominates** — CC=111 (16% of total 700), cognitive=481. Extensively refactored in last two audits (3 Extract Method patterns applied). Further extraction has diminishing returns on aggregate CC.
+2. **transcript.ts has actionable duplication** — 3 functions (truncateInline, formatPreviewValue, formatToolArgsPreview) are exact duplicates of tool-display.ts. Two large if-chains dispatch on segment.kind (6 branches) and message.role (7 branches).
+3. **Provider files cluster in top 4** — claude-cli.ts, claude-agent-sdk.ts, codex-cli.ts share similar stream-parsing patterns. Claude-cli had a handler map applied last audit.
+4. **TUI complexity is distributed** — 6 TUI files rank in top 15, but each is individually moderate.
+5. **Type safety is excellent** — Only 5 `any` usages across 57 files.
+6. **Prior audit insight: Extract Method doesn't reduce aggregate CC** — decision points just move. This audit prioritizes deduplication and handler maps which genuinely remove branches.
