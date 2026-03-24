@@ -1,0 +1,37 @@
+name: Complexity Gate
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  complexity-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r build
+
+      - run: pnpm -r test
+
+      - name: Capture current metrics
+        run: bash .audit/benchmarks/snapshot_metrics.sh > .audit/benchmarks/snapshots/current.json
+
+      - name: Compare against baseline
+        run: node .audit/benchmarks/compare_snapshots.mjs
+
+      - name: Show report
+        if: always()
+        run: cat .audit/benchmarks/report.md

@@ -73,3 +73,13 @@
 - Bash tool: `packages/deep-factor-tui/src/tools/bash.ts` (createBashTool factory, --sandbox flag: workspace|local|docker)
 - TUI types: `packages/deep-factor-tui/src/types.ts` (TuiAppProps, ChatMessage, AgentStatus)
 - Tests: `packages/deep-factor-tui/__tests__/` (components, integration, e2e)
+
+### Complexity Audit Workflow
+
+- Full audit cycle (branch, score, reduce, benchmark, PR): `/complexity-audit`
+- Scoring/analysis only: `/complexity-score`
+- CI gate: `.github/workflows/complexity-gate.yml` checks PRs for complexity regression
+- Audit history: `.audit/audit-manifest.json`
+- Pattern statuses: `.audit/pattern_recommendations.yaml` (`status: applied|pending|skipped`)
+- Baseline: `.audit/benchmarks/snapshots/baseline.json`
+- Rotate baseline after audit: `bash .audit/rotate-baseline.sh`
