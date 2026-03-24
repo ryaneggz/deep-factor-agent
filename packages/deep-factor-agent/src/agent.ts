@@ -939,6 +939,146 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     }
   }
 
+  /**
+   * Execute a batch of tool calls, splitting into parallel-safe and sequential
+   * (HITL / gated) groups when parallel execution is enabled.
+   *
+   * Extracted from runLoop to reduce nesting and enable independent testing.
+   */
+  private async executeToolBatch(
+    toolCalls: Array<{ name: string; args?: Record<string, unknown>; id?: string }>,
+    toolMap: Record<string, StructuredToolInterface>,
+    thread: AgentThread,
+    iteration: number,
+    stepCount: number,
+    messages: BaseMessage[],
+    appendToolCallIfNew: (
+      tc: { name: string; args?: Record<string, unknown>; id?: string },
+      timestamp?: number,
+      parallelGroup?: string,
+    ) => void,
+    currentUsageSnapshot: () => TokenUsage,
+  ): Promise<{ pendingRequest: PendingHumanRequest | null }> {
+    const now = Date.now();
+
+    if (this.parallelToolCalls && toolCalls.length > 0) {
+      // --- Parallel execution path ---
+      const parallelBatch: typeof toolCalls = [];
+      const sequentialBatch: typeof toolCalls = [];
+      for (const tc of toolCalls) {
+        const foundTool = toolMap[tc.name];
+        const decision = this.evaluateToolExecution(tc.name, foundTool);
+        if (
+          tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT ||
+          this.interruptOn.includes(tc.name) ||
+          decision.action !== "execute"
+        ) {
+          sequentialBatch.push(tc);
+        } else {
+          parallelBatch.push(tc);
+        }
+      }
+
+      const groupId =
+        parallelBatch.length > 1 ? `pg_${iteration}_${stepCount}_${Date.now()}` : undefined;
+
+      for (const tc of parallelBatch) {
+        appendToolCallIfNew(tc, now, groupId);
+      }
+
+      const parallelResults = await Promise.all(
+        parallelBatch.map(async (tc) => {
+          const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+          const foundTool = toolMap[tc.name];
+          const start = performance.now();
+          if (foundTool) {
+            try {
+              const toolResult = await this.invokeTool(
+                foundTool,
+                (tc.args ?? {}) as Record<string, unknown>,
+              );
+              const resultStr = stringifyToolResult(toolResult);
+              const durationMs = Math.round(performance.now() - start);
+              this.syncTodoMetadata(tc.name, resultStr, thread);
+              return { toolCallId, result: toolResult, durationMs, tc };
+            } catch (err) {
+              const durationMs = Math.round(performance.now() - start);
+              const errorMsg = `Tool error: ${compactError(err)}`;
+              return { toolCallId, result: errorMsg, durationMs, tc };
+            }
+          } else {
+            const durationMs = Math.round(performance.now() - start);
+            const errorMsg = `Tool not found: "${tc.name}"`;
+            return { toolCallId, result: errorMsg, durationMs, tc };
+          }
+        }),
+      );
+
+      for (const pr of parallelResults) {
+        const resultStr = stringifyToolResult(pr.result);
+        const toolResultEvent: ToolResultEvent = {
+          type: "tool_result",
+          toolCallId: pr.toolCallId,
+          result: resultStr,
+          display: resolveToolResultDisplay(
+            pr.tc.name,
+            (pr.tc.args ?? {}) as Record<string, unknown>,
+            pr.result,
+          ),
+          timestamp: Date.now(),
+          iteration,
+          durationMs: pr.durationMs,
+          parallelGroup: groupId,
+        };
+        this.appendEvent(thread, toolResultEvent, {
+          usage: currentUsageSnapshot(),
+          iterations: iteration,
+          status: "running",
+        });
+        messages.push(
+          new ToolMessage({
+            tool_call_id: pr.toolCallId,
+            content: resultStr,
+          }),
+        );
+      }
+
+      // Handle sequential tools (HITL / interruptOn) after parallel batch
+      for (const tc of sequentialBatch) {
+        appendToolCallIfNew(tc, Date.now());
+        const outcome = await this.executeToolCall(
+          tc,
+          toolMap[tc.name],
+          thread,
+          iteration,
+          currentUsageSnapshot(),
+        );
+        messages.push(outcome.toolMessage);
+        if (outcome.kind === "pending") {
+          return { pendingRequest: outcome.pending ?? null };
+        }
+      }
+    } else {
+      // --- Sequential execution path ---
+      for (const tc of toolCalls) {
+        appendToolCallIfNew(tc, now);
+        const outcome = await this.executeToolCall(
+          tc,
+          toolMap[tc.name],
+          thread,
+          iteration,
+          currentUsageSnapshot(),
+        );
+        messages.push(outcome.toolMessage);
+        if (outcome.kind === "pending") {
+          return { pendingRequest: outcome.pending ?? null };
+        }
+      }
+    }
+
+    return { pendingRequest: null };
+  }
+
   private checkInterruptOn(thread: AgentThread, iteration: number): string | null {
     if (this.interruptOn.length === 0) return null;
 
@@ -1201,131 +1341,18 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
           const toolCalls = response.tool_calls ?? [];
           if (toolCalls.length === 0) break;
 
-          // Record and execute tool calls
-          const now = Date.now();
-
-          if (this.parallelToolCalls && toolCalls.length > 0) {
-            // --- Parallel execution path ---
-            // Partition tool calls into parallel-safe and sequential (HITL / gated writes)
-            const parallelBatch: typeof toolCalls = [];
-            const sequentialBatch: typeof toolCalls = [];
-            for (const tc of toolCalls) {
-              const foundTool = toolMap[tc.name];
-              const decision = this.evaluateToolExecution(tc.name, foundTool);
-              if (
-                tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT ||
-                this.interruptOn.includes(tc.name) ||
-                decision.action !== "execute"
-              ) {
-                sequentialBatch.push(tc);
-              } else {
-                parallelBatch.push(tc);
-              }
-            }
-
-            // Generate a parallelGroup ID for this batch
-            const groupId =
-              parallelBatch.length > 1 ? `pg_${iteration}_${stepCount}_${Date.now()}` : undefined;
-
-            // Record ToolCallEvents for parallel batch upfront
-            for (const tc of parallelBatch) {
-              appendToolCallIfNew(tc, now, groupId);
-            }
-
-            // Execute parallel batch via Promise.all with per-tool timing
-            const parallelResults = await Promise.all(
-              parallelBatch.map(async (tc) => {
-                const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
-                const foundTool = toolMap[tc.name];
-                const start = performance.now();
-                if (foundTool) {
-                  try {
-                    const toolResult = await this.invokeTool(
-                      foundTool,
-                      (tc.args ?? {}) as Record<string, unknown>,
-                    );
-                    const resultStr = stringifyToolResult(toolResult);
-                    const durationMs = Math.round(performance.now() - start);
-                    this.syncTodoMetadata(tc.name, resultStr, thread);
-
-                    return { toolCallId, result: toolResult, durationMs, tc };
-                  } catch (err) {
-                    const durationMs = Math.round(performance.now() - start);
-                    const errorMsg = `Tool error: ${compactError(err)}`;
-                    return { toolCallId, result: errorMsg, durationMs, tc };
-                  }
-                } else {
-                  const durationMs = Math.round(performance.now() - start);
-                  const errorMsg = `Tool not found: "${tc.name}"`;
-                  return { toolCallId, result: errorMsg, durationMs, tc };
-                }
-              }),
-            );
-
-            // Record ToolResultEvents + push ToolMessages in original order
-            for (const pr of parallelResults) {
-              const resultStr = stringifyToolResult(pr.result);
-              const toolResultEvent: ToolResultEvent = {
-                type: "tool_result",
-                toolCallId: pr.toolCallId,
-                result: resultStr,
-                display: resolveToolResultDisplay(
-                  pr.tc.name,
-                  (pr.tc.args ?? {}) as Record<string, unknown>,
-                  pr.result,
-                ),
-                timestamp: Date.now(),
-                iteration,
-                durationMs: pr.durationMs,
-                parallelGroup: groupId,
-              };
-              this.appendEvent(thread, toolResultEvent, {
-                usage: currentUsageSnapshot(),
-                iterations: iteration,
-                status: "running",
-              });
-              messages.push(
-                new ToolMessage({
-                  tool_call_id: pr.toolCallId,
-                  content: resultStr,
-                }),
-              );
-            }
-
-            // Handle sequential tools (HITL / interruptOn) after parallel batch
-            for (const tc of sequentialBatch) {
-              appendToolCallIfNew(tc, Date.now());
-              const outcome = await this.executeToolCall(
-                tc,
-                toolMap[tc.name],
-                thread,
-                iteration,
-                currentUsageSnapshot(),
-              );
-              messages.push(outcome.toolMessage);
-              if (outcome.kind === "pending") {
-                pendingRequest = outcome.pending ?? null;
-                break;
-              }
-            }
-          } else {
-            // --- Sequential execution path (original logic) ---
-            for (const tc of toolCalls) {
-              appendToolCallIfNew(tc, now);
-              const outcome = await this.executeToolCall(
-                tc,
-                toolMap[tc.name],
-                thread,
-                iteration,
-                currentUsageSnapshot(),
-              );
-              messages.push(outcome.toolMessage);
-              if (outcome.kind === "pending") {
-                pendingRequest = outcome.pending ?? null;
-                break;
-              }
-            }
-          }
+          // Execute tool calls (parallel or sequential)
+          const batchResult = await this.executeToolBatch(
+            toolCalls,
+            toolMap,
+            thread,
+            iteration,
+            stepCount,
+            messages,
+            appendToolCallIfNew,
+            currentUsageSnapshot,
+          );
+          pendingRequest = batchResult.pendingRequest;
 
           if (pendingRequest) break;
           iterationUsage = addUsage(iterationUsage, currentStepUsage);
