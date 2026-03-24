@@ -231,6 +231,16 @@ function findPendingToolSegment(
   return undefined;
 }
 
+const SIMPLE_ROLE_BUILDERS: {
+  [key: string]: ((msg: ChatMessage) => TranscriptSegment) | undefined;
+} = {
+  assistant: (msg) => ({ kind: "assistant", id: msg.id, content: msg.content }),
+  thinking: (msg) => ({ kind: "thinking", id: msg.id, content: msg.thinking ?? msg.content }),
+  plan: (msg) => ({ kind: "plan", id: msg.id, content: msg.planContent ?? msg.content }),
+  summary: (msg) => ({ kind: "summary", id: msg.id, content: msg.content }),
+  error: (msg) => ({ kind: "error", id: msg.id, content: msg.content }),
+};
+
 export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[] {
   const turns: TranscriptTurn[] = [];
   let currentTurn: TranscriptTurn | null = null;
@@ -244,39 +254,9 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
 
     currentTurn = ensureCurrentTurn(turns, currentTurn);
 
-    if (message.role === "assistant") {
-      currentTurn.segments.push({
-        kind: "assistant",
-        id: message.id,
-        content: message.content,
-      });
-      continue;
-    }
-
-    if (message.role === "thinking") {
-      currentTurn.segments.push({
-        kind: "thinking",
-        id: message.id,
-        content: message.thinking ?? message.content,
-      });
-      continue;
-    }
-
-    if (message.role === "plan") {
-      currentTurn.segments.push({
-        kind: "plan",
-        id: message.id,
-        content: message.planContent ?? message.content,
-      });
-      continue;
-    }
-
-    if (message.role === "summary") {
-      currentTurn.segments.push({
-        kind: "summary",
-        id: message.id,
-        content: message.content,
-      });
+    const builder = SIMPLE_ROLE_BUILDERS[message.role];
+    if (builder) {
+      currentTurn.segments.push(builder(message));
       continue;
     }
 
@@ -287,15 +267,6 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
         content: message.content,
         retryAfterMs: message.rateLimitInfo?.retryAfterMs,
         message: message.rateLimitInfo?.message,
-      });
-      continue;
-    }
-
-    if (message.role === "error") {
-      currentTurn.segments.push({
-        kind: "error",
-        id: message.id,
-        content: message.content,
       });
       continue;
     }
