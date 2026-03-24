@@ -405,6 +405,99 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
     );
   }
 
+  // --- Stream event handler map ---
+  // Each handler processes a specific event type from the Claude CLI stream.
+  // Defined as a Record<string, handler> to replace the if-chain dispatch.
+
+  interface StreamEventCtx {
+    event: Record<string, unknown>;
+    state: ClaudeCliStreamState;
+    onUpdate?: (update: ModelInvocationUpdate) => void;
+    rawStopReason: string | undefined;
+    emitUsage: () => void;
+  }
+
+  type StreamEventHandler = (ctx: StreamEventCtx) => void;
+
+  function handleAssistantEvent(ctx: StreamEventCtx): void {
+    const { event, state, onUpdate, emitUsage } = ctx;
+    const message =
+      typeof event.message === "object" && event.message !== null
+        ? (event.message as Record<string, unknown>)
+        : event;
+    const content = Array.isArray(message.content) ? message.content : [];
+
+    for (const block of content) {
+      if (typeof block !== "object" || block === null) continue;
+
+      const contentBlock = block as Record<string, unknown>;
+      if (contentBlock.type === "text") {
+        addAssistantText(
+          typeof contentBlock.text === "string" ? contentBlock.text : "",
+          state,
+          onUpdate,
+        );
+      } else if (contentBlock.type === "tool_use") {
+        addToolCallFromBlock(contentBlock, state, onUpdate);
+      }
+    }
+    emitUsage();
+  }
+
+  function handleStreamEventType(ctx: StreamEventCtx): void {
+    const partialText = parsePartialTextEvent(ctx.event);
+    if (partialText.trim()) {
+      ctx.state.partialText.push(partialText);
+    }
+  }
+
+  function handleResultEvent(ctx: StreamEventCtx): void {
+    const { event, state, onUpdate, rawStopReason, emitUsage } = ctx;
+    state.sawFinalEvent = true;
+
+    if (event.subtype === "error" || event.is_error === true || typeof event.error === "string") {
+      const message =
+        typeof event.error === "string"
+          ? event.error
+          : typeof event.result === "string"
+            ? event.result
+            : "Claude CLI reported an error result.";
+      onUpdate?.({ type: "error", error: message, rawStopReason });
+      throw new Error(message);
+    }
+
+    if (typeof event.result === "string" && event.result.trim()) {
+      state.finalContent = event.result.trim();
+    }
+
+    emitUsage();
+    onUpdate?.({
+      type: "final",
+      content: state.finalContent,
+      usage: state.usage,
+      rawStopReason,
+    });
+  }
+
+  function handleErrorEvent(ctx: StreamEventCtx): void {
+    const { event, onUpdate, rawStopReason } = ctx;
+    const message =
+      typeof event.error === "string"
+        ? event.error
+        : typeof event.message === "string"
+          ? event.message
+          : "Claude CLI reported a stream error.";
+    onUpdate?.({ type: "error", error: message, rawStopReason });
+    throw new Error(message);
+  }
+
+  const streamEventHandlers: Record<string, StreamEventHandler> = {
+    assistant: handleAssistantEvent,
+    stream_event: handleStreamEventType,
+    result: handleResultEvent,
+    error: handleErrorEvent,
+  };
+
   function processStreamLine(
     line: string,
     state: ClaudeCliStreamState,
@@ -422,9 +515,7 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
       throw new Error(message);
     }
 
-    if (typeof parsed !== "object" || parsed === null) {
-      return;
-    }
+    if (typeof parsed !== "object" || parsed === null) return;
 
     const event = parsed as Record<string, unknown>;
     const type = typeof event.type === "string" ? event.type : undefined;
@@ -435,6 +526,7 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
           ? (readNestedProperty(event, ["message", "stop_reason"]) as string)
           : undefined;
 
+    // Extract shared metadata
     if (typeof event.session_id === "string") {
       state.responseMetadata.session_id = event.session_id;
     }
@@ -450,104 +542,18 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
 
     const usage = normalizeUsage(event.usage ?? readNestedProperty(event, ["message", "usage"]));
     const emitUsage = (): void => {
-      if (!usage) {
-        return;
-      }
-
+      if (!usage) return;
       state.usage = maxUsage(state.usage, usage);
-      onUpdate?.({
-        type: "usage",
-        usage: state.usage,
-        rawStopReason,
-      });
+      onUpdate?.({ type: "usage", usage: state.usage, rawStopReason });
     };
 
-    if (type === "assistant") {
-      const message =
-        typeof event.message === "object" && event.message !== null
-          ? (event.message as Record<string, unknown>)
-          : event;
-      const content = Array.isArray(message.content) ? message.content : [];
-
-      for (const block of content) {
-        if (typeof block !== "object" || block === null) {
-          continue;
-        }
-
-        const contentBlock = block as Record<string, unknown>;
-        if (contentBlock.type === "text") {
-          addAssistantText(
-            typeof contentBlock.text === "string" ? contentBlock.text : "",
-            state,
-            onUpdate,
-          );
-          continue;
-        }
-
-        if (contentBlock.type === "tool_use") {
-          addToolCallFromBlock(contentBlock, state, onUpdate);
-        }
-      }
+    // Dispatch to handler or fall through to default
+    const handler = type ? streamEventHandlers[type] : undefined;
+    if (handler) {
+      handler({ event, state, onUpdate, rawStopReason, emitUsage });
+    } else {
       emitUsage();
-      return;
     }
-
-    if (type === "stream_event") {
-      const partialText = parsePartialTextEvent(event);
-      if (partialText.trim()) {
-        state.partialText.push(partialText);
-      }
-      return;
-    }
-
-    if (type === "result") {
-      state.sawFinalEvent = true;
-
-      if (event.subtype === "error" || event.is_error === true || typeof event.error === "string") {
-        const message =
-          typeof event.error === "string"
-            ? event.error
-            : typeof event.result === "string"
-              ? event.result
-              : "Claude CLI reported an error result.";
-        onUpdate?.({
-          type: "error",
-          error: message,
-          rawStopReason,
-        });
-        throw new Error(message);
-      }
-
-      if (typeof event.result === "string" && event.result.trim()) {
-        state.finalContent = event.result.trim();
-      }
-
-      emitUsage();
-      onUpdate?.({
-        type: "final",
-        content: state.finalContent,
-        usage: state.usage,
-        rawStopReason,
-      });
-      return;
-    }
-
-    if (type === "error") {
-      const message =
-        typeof event.error === "string"
-          ? event.error
-          : typeof event.message === "string"
-            ? event.message
-            : "Claude CLI reported a stream error.";
-      onUpdate?.({
-        type: "error",
-        error: message,
-        rawStopReason,
-      });
-      throw new Error(message);
-    }
-
-    emitUsage();
   }
 
   function buildStreamMessage(state: ClaudeCliStreamState): AIMessage {
