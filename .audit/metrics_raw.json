@@ -1,16 +1,16 @@
 {
-  "timestamp": "2026-03-24T04:48:06.440Z",
+  "timestamp": "2026-03-24T05:15:23.340Z",
   "git_sha": "HEAD",
   "git_message": "baseline — before refactoring",
   "totals": {
     "files_analyzed": 57,
-    "total_cc": 700,
-    "avg_cc": 12.3,
+    "total_cc": 683,
+    "avg_cc": 12,
     "max_cc": 111,
-    "total_cognitive": 2264,
-    "total_coupling": 36.62,
+    "total_cognitive": 2217,
+    "total_coupling": 36.7,
     "total_duplication_pct": 0,
-    "total_loc": 8849,
+    "total_loc": 8800,
     "total_any_types": 6
   },
   "files": {
@@ -57,17 +57,6 @@
       "churnCC": 145,
       "composite": 34.4,
       "any_types": 1
-    },
-    "packages/deep-factor-tui/src/transcript.ts": {
-      "cc": 40,
-      "cognitive": 93,
-      "coupling_instability": 0.67,
-      "loc": 357,
-      "duplication_pct": 0,
-      "churn": 5,
-      "churnCC": 200,
-      "composite": 32.1,
-      "any_types": 0
     },
     "packages/deep-factor-tui/src/components/PendingInputPanel.tsx": {
       "cc": 27,
@@ -155,6 +144,17 @@
       "churn": 1,
       "churnCC": 21,
       "composite": 27,
+      "any_types": 0
+    },
+    "packages/deep-factor-tui/src/transcript.ts": {
+      "cc": 23,
+      "cognitive": 46,
+      "coupling_instability": 0.75,
+      "loc": 308,
+      "duplication_pct": 0,
+      "churn": 5,
+      "churnCC": 115,
+      "composite": 26.3,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/hooks/useTextInput.ts": {
@@ -689,17 +689,6 @@
     },
     {
       "rank": 5,
-      "file": "packages/deep-factor-tui/src/transcript.ts",
-      "composite": 32.1,
-      "cc": 40,
-      "cognitive": 93,
-      "coupling": 0.67,
-      "churnCC": 200,
-      "duplication": 0,
-      "loc": 357
-    },
-    {
-      "rank": 6,
       "file": "packages/deep-factor-tui/src/components/PendingInputPanel.tsx",
       "composite": 31,
       "cc": 27,
@@ -710,7 +699,7 @@
       "loc": 263
     },
     {
-      "rank": 7,
+      "rank": 6,
       "file": "packages/deep-factor-agent/src/tool-display.ts",
       "composite": 29.4,
       "cc": 44,
@@ -721,7 +710,7 @@
       "loc": 329
     },
     {
-      "rank": 8,
+      "rank": 7,
       "file": "packages/deep-factor-tui/src/hooks/useAgent.ts",
       "composite": 29.1,
       "cc": 31,
@@ -732,7 +721,7 @@
       "loc": 460
     },
     {
-      "rank": 9,
+      "rank": 8,
       "file": "packages/deep-factor-agent/src/log-mappers/replay.ts",
       "composite": 28.2,
       "cc": 31,
@@ -743,7 +732,7 @@
       "loc": 283
     },
     {
-      "rank": 10,
+      "rank": 9,
       "file": "packages/deep-factor-agent/src/providers/messages-to-xml.ts",
       "composite": 28.2,
       "cc": 22,
@@ -754,7 +743,7 @@
       "loc": 132
     },
     {
-      "rank": 11,
+      "rank": 10,
       "file": "packages/deep-factor-agent/src/log-mappers/langchain-mapper.ts",
       "composite": 28,
       "cc": 21,
@@ -765,7 +754,7 @@
       "loc": 233
     },
     {
-      "rank": 12,
+      "rank": 11,
       "file": "packages/deep-factor-tui/src/events-to-messages.ts",
       "composite": 27.2,
       "cc": 27,
@@ -776,7 +765,7 @@
       "loc": 208
     },
     {
-      "rank": 13,
+      "rank": 12,
       "file": "packages/deep-factor-agent/src/log-mappers/claude-mapper.ts",
       "composite": 27,
       "cc": 21,
@@ -785,6 +774,17 @@
       "churnCC": 21,
       "duplication": 0,
       "loc": 167
+    },
+    {
+      "rank": 13,
+      "file": "packages/deep-factor-tui/src/transcript.ts",
+      "composite": 26.3,
+      "cc": 23,
+      "cognitive": 46,
+      "coupling": 0.75,
+      "churnCC": 115,
+      "duplication": 0,
+      "loc": 308
     },
     {
       "rank": 14,

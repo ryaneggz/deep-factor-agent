@@ -42,7 +42,13 @@ export type {
 } from "./types.js";
 
 export { isPendingResult, isPlanResult } from "./types.js";
-export { buildToolCallDisplay, buildToolResultDisplay } from "./tool-display.js";
+export {
+  buildToolCallDisplay,
+  buildToolResultDisplay,
+  truncateInline,
+  formatPreviewValue,
+  formatToolArgsPreview,
+} from "./tool-display.js";
 
 // Stop conditions
 export {

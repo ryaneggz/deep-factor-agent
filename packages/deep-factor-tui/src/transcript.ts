@@ -1,4 +1,6 @@
 import type { ToolDisplayMetadata, ToolFileChangeSummary } from "deep-factor-agent";
+import { truncateInline, formatToolArgsPreview } from "deep-factor-agent";
+export { formatToolArgsPreview };
 import type {
   ChatMessage,
   ToolTranscriptSegment,
@@ -7,7 +9,6 @@ import type {
   TranscriptTurn,
 } from "./types.js";
 
-const MAX_TOOL_ARG_PREVIEW = 48;
 const MAX_TOOL_RESULT_LINE_LENGTH = 88;
 const MAX_TOOL_RESULT_LINES = 2;
 
@@ -18,44 +19,6 @@ export interface ToolResultPreview {
   fileOverflowCount?: number;
   diffPreviewLines?: string[];
   diffOverflowLineCount?: number;
-}
-
-function truncateInline(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return value.slice(0, Math.max(0, maxLength - 3)) + "...";
-}
-
-function formatPreviewValue(value: unknown): string {
-  if (typeof value === "string") {
-    return JSON.stringify(truncateInline(value, MAX_TOOL_ARG_PREVIEW));
-  }
-  if (typeof value === "number" || typeof value === "boolean" || value == null) {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "[]";
-    const preview = value.slice(0, 2).map((item) => formatPreviewValue(item));
-    return `[${preview.join(", ")}${value.length > 2 ? ", ..." : ""}]`;
-  }
-  if (typeof value === "object") {
-    return "{...}";
-  }
-  return JSON.stringify(String(value));
-}
-
-export function formatToolArgsPreview(toolArgs?: Record<string, unknown>): string | null {
-  if (!toolArgs || Object.keys(toolArgs).length === 0) {
-    return null;
-  }
-
-  const entries = Object.entries(toolArgs);
-  const preview = entries
-    .slice(0, 2)
-    .map(([key, value]) => `${key}=${formatPreviewValue(value)}`)
-    .join(", ");
-  return `${preview}${entries.length > 2 ? ", ..." : ""}`;
 }
 
 export function formatToolLabel(
@@ -159,6 +122,15 @@ function isGroupedFileReadSegment(segment: TranscriptSegment): segment is ToolTr
   );
 }
 
+const SIMPLE_SEGMENT_BLOCK_KINDS: { [key: string]: TranscriptRenderBlock["kind"] | undefined } = {
+  assistant: "assistant_block",
+  thinking: "thinking_block",
+  plan: "plan_block",
+  summary: "summary_block",
+  rate_limit: "rate_limit_block",
+  error: "error_block",
+};
+
 export function buildTranscriptRenderBlocks(
   segments: TranscriptSegment[],
 ): TranscriptRenderBlock[] {
@@ -167,62 +139,15 @@ export function buildTranscriptRenderBlocks(
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
 
-    if (segment.kind === "assistant") {
-      blocks.push({
-        kind: "assistant_block",
-        id: segment.id,
-        segment,
-      });
+    const blockKind = SIMPLE_SEGMENT_BLOCK_KINDS[segment.kind];
+    if (blockKind) {
+      blocks.push({ kind: blockKind, id: segment.id, segment } as TranscriptRenderBlock);
       continue;
     }
 
-    if (segment.kind === "thinking") {
-      blocks.push({
-        kind: "thinking_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "plan") {
-      blocks.push({
-        kind: "plan_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "summary") {
-      blocks.push({
-        kind: "summary_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "rate_limit") {
-      blocks.push({
-        kind: "rate_limit_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "error") {
-      blocks.push({
-        kind: "error_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
+    // Only tool segments remain after the handler map
+    const toolSegment = segment as unknown as ToolTranscriptSegment;
     if (!isGroupedFileReadSegment(segment)) {
-      const toolSegment = segment as ToolTranscriptSegment;
       blocks.push({
         kind: "tool_block",
         id: toolSegment.id,
@@ -306,6 +231,16 @@ function findPendingToolSegment(
   return undefined;
 }
 
+const SIMPLE_ROLE_BUILDERS: {
+  [key: string]: ((msg: ChatMessage) => TranscriptSegment) | undefined;
+} = {
+  assistant: (msg) => ({ kind: "assistant", id: msg.id, content: msg.content }),
+  thinking: (msg) => ({ kind: "thinking", id: msg.id, content: msg.thinking ?? msg.content }),
+  plan: (msg) => ({ kind: "plan", id: msg.id, content: msg.planContent ?? msg.content }),
+  summary: (msg) => ({ kind: "summary", id: msg.id, content: msg.content }),
+  error: (msg) => ({ kind: "error", id: msg.id, content: msg.content }),
+};
+
 export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[] {
   const turns: TranscriptTurn[] = [];
   let currentTurn: TranscriptTurn | null = null;
@@ -319,39 +254,9 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
 
     currentTurn = ensureCurrentTurn(turns, currentTurn);
 
-    if (message.role === "assistant") {
-      currentTurn.segments.push({
-        kind: "assistant",
-        id: message.id,
-        content: message.content,
-      });
-      continue;
-    }
-
-    if (message.role === "thinking") {
-      currentTurn.segments.push({
-        kind: "thinking",
-        id: message.id,
-        content: message.thinking ?? message.content,
-      });
-      continue;
-    }
-
-    if (message.role === "plan") {
-      currentTurn.segments.push({
-        kind: "plan",
-        id: message.id,
-        content: message.planContent ?? message.content,
-      });
-      continue;
-    }
-
-    if (message.role === "summary") {
-      currentTurn.segments.push({
-        kind: "summary",
-        id: message.id,
-        content: message.content,
-      });
+    const builder = SIMPLE_ROLE_BUILDERS[message.role];
+    if (builder) {
+      currentTurn.segments.push(builder(message));
       continue;
     }
 
@@ -362,15 +267,6 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): TranscriptTurn[
         content: message.content,
         retryAfterMs: message.rateLimitInfo?.retryAfterMs,
         message: message.rateLimitInfo?.message,
-      });
-      continue;
-    }
-
-    if (message.role === "error") {
-      currentTurn.segments.push({
-        kind: "error",
-        id: message.id,
-        content: message.content,
       });
       continue;
     }

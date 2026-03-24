@@ -1,6 +1,6 @@
 # Complexity Scoring Rubric
 # Project: deep-factor-agent + deep-factor-tui
-# Date: 2026-03-23 (fresh audit)
+# Date: 2026-03-23 (fresh audit #2)
 # Methodology: McCabe CC (control-flow decision points only)
 
 project: deep-factor-agent
@@ -27,12 +27,12 @@ metrics:
   churn_x_cc:
     weight: 0.15
     method: "git log --since='6 months' commit count * CC"
-    justification: "agent.ts (19 commits * CC 111 = 2109) and useAgent.ts (21 * 31 = 651) are active hot spots"
+    justification: "useAgent.ts (21 commits * CC 31 = 651) is the most active hot spot"
 
   duplication:
     weight: 0.10
-    method: "jscpd with min-lines=5, min-tokens=50; manual verification"
-    justification: "Duplication was 2.6% in useAgent (now resolved). Near zero across codebase."
+    method: "Manual cross-file comparison; structural clone detection"
+    justification: "Key duplication found: transcript.ts duplicates 3 functions from tool-display.ts; Claude/Codex CLI providers share utility functions"
 
 composite_formula: "SUM(metric_normalized * weight)"
 normalization: "Divide by max value across all scanned files (0-100 scale)"
