@@ -1,28 +1,39 @@
 ## Summary
 
-- **Pattern 1** — Deduplicate formatting utilities: removed `truncateInline`, `formatPreviewValue`, `formatToolArgsPreview` from `transcript.ts` and imported from `tool-display.ts` (agent package). Removed ~37 lines of duplicated code.
-- **Pattern 2** — Handler map for segment dispatch: replaced 6 sequential if-blocks in `buildTranscriptRenderBlocks` with a `SIMPLE_SEGMENT_BLOCK_KINDS` map lookup. Reduced function from 97 to 55 lines.
-- **Pattern 3** — Handler map for role dispatch: replaced 5 sequential if-blocks in `groupMessagesIntoTurns` with a `SIMPLE_ROLE_BUILDERS` map lookup. Reduced function from 103 to 74 lines.
-
-### Patterns deferred to next cycle
-
-- **Pattern 4** — claude-agent-sdk.ts: Extract SDK option builder (Extract Method, no aggregate CC reduction)
-- **Pattern 5** — log-mappers: Strategy pattern for event dispatch (5 files, medium risk)
+- **Pattern 1: CLI shared utility extraction** — Extracted 6 duplicated utility functions (`createZeroUsage`, `normalizeUsage`, `extractTextFromUnknown`, `stripToolCallJsonBlock`, `toUsageMetadata`, `TOOL_CALL_FORMAT`) from `claude-cli.ts` and `codex-cli.ts` into new `cli-shared.ts`. Unified `normalizeUsage` handles all provider field name variants. CC impact: -29 (claude-cli) + -22 (codex-cli) + +32 (cli-shared) = **-19 CC net**.
+- **Pattern 2: events-to-messages.ts handler map** — Replaced 6 simple switch cases (error, plan, summary, completion, approval, human_input_requested) with `SIMPLE_EVENT_BUILDERS` handler map. CC impact: **-4 CC**.
+- **Pattern 3: tool-display.ts unified tool name map** — Replaced 4 `Set` constants + 4 `if`-block dispatch in `normalizeToolKind` with single `Map<string, ToolDisplayKind>` lookup. CC impact: **-4 CC**.
 
 ## Benchmark Report
 
 **Verdict: PASS**
 
-| Metric          | Baseline | Current | Delta       | Status |
-| --------------- | -------- | ------- | ----------- | ------ |
-| Total CC        | 700      | 683     | -17 (-2.4%) | PASS   |
-| Total Cognitive | 2264     | 2217    | -47 (-2.1%) | PASS   |
-| Test Count      | 440      | 440     | +0          | PASS   |
-| Test Pass Rate  | 100%     | 100%    | +0          | PASS   |
-| Build           | PASS     | PASS    | —           | PASS   |
-| Type Check      | PASS     | PASS    | —           | PASS   |
+| Metric          | Baseline | Current | Delta | % Change  |
+| --------------- | -------- | ------- | ----- | --------- |
+| Total CC        | 683      | 656     | -27   | **-4.0%** |
+| Average CC      | 12       | 11.3    | -0.7  | -5.8%     |
+| Total Cognitive | 2217     | 2102    | -115  | -5.2%     |
+| Test Count      | 440      | 440     | 0     | 0.0%      |
+| Test Pass Rate  | 100%     | 100%    | 0     | 0.0%      |
 
-> Key insight from this audit: deduplication and handler map patterns genuinely reduce aggregate CC, unlike Extract Method which just redistributes complexity. This is the first audit cycle to achieve a net CC reduction.
+### Per-File Changes
+
+| File                          | CC Delta | Cognitive Delta |
+| ----------------------------- | -------- | --------------- |
+| providers/cli-shared.ts (NEW) | +32      | +85             |
+| providers/claude-cli.ts       | -29      | -97             |
+| providers/codex-cli.ts        | -22      | -80             |
+| events-to-messages.ts         | -4       | -13             |
+| tool-display.ts               | -4       | -10             |
+
+## Test plan
+
+- [x] `pnpm -r build` passes
+- [x] `pnpm -r type-check` passes
+- [x] `pnpm -r test` passes (440 tests, 100% pass rate)
+- [x] Benchmark suite passes with CC reduction verified
+- [x] Each pattern applied as isolated atomic commit
+- [x] No test changes required
 
 ## Validation Commands
 
