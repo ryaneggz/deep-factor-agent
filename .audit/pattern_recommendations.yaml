@@ -32,7 +32,7 @@
   files_affected:
     - packages/deep-factor-agent/src/agent.ts (refactor, no new files)
   risk: LOW — internal method extraction, no public API change
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 2 — agent.ts: Extract post-iteration evaluation from runLoop
@@ -63,7 +63,7 @@
   files_affected:
     - packages/deep-factor-agent/src/agent.ts (refactor, no new files)
   risk: LOW — internal method extraction, no public API change
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 3 — claude-cli.ts: Event Handler Map for processStreamLine
@@ -96,7 +96,7 @@
   files_affected:
     - packages/deep-factor-agent/src/providers/claude-cli.ts (refactor)
   risk: LOW — internal refactor, ModelAdapter interface unchanged
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 4 — claude-agent-sdk.ts: Extract response parsing
