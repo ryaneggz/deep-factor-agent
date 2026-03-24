@@ -1079,6 +1079,201 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     return { pendingRequest: null };
   }
 
+  /**
+   * Evaluate whether the current iteration should end the loop, return a
+   * pending/plan result, or continue to the next iteration.
+   *
+   * Returns an AgentResult/PendingResult/PlanResult to exit, or null to
+   * continue the outer loop.
+   *
+   * Extracted from runLoop to separate orchestration from decision logic.
+   */
+  private async evaluateIterationResult(ctx: {
+    thread: AgentThread;
+    totalUsage: TokenUsage;
+    iteration: number;
+    lastResponse: string;
+    pendingRequest: PendingHumanRequest | null;
+    prompt: string;
+    emittedPlanContents: Set<string>;
+  }): Promise<AgentResult | PendingResult | PlanResult | null> {
+    const {
+      thread,
+      totalUsage,
+      iteration,
+      lastResponse,
+      pendingRequest,
+      prompt,
+      emittedPlanContents,
+    } = ctx;
+
+    // Evaluate stop conditions
+    const stopResult = evaluateStopConditions(this.stopConditions, {
+      iteration,
+      usage: totalUsage,
+      model: this.modelId,
+      thread,
+    });
+
+    if (stopResult) {
+      this.emitUpdate({
+        thread,
+        usage: totalUsage,
+        iterations: iteration,
+        status: "done",
+        stopReason: "stop_condition",
+      });
+      return {
+        response: lastResponse,
+        thread,
+        usage: totalUsage,
+        iterations: iteration,
+        stopReason: "stop_condition",
+        stopDetail: stopResult.reason,
+      };
+    }
+
+    // Check human input request
+    if (pendingRequest) {
+      return this.createPendingResult(
+        thread,
+        totalUsage,
+        iteration,
+        lastResponse,
+        prompt,
+        pendingRequest.detail,
+      );
+    }
+
+    // Verification
+    if (this.verifyCompletion) {
+      const verifyResult = await this.verifyCompletion({
+        result: lastResponse,
+        iteration,
+        thread,
+        originalPrompt: prompt,
+      });
+
+      if (verifyResult.complete) {
+        const completionEvent: CompletionEvent = {
+          type: "completion",
+          result: lastResponse,
+          verified: true,
+          timestamp: Date.now(),
+          iteration,
+        };
+        this.appendEvent(thread, completionEvent, {
+          usage: totalUsage,
+          iterations: iteration,
+          status: "done",
+          stopReason: "completed",
+        });
+
+        this.emitUpdate({
+          thread,
+          usage: totalUsage,
+          iterations: iteration,
+          status: "done",
+          stopReason: "completed",
+        });
+
+        return {
+          response: lastResponse,
+          thread,
+          usage: totalUsage,
+          iterations: iteration,
+          stopReason: "completed",
+        };
+      }
+
+      // Verification failed - inject feedback and continue
+      if (verifyResult.reason) {
+        this.appendEvent(
+          thread,
+          {
+            type: "message",
+            role: "user",
+            content: `Verification failed: ${verifyResult.reason}. Please try again.`,
+            timestamp: Date.now(),
+            iteration,
+          },
+          { usage: totalUsage, iterations: iteration, status: "running" },
+        );
+      }
+      return null; // continue loop
+    }
+
+    // No verification function — single iteration mode
+    const parsedPlan = this.mode === "plan" ? parsePlanBlock(lastResponse) : null;
+    const completionEvent: CompletionEvent = {
+      type: "completion",
+      result: lastResponse,
+      verified: false,
+      timestamp: Date.now(),
+      iteration,
+    };
+    this.appendEvent(thread, completionEvent, {
+      usage: totalUsage,
+      iterations: iteration,
+      status: this.mode === "plan" ? "running" : "done",
+      stopReason: this.mode === "plan" ? undefined : "completed",
+    });
+
+    if (this.mode === "plan") {
+      if (!parsedPlan) {
+        this.appendEvent(
+          thread,
+          {
+            type: "message",
+            role: "user",
+            content:
+              "Plan mode requires exactly one <proposed_plan>...</proposed_plan> block. Try again.",
+            timestamp: Date.now(),
+            iteration,
+          },
+          { usage: totalUsage, iterations: iteration, status: "running" },
+        );
+        return null; // continue loop
+      }
+      if (!emittedPlanContents.has(parsedPlan.content)) {
+        emittedPlanContents.add(parsedPlan.content);
+        this.appendEvent(
+          thread,
+          {
+            type: "plan",
+            content: parsedPlan.content,
+            timestamp: Date.now(),
+            iteration,
+          },
+          { usage: totalUsage, iterations: iteration, status: "running" },
+        );
+      }
+      return this.createPlanPendingResult(
+        thread,
+        totalUsage,
+        iteration,
+        parsedPlan.content,
+        prompt,
+      );
+    }
+
+    this.emitUpdate({
+      thread,
+      usage: totalUsage,
+      iterations: iteration,
+      status: "done",
+      stopReason: "completed",
+    });
+
+    return {
+      response: lastResponse,
+      thread,
+      usage: totalUsage,
+      iterations: iteration,
+      stopReason: "completed",
+    };
+  }
+
   private checkInterruptOn(thread: AgentThread, iteration: number): string | null {
     if (this.interruptOn.length === 0) return null;
 
@@ -1402,172 +1597,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         // Callback
         this.onIterationEnd?.(iteration, lastAIResponse);
 
-        // Evaluate stop conditions
-        const stopResult = evaluateStopConditions(this.stopConditions, {
-          iteration,
-          usage: totalUsage,
-          model: this.modelId,
+        // Evaluate stop conditions, pending requests, verification, and completion
+        const evalResult = await this.evaluateIterationResult({
           thread,
+          totalUsage,
+          iteration,
+          lastResponse,
+          pendingRequest,
+          prompt,
+          emittedPlanContents,
         });
-
-        if (stopResult) {
-          this.emitUpdate({
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            status: "done",
-            stopReason: "stop_condition",
-          });
-          return {
-            response: lastResponse,
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            stopReason: "stop_condition",
-            stopDetail: stopResult.reason,
-          };
-        }
-
-        // Check human input request (must be checked BEFORE interruptOn so
-        // the model's actual question/choices take priority over the generic
-        // interruptOn message when requestHumanInput is in the interruptOn list)
-        if (pendingRequest) {
-          return this.createPendingResult(
-            thread,
-            totalUsage,
-            iteration,
-            lastResponse,
-            prompt,
-            pendingRequest.detail,
-          );
-        }
-
-        // Verification
-        if (this.verifyCompletion) {
-          const verifyResult = await this.verifyCompletion({
-            result: lastResponse,
-            iteration,
-            thread,
-            originalPrompt: prompt,
-          });
-
-          if (verifyResult.complete) {
-            const completionEvent: CompletionEvent = {
-              type: "completion",
-              result: lastResponse,
-              verified: true,
-              timestamp: Date.now(),
-              iteration,
-            };
-            this.appendEvent(thread, completionEvent, {
-              usage: totalUsage,
-              iterations: iteration,
-              status: "done",
-              stopReason: "completed",
-            });
-
-            this.emitUpdate({
-              thread,
-              usage: totalUsage,
-              iterations: iteration,
-              status: "done",
-              stopReason: "completed",
-            });
-
-            return {
-              response: lastResponse,
-              thread,
-              usage: totalUsage,
-              iterations: iteration,
-              stopReason: "completed",
-            };
-          }
-
-          // Verification failed - inject feedback and continue
-          if (verifyResult.reason) {
-            this.appendEvent(
-              thread,
-              {
-                type: "message",
-                role: "user",
-                content: `Verification failed: ${verifyResult.reason}. Please try again.`,
-                timestamp: Date.now(),
-                iteration,
-              },
-              { usage: totalUsage, iterations: iteration, status: "running" },
-            );
-          }
-        } else {
-          // No verification function - single iteration mode
-          const completionEvent: CompletionEvent = {
-            type: "completion",
-            result: lastResponse,
-            verified: false,
-            timestamp: Date.now(),
-            iteration,
-          };
-          this.appendEvent(thread, completionEvent, {
-            usage: totalUsage,
-            iterations: iteration,
-            status: this.mode === "plan" ? "running" : "done",
-            stopReason: this.mode === "plan" ? undefined : "completed",
-          });
-
-          if (this.mode === "plan") {
-            if (!parsedPlan) {
-              this.appendEvent(
-                thread,
-                {
-                  type: "message",
-                  role: "user",
-                  content:
-                    "Plan mode requires exactly one <proposed_plan>...</proposed_plan> block. Try again.",
-                  timestamp: Date.now(),
-                  iteration,
-                },
-                { usage: totalUsage, iterations: iteration, status: "running" },
-              );
-              iteration++;
-              continue;
-            }
-            if (!emittedPlanContents.has(parsedPlan.content)) {
-              emittedPlanContents.add(parsedPlan.content);
-              this.appendEvent(
-                thread,
-                {
-                  type: "plan",
-                  content: parsedPlan.content,
-                  timestamp: Date.now(),
-                  iteration,
-                },
-                { usage: totalUsage, iterations: iteration, status: "running" },
-              );
-            }
-            return this.createPlanPendingResult(
-              thread,
-              totalUsage,
-              iteration,
-              parsedPlan.content,
-              prompt,
-            );
-          }
-
-          this.emitUpdate({
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            status: "done",
-            stopReason: "completed",
-          });
-
-          return {
-            response: lastResponse,
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            stopReason: "completed",
-          };
-        }
+        if (evalResult) return evalResult;
       } catch (error) {
         consecutiveErrors++;
         const isRecoverable = consecutiveErrors < 3;
