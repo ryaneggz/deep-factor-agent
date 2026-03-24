@@ -59,11 +59,23 @@
           "Consider adding guard clause patterns to the extracted methods themselves (e.g., evaluateIterationResult has several nested if-blocks that could become early returns) in a future audit"
         ]
       }
+    },
+    {
+      "id": "20260323b",
+      "date": "2026-03-23",
+      "branch": "refactor/complexity-audit-20260323b",
+      "patterns_total": 5,
+      "patterns_applied": [1, 2, 3],
+      "patterns_deferred": [4, 5],
+      "baseline_cc": 700,
+      "result_cc": 683,
+      "test_count": 440,
+      "verdict": "PASS"
     }
   ],
   "current_baseline": {
     "snapshot": ".audit/benchmarks/snapshots/baseline.json",
-    "total_cc": 700,
+    "total_cc": 683,
     "test_count": 440
   }
 }

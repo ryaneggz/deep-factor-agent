@@ -1,16 +1,16 @@
 {
-  "timestamp": "2026-03-24T05:08:01Z",
-  "git_sha": "f0d8d80",
-  "git_message": "add leftover files",
+  "timestamp": "2026-03-24T05:15:21Z",
+  "git_sha": "e4a5030",
+  "git_message": "chore(audit): update pattern statuses after reduce phase",
   "totals": {
     "files_analyzed": 57,
-    "total_cc": 700,
-    "avg_cc": 12.3,
+    "total_cc": 683,
+    "avg_cc": 12,
     "max_cc": 111,
-    "total_cognitive": 2264,
-    "total_coupling": 36.62,
+    "total_cognitive": 2217,
+    "total_coupling": 36.7,
     "total_duplication_pct": 0,
-    "total_loc": 8849,
+    "total_loc": 8800,
     "total_any_types": 6,
     "test_count": 440,
     "test_pass_rate": 1,
@@ -60,17 +60,6 @@
       "churnCC": 145,
       "composite": 34.4,
       "any_types": 1
-    },
-    "packages/deep-factor-tui/src/transcript.ts": {
-      "cc": 40,
-      "cognitive": 93,
-      "coupling_instability": 0.67,
-      "loc": 357,
-      "duplication_pct": 0,
-      "churn": 5,
-      "churnCC": 200,
-      "composite": 32.1,
-      "any_types": 0
     },
     "packages/deep-factor-tui/src/components/PendingInputPanel.tsx": {
       "cc": 27,
@@ -158,6 +147,17 @@
       "churn": 1,
       "churnCC": 21,
       "composite": 27,
+      "any_types": 0
+    },
+    "packages/deep-factor-tui/src/transcript.ts": {
+      "cc": 23,
+      "cognitive": 46,
+      "coupling_instability": 0.75,
+      "loc": 308,
+      "duplication_pct": 0,
+      "churn": 5,
+      "churnCC": 115,
+      "composite": 26.3,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/hooks/useTextInput.ts": {
