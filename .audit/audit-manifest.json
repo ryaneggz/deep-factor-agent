@@ -38,7 +38,27 @@
       "baseline_cc": 700,
       "result_cc": 700,
       "test_count": 440,
-      "verdict": "PASS"
+      "verdict": "PASS",
+      "reflections": {
+        "what_worked": [
+          "Following prior reflection: starting with the highest-composite pattern (runLoop extraction) first was correct — the two agent.ts extractions composed cleanly without circular dependencies",
+          "Following prior reflection: defining the StreamEventHandler type signature first before extracting handler functions (Pattern 3) made the handler map refactor mechanical and error-free",
+          "Passing mutable state (messages array, Sets) by reference to extracted methods avoided complex return types while keeping the API clean",
+          "The context-object parameter pattern (evaluateIterationResult takes a single ctx object) worked better than positional params for methods with 7+ inputs"
+        ],
+        "what_failed": [],
+        "surprises": [
+          "Extract Method refactors don't reduce aggregate CC — the same decision points exist, they're just in different methods. The real win is per-method cognitive complexity (nesting depth) which the current benchmark suite doesn't track per-method",
+          "Total CC increased from 636 (post-previous-audit) to 700 — new feature code (events-to-messages.ts +27, PendingInputPanel.tsx +27, expanded codex-cli) added 64 CC since the last audit. Feature velocity outpaced the reduction from audit patterns.",
+          "The compute_ranking.mjs hardcoded data approach worked well for consistency between baseline and current snapshots, but means the nesting improvements from extract method don't show up in the aggregate cognitive metric"
+        ],
+        "next_time": [
+          "Add per-method CC tracking to the benchmark suite — extract method patterns improve method-level metrics that the current file-level aggregation doesn't capture",
+          "Pattern 4 (claude-agent-sdk response parsing extraction) is ready to apply — it's the same extract-method approach that worked for Patterns 1-2",
+          "Pattern 5 (log-mapper strategy) should define the shared MapperStrategy interface type in log-mappers/types.ts BEFORE touching any mapper file — same principle as the handler map type-first approach",
+          "Consider adding guard clause patterns to the extracted methods themselves (e.g., evaluateIterationResult has several nested if-blocks that could become early returns) in a future audit"
+        ]
+      }
     }
   ],
   "current_baseline": {
