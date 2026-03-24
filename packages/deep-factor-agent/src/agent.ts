@@ -939,6 +939,341 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
     }
   }
 
+  /**
+   * Execute a batch of tool calls, splitting into parallel-safe and sequential
+   * (HITL / gated) groups when parallel execution is enabled.
+   *
+   * Extracted from runLoop to reduce nesting and enable independent testing.
+   */
+  private async executeToolBatch(
+    toolCalls: Array<{ name: string; args?: Record<string, unknown>; id?: string }>,
+    toolMap: Record<string, StructuredToolInterface>,
+    thread: AgentThread,
+    iteration: number,
+    stepCount: number,
+    messages: BaseMessage[],
+    appendToolCallIfNew: (
+      tc: { name: string; args?: Record<string, unknown>; id?: string },
+      timestamp?: number,
+      parallelGroup?: string,
+    ) => void,
+    currentUsageSnapshot: () => TokenUsage,
+  ): Promise<{ pendingRequest: PendingHumanRequest | null }> {
+    const now = Date.now();
+
+    if (this.parallelToolCalls && toolCalls.length > 0) {
+      // --- Parallel execution path ---
+      const parallelBatch: typeof toolCalls = [];
+      const sequentialBatch: typeof toolCalls = [];
+      for (const tc of toolCalls) {
+        const foundTool = toolMap[tc.name];
+        const decision = this.evaluateToolExecution(tc.name, foundTool);
+        if (
+          tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT ||
+          this.interruptOn.includes(tc.name) ||
+          decision.action !== "execute"
+        ) {
+          sequentialBatch.push(tc);
+        } else {
+          parallelBatch.push(tc);
+        }
+      }
+
+      const groupId =
+        parallelBatch.length > 1 ? `pg_${iteration}_${stepCount}_${Date.now()}` : undefined;
+
+      for (const tc of parallelBatch) {
+        appendToolCallIfNew(tc, now, groupId);
+      }
+
+      const parallelResults = await Promise.all(
+        parallelBatch.map(async (tc) => {
+          const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
+          const foundTool = toolMap[tc.name];
+          const start = performance.now();
+          if (foundTool) {
+            try {
+              const toolResult = await this.invokeTool(
+                foundTool,
+                (tc.args ?? {}) as Record<string, unknown>,
+              );
+              const resultStr = stringifyToolResult(toolResult);
+              const durationMs = Math.round(performance.now() - start);
+              this.syncTodoMetadata(tc.name, resultStr, thread);
+              return { toolCallId, result: toolResult, durationMs, tc };
+            } catch (err) {
+              const durationMs = Math.round(performance.now() - start);
+              const errorMsg = `Tool error: ${compactError(err)}`;
+              return { toolCallId, result: errorMsg, durationMs, tc };
+            }
+          } else {
+            const durationMs = Math.round(performance.now() - start);
+            const errorMsg = `Tool not found: "${tc.name}"`;
+            return { toolCallId, result: errorMsg, durationMs, tc };
+          }
+        }),
+      );
+
+      for (const pr of parallelResults) {
+        const resultStr = stringifyToolResult(pr.result);
+        const toolResultEvent: ToolResultEvent = {
+          type: "tool_result",
+          toolCallId: pr.toolCallId,
+          result: resultStr,
+          display: resolveToolResultDisplay(
+            pr.tc.name,
+            (pr.tc.args ?? {}) as Record<string, unknown>,
+            pr.result,
+          ),
+          timestamp: Date.now(),
+          iteration,
+          durationMs: pr.durationMs,
+          parallelGroup: groupId,
+        };
+        this.appendEvent(thread, toolResultEvent, {
+          usage: currentUsageSnapshot(),
+          iterations: iteration,
+          status: "running",
+        });
+        messages.push(
+          new ToolMessage({
+            tool_call_id: pr.toolCallId,
+            content: resultStr,
+          }),
+        );
+      }
+
+      // Handle sequential tools (HITL / interruptOn) after parallel batch
+      for (const tc of sequentialBatch) {
+        appendToolCallIfNew(tc, Date.now());
+        const outcome = await this.executeToolCall(
+          tc,
+          toolMap[tc.name],
+          thread,
+          iteration,
+          currentUsageSnapshot(),
+        );
+        messages.push(outcome.toolMessage);
+        if (outcome.kind === "pending") {
+          return { pendingRequest: outcome.pending ?? null };
+        }
+      }
+    } else {
+      // --- Sequential execution path ---
+      for (const tc of toolCalls) {
+        appendToolCallIfNew(tc, now);
+        const outcome = await this.executeToolCall(
+          tc,
+          toolMap[tc.name],
+          thread,
+          iteration,
+          currentUsageSnapshot(),
+        );
+        messages.push(outcome.toolMessage);
+        if (outcome.kind === "pending") {
+          return { pendingRequest: outcome.pending ?? null };
+        }
+      }
+    }
+
+    return { pendingRequest: null };
+  }
+
+  /**
+   * Evaluate whether the current iteration should end the loop, return a
+   * pending/plan result, or continue to the next iteration.
+   *
+   * Returns an AgentResult/PendingResult/PlanResult to exit, or null to
+   * continue the outer loop.
+   *
+   * Extracted from runLoop to separate orchestration from decision logic.
+   */
+  private async evaluateIterationResult(ctx: {
+    thread: AgentThread;
+    totalUsage: TokenUsage;
+    iteration: number;
+    lastResponse: string;
+    pendingRequest: PendingHumanRequest | null;
+    prompt: string;
+    emittedPlanContents: Set<string>;
+  }): Promise<AgentResult | PendingResult | PlanResult | null> {
+    const {
+      thread,
+      totalUsage,
+      iteration,
+      lastResponse,
+      pendingRequest,
+      prompt,
+      emittedPlanContents,
+    } = ctx;
+
+    // Evaluate stop conditions
+    const stopResult = evaluateStopConditions(this.stopConditions, {
+      iteration,
+      usage: totalUsage,
+      model: this.modelId,
+      thread,
+    });
+
+    if (stopResult) {
+      this.emitUpdate({
+        thread,
+        usage: totalUsage,
+        iterations: iteration,
+        status: "done",
+        stopReason: "stop_condition",
+      });
+      return {
+        response: lastResponse,
+        thread,
+        usage: totalUsage,
+        iterations: iteration,
+        stopReason: "stop_condition",
+        stopDetail: stopResult.reason,
+      };
+    }
+
+    // Check human input request
+    if (pendingRequest) {
+      return this.createPendingResult(
+        thread,
+        totalUsage,
+        iteration,
+        lastResponse,
+        prompt,
+        pendingRequest.detail,
+      );
+    }
+
+    // Verification
+    if (this.verifyCompletion) {
+      const verifyResult = await this.verifyCompletion({
+        result: lastResponse,
+        iteration,
+        thread,
+        originalPrompt: prompt,
+      });
+
+      if (verifyResult.complete) {
+        const completionEvent: CompletionEvent = {
+          type: "completion",
+          result: lastResponse,
+          verified: true,
+          timestamp: Date.now(),
+          iteration,
+        };
+        this.appendEvent(thread, completionEvent, {
+          usage: totalUsage,
+          iterations: iteration,
+          status: "done",
+          stopReason: "completed",
+        });
+
+        this.emitUpdate({
+          thread,
+          usage: totalUsage,
+          iterations: iteration,
+          status: "done",
+          stopReason: "completed",
+        });
+
+        return {
+          response: lastResponse,
+          thread,
+          usage: totalUsage,
+          iterations: iteration,
+          stopReason: "completed",
+        };
+      }
+
+      // Verification failed - inject feedback and continue
+      if (verifyResult.reason) {
+        this.appendEvent(
+          thread,
+          {
+            type: "message",
+            role: "user",
+            content: `Verification failed: ${verifyResult.reason}. Please try again.`,
+            timestamp: Date.now(),
+            iteration,
+          },
+          { usage: totalUsage, iterations: iteration, status: "running" },
+        );
+      }
+      return null; // continue loop
+    }
+
+    // No verification function — single iteration mode
+    const parsedPlan = this.mode === "plan" ? parsePlanBlock(lastResponse) : null;
+    const completionEvent: CompletionEvent = {
+      type: "completion",
+      result: lastResponse,
+      verified: false,
+      timestamp: Date.now(),
+      iteration,
+    };
+    this.appendEvent(thread, completionEvent, {
+      usage: totalUsage,
+      iterations: iteration,
+      status: this.mode === "plan" ? "running" : "done",
+      stopReason: this.mode === "plan" ? undefined : "completed",
+    });
+
+    if (this.mode === "plan") {
+      if (!parsedPlan) {
+        this.appendEvent(
+          thread,
+          {
+            type: "message",
+            role: "user",
+            content:
+              "Plan mode requires exactly one <proposed_plan>...</proposed_plan> block. Try again.",
+            timestamp: Date.now(),
+            iteration,
+          },
+          { usage: totalUsage, iterations: iteration, status: "running" },
+        );
+        return null; // continue loop
+      }
+      if (!emittedPlanContents.has(parsedPlan.content)) {
+        emittedPlanContents.add(parsedPlan.content);
+        this.appendEvent(
+          thread,
+          {
+            type: "plan",
+            content: parsedPlan.content,
+            timestamp: Date.now(),
+            iteration,
+          },
+          { usage: totalUsage, iterations: iteration, status: "running" },
+        );
+      }
+      return this.createPlanPendingResult(
+        thread,
+        totalUsage,
+        iteration,
+        parsedPlan.content,
+        prompt,
+      );
+    }
+
+    this.emitUpdate({
+      thread,
+      usage: totalUsage,
+      iterations: iteration,
+      status: "done",
+      stopReason: "completed",
+    });
+
+    return {
+      response: lastResponse,
+      thread,
+      usage: totalUsage,
+      iterations: iteration,
+      stopReason: "completed",
+    };
+  }
+
   private checkInterruptOn(thread: AgentThread, iteration: number): string | null {
     if (this.interruptOn.length === 0) return null;
 
@@ -1201,131 +1536,18 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
           const toolCalls = response.tool_calls ?? [];
           if (toolCalls.length === 0) break;
 
-          // Record and execute tool calls
-          const now = Date.now();
-
-          if (this.parallelToolCalls && toolCalls.length > 0) {
-            // --- Parallel execution path ---
-            // Partition tool calls into parallel-safe and sequential (HITL / gated writes)
-            const parallelBatch: typeof toolCalls = [];
-            const sequentialBatch: typeof toolCalls = [];
-            for (const tc of toolCalls) {
-              const foundTool = toolMap[tc.name];
-              const decision = this.evaluateToolExecution(tc.name, foundTool);
-              if (
-                tc.name === TOOL_NAME_REQUEST_HUMAN_INPUT ||
-                this.interruptOn.includes(tc.name) ||
-                decision.action !== "execute"
-              ) {
-                sequentialBatch.push(tc);
-              } else {
-                parallelBatch.push(tc);
-              }
-            }
-
-            // Generate a parallelGroup ID for this batch
-            const groupId =
-              parallelBatch.length > 1 ? `pg_${iteration}_${stepCount}_${Date.now()}` : undefined;
-
-            // Record ToolCallEvents for parallel batch upfront
-            for (const tc of parallelBatch) {
-              appendToolCallIfNew(tc, now, groupId);
-            }
-
-            // Execute parallel batch via Promise.all with per-tool timing
-            const parallelResults = await Promise.all(
-              parallelBatch.map(async (tc) => {
-                const toolCallId = tc.id ?? `call_${stepCount}_${tc.name}`;
-                const foundTool = toolMap[tc.name];
-                const start = performance.now();
-                if (foundTool) {
-                  try {
-                    const toolResult = await this.invokeTool(
-                      foundTool,
-                      (tc.args ?? {}) as Record<string, unknown>,
-                    );
-                    const resultStr = stringifyToolResult(toolResult);
-                    const durationMs = Math.round(performance.now() - start);
-                    this.syncTodoMetadata(tc.name, resultStr, thread);
-
-                    return { toolCallId, result: toolResult, durationMs, tc };
-                  } catch (err) {
-                    const durationMs = Math.round(performance.now() - start);
-                    const errorMsg = `Tool error: ${compactError(err)}`;
-                    return { toolCallId, result: errorMsg, durationMs, tc };
-                  }
-                } else {
-                  const durationMs = Math.round(performance.now() - start);
-                  const errorMsg = `Tool not found: "${tc.name}"`;
-                  return { toolCallId, result: errorMsg, durationMs, tc };
-                }
-              }),
-            );
-
-            // Record ToolResultEvents + push ToolMessages in original order
-            for (const pr of parallelResults) {
-              const resultStr = stringifyToolResult(pr.result);
-              const toolResultEvent: ToolResultEvent = {
-                type: "tool_result",
-                toolCallId: pr.toolCallId,
-                result: resultStr,
-                display: resolveToolResultDisplay(
-                  pr.tc.name,
-                  (pr.tc.args ?? {}) as Record<string, unknown>,
-                  pr.result,
-                ),
-                timestamp: Date.now(),
-                iteration,
-                durationMs: pr.durationMs,
-                parallelGroup: groupId,
-              };
-              this.appendEvent(thread, toolResultEvent, {
-                usage: currentUsageSnapshot(),
-                iterations: iteration,
-                status: "running",
-              });
-              messages.push(
-                new ToolMessage({
-                  tool_call_id: pr.toolCallId,
-                  content: resultStr,
-                }),
-              );
-            }
-
-            // Handle sequential tools (HITL / interruptOn) after parallel batch
-            for (const tc of sequentialBatch) {
-              appendToolCallIfNew(tc, Date.now());
-              const outcome = await this.executeToolCall(
-                tc,
-                toolMap[tc.name],
-                thread,
-                iteration,
-                currentUsageSnapshot(),
-              );
-              messages.push(outcome.toolMessage);
-              if (outcome.kind === "pending") {
-                pendingRequest = outcome.pending ?? null;
-                break;
-              }
-            }
-          } else {
-            // --- Sequential execution path (original logic) ---
-            for (const tc of toolCalls) {
-              appendToolCallIfNew(tc, now);
-              const outcome = await this.executeToolCall(
-                tc,
-                toolMap[tc.name],
-                thread,
-                iteration,
-                currentUsageSnapshot(),
-              );
-              messages.push(outcome.toolMessage);
-              if (outcome.kind === "pending") {
-                pendingRequest = outcome.pending ?? null;
-                break;
-              }
-            }
-          }
+          // Execute tool calls (parallel or sequential)
+          const batchResult = await this.executeToolBatch(
+            toolCalls,
+            toolMap,
+            thread,
+            iteration,
+            stepCount,
+            messages,
+            appendToolCallIfNew,
+            currentUsageSnapshot,
+          );
+          pendingRequest = batchResult.pendingRequest;
 
           if (pendingRequest) break;
           iterationUsage = addUsage(iterationUsage, currentStepUsage);
@@ -1375,172 +1597,17 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
         // Callback
         this.onIterationEnd?.(iteration, lastAIResponse);
 
-        // Evaluate stop conditions
-        const stopResult = evaluateStopConditions(this.stopConditions, {
-          iteration,
-          usage: totalUsage,
-          model: this.modelId,
+        // Evaluate stop conditions, pending requests, verification, and completion
+        const evalResult = await this.evaluateIterationResult({
           thread,
+          totalUsage,
+          iteration,
+          lastResponse,
+          pendingRequest,
+          prompt,
+          emittedPlanContents,
         });
-
-        if (stopResult) {
-          this.emitUpdate({
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            status: "done",
-            stopReason: "stop_condition",
-          });
-          return {
-            response: lastResponse,
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            stopReason: "stop_condition",
-            stopDetail: stopResult.reason,
-          };
-        }
-
-        // Check human input request (must be checked BEFORE interruptOn so
-        // the model's actual question/choices take priority over the generic
-        // interruptOn message when requestHumanInput is in the interruptOn list)
-        if (pendingRequest) {
-          return this.createPendingResult(
-            thread,
-            totalUsage,
-            iteration,
-            lastResponse,
-            prompt,
-            pendingRequest.detail,
-          );
-        }
-
-        // Verification
-        if (this.verifyCompletion) {
-          const verifyResult = await this.verifyCompletion({
-            result: lastResponse,
-            iteration,
-            thread,
-            originalPrompt: prompt,
-          });
-
-          if (verifyResult.complete) {
-            const completionEvent: CompletionEvent = {
-              type: "completion",
-              result: lastResponse,
-              verified: true,
-              timestamp: Date.now(),
-              iteration,
-            };
-            this.appendEvent(thread, completionEvent, {
-              usage: totalUsage,
-              iterations: iteration,
-              status: "done",
-              stopReason: "completed",
-            });
-
-            this.emitUpdate({
-              thread,
-              usage: totalUsage,
-              iterations: iteration,
-              status: "done",
-              stopReason: "completed",
-            });
-
-            return {
-              response: lastResponse,
-              thread,
-              usage: totalUsage,
-              iterations: iteration,
-              stopReason: "completed",
-            };
-          }
-
-          // Verification failed - inject feedback and continue
-          if (verifyResult.reason) {
-            this.appendEvent(
-              thread,
-              {
-                type: "message",
-                role: "user",
-                content: `Verification failed: ${verifyResult.reason}. Please try again.`,
-                timestamp: Date.now(),
-                iteration,
-              },
-              { usage: totalUsage, iterations: iteration, status: "running" },
-            );
-          }
-        } else {
-          // No verification function - single iteration mode
-          const completionEvent: CompletionEvent = {
-            type: "completion",
-            result: lastResponse,
-            verified: false,
-            timestamp: Date.now(),
-            iteration,
-          };
-          this.appendEvent(thread, completionEvent, {
-            usage: totalUsage,
-            iterations: iteration,
-            status: this.mode === "plan" ? "running" : "done",
-            stopReason: this.mode === "plan" ? undefined : "completed",
-          });
-
-          if (this.mode === "plan") {
-            if (!parsedPlan) {
-              this.appendEvent(
-                thread,
-                {
-                  type: "message",
-                  role: "user",
-                  content:
-                    "Plan mode requires exactly one <proposed_plan>...</proposed_plan> block. Try again.",
-                  timestamp: Date.now(),
-                  iteration,
-                },
-                { usage: totalUsage, iterations: iteration, status: "running" },
-              );
-              iteration++;
-              continue;
-            }
-            if (!emittedPlanContents.has(parsedPlan.content)) {
-              emittedPlanContents.add(parsedPlan.content);
-              this.appendEvent(
-                thread,
-                {
-                  type: "plan",
-                  content: parsedPlan.content,
-                  timestamp: Date.now(),
-                  iteration,
-                },
-                { usage: totalUsage, iterations: iteration, status: "running" },
-              );
-            }
-            return this.createPlanPendingResult(
-              thread,
-              totalUsage,
-              iteration,
-              parsedPlan.content,
-              prompt,
-            );
-          }
-
-          this.emitUpdate({
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            status: "done",
-            stopReason: "completed",
-          });
-
-          return {
-            response: lastResponse,
-            thread,
-            usage: totalUsage,
-            iterations: iteration,
-            stopReason: "completed",
-          };
-        }
+        if (evalResult) return evalResult;
       } catch (error) {
         consecutiveErrors++;
         const isRecoverable = consecutiveErrors < 3;
