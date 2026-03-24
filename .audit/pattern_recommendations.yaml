@@ -35,7 +35,7 @@
     - packages/deep-factor-agent/src/index.ts (re-export utilities)
     - packages/deep-factor-tui/src/transcript.ts (remove duplicates, add imports)
   risk: LOW — exact function copies, identical behavior, existing package dependency
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 2 — transcript.ts: Handler map for segment kind dispatch
@@ -76,7 +76,7 @@
   files_affected:
     - packages/deep-factor-tui/src/transcript.ts (refactor buildTranscriptRenderBlocks)
   risk: LOW — mechanical replacement of identical if-blocks with map lookup
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 3 — transcript.ts: Handler map for message role dispatch
@@ -119,7 +119,7 @@
   files_affected:
     - packages/deep-factor-tui/src/transcript.ts (refactor groupMessagesIntoTurns)
   risk: LOW — mechanical replacement; test coverage verifies behavior
-  status: pending
+  status: applied
 
 # =============================================================================
 # PATTERN 4 — claude-agent-sdk.ts: Extract SDK option builder
