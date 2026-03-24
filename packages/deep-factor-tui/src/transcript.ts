@@ -122,6 +122,15 @@ function isGroupedFileReadSegment(segment: TranscriptSegment): segment is ToolTr
   );
 }
 
+const SIMPLE_SEGMENT_BLOCK_KINDS: { [key: string]: TranscriptRenderBlock["kind"] | undefined } = {
+  assistant: "assistant_block",
+  thinking: "thinking_block",
+  plan: "plan_block",
+  summary: "summary_block",
+  rate_limit: "rate_limit_block",
+  error: "error_block",
+};
+
 export function buildTranscriptRenderBlocks(
   segments: TranscriptSegment[],
 ): TranscriptRenderBlock[] {
@@ -130,62 +139,15 @@ export function buildTranscriptRenderBlocks(
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
 
-    if (segment.kind === "assistant") {
-      blocks.push({
-        kind: "assistant_block",
-        id: segment.id,
-        segment,
-      });
+    const blockKind = SIMPLE_SEGMENT_BLOCK_KINDS[segment.kind];
+    if (blockKind) {
+      blocks.push({ kind: blockKind, id: segment.id, segment } as TranscriptRenderBlock);
       continue;
     }
 
-    if (segment.kind === "thinking") {
-      blocks.push({
-        kind: "thinking_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "plan") {
-      blocks.push({
-        kind: "plan_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "summary") {
-      blocks.push({
-        kind: "summary_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "rate_limit") {
-      blocks.push({
-        kind: "rate_limit_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
-    if (segment.kind === "error") {
-      blocks.push({
-        kind: "error_block",
-        id: segment.id,
-        segment,
-      });
-      continue;
-    }
-
+    // Only tool segments remain after the handler map
+    const toolSegment = segment as unknown as ToolTranscriptSegment;
     if (!isGroupedFileReadSegment(segment)) {
-      const toolSegment = segment as ToolTranscriptSegment;
       blocks.push({
         kind: "tool_block",
         id: toolSegment.id,
