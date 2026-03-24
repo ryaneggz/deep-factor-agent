@@ -13,14 +13,14 @@ const FILE_EDIT_TOOL_NAMES = new Set(["Edit", "MultiEdit", "apply_patch", "edit_
 const FILE_WRITE_TOOL_NAMES = new Set(["Write", "write_file"]);
 const COMMAND_TOOL_NAMES = new Set(["Bash", "bash"]);
 
-function truncateInline(value: string, maxLength: number): string {
+export function truncateInline(value: string, maxLength: number): string {
   if (value.length <= maxLength) {
     return value;
   }
   return value.slice(0, Math.max(0, maxLength - 3)) + "...";
 }
 
-function formatPreviewValue(value: unknown): string {
+export function formatPreviewValue(value: unknown): string {
   if (typeof value === "string") {
     return JSON.stringify(truncateInline(value, MAX_TOOL_ARG_PREVIEW));
   }
@@ -38,7 +38,7 @@ function formatPreviewValue(value: unknown): string {
   return JSON.stringify(String(value));
 }
 
-function formatToolArgsPreview(toolArgs?: Record<string, unknown>): string | null {
+export function formatToolArgsPreview(toolArgs?: Record<string, unknown>): string | null {
   if (!toolArgs || Object.keys(toolArgs).length === 0) {
     return null;
   }
