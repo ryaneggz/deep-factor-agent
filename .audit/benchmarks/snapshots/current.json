@@ -1,16 +1,16 @@
 {
-  "timestamp": "2026-03-24T05:15:21Z",
-  "git_sha": "e4a5030",
+  "timestamp": "2026-03-24T05:39:06Z",
+  "git_sha": "ef93cab",
   "git_message": "chore(audit): update pattern statuses after reduce phase",
   "totals": {
-    "files_analyzed": 57,
-    "total_cc": 683,
-    "avg_cc": 12,
+    "files_analyzed": 58,
+    "total_cc": 656,
+    "avg_cc": 11.3,
     "max_cc": 111,
-    "total_cognitive": 2217,
-    "total_coupling": 36.7,
+    "total_cognitive": 2102,
+    "total_coupling": 37.48,
     "total_duplication_pct": 0,
-    "total_loc": 8800,
+    "total_loc": 8684,
     "total_any_types": 6,
     "test_count": 440,
     "test_pass_rate": 1,
@@ -25,18 +25,7 @@
       "duplication_pct": 0,
       "churn": 19,
       "churnCC": 2109,
-      "composite": 86.6,
-      "any_types": 1
-    },
-    "packages/deep-factor-agent/src/providers/claude-cli.ts": {
-      "cc": 62,
-      "cognitive": 207,
-      "coupling_instability": 0.73,
-      "loc": 678,
-      "duplication_pct": 0,
-      "churn": 9,
-      "churnCC": 558,
-      "composite": 47.9,
+      "composite": 86.4,
       "any_types": 1
     },
     "packages/deep-factor-agent/src/providers/claude-agent-sdk.ts": {
@@ -47,18 +36,18 @@
       "duplication_pct": 0,
       "churn": 1,
       "churnCC": 51,
-      "composite": 42.5,
+      "composite": 42.3,
       "any_types": 0
     },
-    "packages/deep-factor-agent/src/providers/codex-cli.ts": {
-      "cc": 29,
-      "cognitive": 106,
-      "coupling_instability": 0.89,
-      "loc": 406,
+    "packages/deep-factor-agent/src/providers/claude-cli.ts": {
+      "cc": 33,
+      "cognitive": 110,
+      "coupling_instability": 0.75,
+      "loc": 548,
       "duplication_pct": 0,
-      "churn": 5,
-      "churnCC": 145,
-      "composite": 34.4,
+      "churn": 9,
+      "churnCC": 297,
+      "composite": 33.4,
       "any_types": 1
     },
     "packages/deep-factor-tui/src/components/PendingInputPanel.tsx": {
@@ -69,18 +58,18 @@
       "duplication_pct": 0,
       "churn": 2,
       "churnCC": 54,
-      "composite": 31,
+      "composite": 30.8,
       "any_types": 0
     },
-    "packages/deep-factor-agent/src/tool-display.ts": {
-      "cc": 44,
-      "cognitive": 103,
-      "coupling_instability": 0.5,
-      "loc": 329,
+    "packages/deep-factor-agent/src/providers/cli-shared.ts": {
+      "cc": 32,
+      "cognitive": 85,
+      "coupling_instability": 0.75,
+      "loc": 130,
       "duplication_pct": 0,
-      "churn": 3,
-      "churnCC": 132,
-      "composite": 29.4,
+      "churn": 0,
+      "churnCC": 0,
+      "composite": 29.7,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/hooks/useAgent.ts": {
@@ -91,7 +80,7 @@
       "duplication_pct": 0,
       "churn": 21,
       "churnCC": 651,
-      "composite": 29.1,
+      "composite": 29,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/log-mappers/replay.ts": {
@@ -102,7 +91,7 @@
       "duplication_pct": 0,
       "churn": 2,
       "churnCC": 62,
-      "composite": 28.2,
+      "composite": 28,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/providers/messages-to-xml.ts": {
@@ -113,7 +102,7 @@
       "duplication_pct": 0,
       "churn": 3,
       "churnCC": 66,
-      "composite": 28.2,
+      "composite": 28,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/log-mappers/langchain-mapper.ts": {
@@ -124,18 +113,18 @@
       "duplication_pct": 0,
       "churn": 2,
       "churnCC": 42,
-      "composite": 28,
+      "composite": 27.8,
       "any_types": 0
     },
-    "packages/deep-factor-tui/src/events-to-messages.ts": {
-      "cc": 27,
-      "cognitive": 90,
-      "coupling_instability": 0.67,
-      "loc": 208,
+    "packages/deep-factor-agent/src/tool-display.ts": {
+      "cc": 40,
+      "cognitive": 93,
+      "coupling_instability": 0.5,
+      "loc": 329,
       "duplication_pct": 0,
-      "churn": 1,
-      "churnCC": 27,
-      "composite": 27.2,
+      "churn": 3,
+      "churnCC": 120,
+      "composite": 27.6,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/log-mappers/claude-mapper.ts": {
@@ -146,7 +135,7 @@
       "duplication_pct": 0,
       "churn": 1,
       "churnCC": 21,
-      "composite": 27,
+      "composite": 26.9,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/transcript.ts": {
@@ -157,7 +146,7 @@
       "duplication_pct": 0,
       "churn": 5,
       "churnCC": 115,
-      "composite": 26.3,
+      "composite": 26.1,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/hooks/useTextInput.ts": {
@@ -168,7 +157,18 @@
       "duplication_pct": 0,
       "churn": 7,
       "churnCC": 147,
-      "composite": 25.6,
+      "composite": 25.4,
+      "any_types": 0
+    },
+    "packages/deep-factor-tui/src/events-to-messages.ts": {
+      "cc": 23,
+      "cognitive": 77,
+      "coupling_instability": 0.67,
+      "loc": 208,
+      "duplication_pct": 0,
+      "churn": 1,
+      "churnCC": 23,
+      "composite": 25.3,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/session-logger.ts": {
@@ -179,8 +179,19 @@
       "duplication_pct": 0,
       "churn": 10,
       "churnCC": 170,
-      "composite": 25.3,
+      "composite": 25.1,
       "any_types": 2
+    },
+    "packages/deep-factor-agent/src/providers/codex-cli.ts": {
+      "cc": 7,
+      "cognitive": 26,
+      "coupling_instability": 0.9,
+      "loc": 290,
+      "duplication_pct": 0,
+      "churn": 5,
+      "churnCC": 35,
+      "composite": 23.5,
+      "any_types": 1
     },
     "packages/deep-factor-tui/src/cli.tsx": {
       "cc": 18,
@@ -190,7 +201,7 @@
       "duplication_pct": 0,
       "churn": 14,
       "churnCC": 252,
-      "composite": 23.5,
+      "composite": 23.4,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/context-manager.ts": {
@@ -201,7 +212,7 @@
       "duplication_pct": 0,
       "churn": 4,
       "churnCC": 48,
-      "composite": 23.4,
+      "composite": 23.2,
       "any_types": 1
     },
     "packages/deep-factor-tui/src/components/TranscriptSegment.tsx": {
@@ -212,7 +223,7 @@
       "duplication_pct": 0,
       "churn": 9,
       "churnCC": 126,
-      "composite": 23,
+      "composite": 22.8,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/log-mappers/codex-mapper.ts": {
@@ -223,7 +234,7 @@
       "duplication_pct": 0,
       "churn": 1,
       "churnCC": 13,
-      "composite": 22.7,
+      "composite": 22.5,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/print.ts": {
@@ -234,7 +245,7 @@
       "duplication_pct": 0,
       "churn": 9,
       "churnCC": 108,
-      "composite": 22.5,
+      "composite": 22.3,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/MessageBubble.tsx": {
@@ -245,7 +256,7 @@
       "duplication_pct": 0,
       "churn": 10,
       "churnCC": 90,
-      "composite": 21.8,
+      "composite": 21.6,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/StatusLine.tsx": {
@@ -256,7 +267,7 @@
       "duplication_pct": 0,
       "churn": 3,
       "churnCC": 27,
-      "composite": 21.5,
+      "composite": 21.3,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/tools/file-utils.ts": {
@@ -267,7 +278,7 @@
       "duplication_pct": 0,
       "churn": 1,
       "churnCC": 7,
-      "composite": 20.8,
+      "composite": 20.6,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/provider-resolution.ts": {
@@ -278,7 +289,7 @@
       "duplication_pct": 0,
       "churn": 5,
       "churnCC": 25,
-      "composite": 20.1,
+      "composite": 19.9,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/tool-adapter.ts": {
@@ -289,7 +300,7 @@
       "duplication_pct": 0,
       "churn": 2,
       "churnCC": 8,
-      "composite": 19.5,
+      "composite": 19.3,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/TranscriptTurn.tsx": {
@@ -300,7 +311,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 19.3,
+      "composite": 19.1,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/app.tsx": {
@@ -311,18 +322,7 @@
       "duplication_pct": 0,
       "churn": 15,
       "churnCC": 90,
-      "composite": 18.9,
-      "any_types": 0
-    },
-    "packages/deep-factor-tui/src/tools/default-tools.ts": {
-      "cc": 0,
-      "cognitive": 0,
-      "coupling_instability": 0.83,
-      "loc": 8,
-      "duplication_pct": 0,
-      "churn": 0,
-      "churnCC": 0,
-      "composite": 18.7,
+      "composite": 18.8,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/xml-serializer.ts": {
@@ -333,7 +333,18 @@
       "duplication_pct": 0,
       "churn": 2,
       "churnCC": 32,
-      "composite": 18.5,
+      "composite": 18.4,
+      "any_types": 0
+    },
+    "packages/deep-factor-tui/src/tools/default-tools.ts": {
+      "cc": 0,
+      "cognitive": 0,
+      "coupling_instability": 0.83,
+      "loc": 8,
+      "duplication_pct": 0,
+      "churn": 0,
+      "churnCC": 0,
+      "composite": 18.4,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/middleware.ts": {
@@ -344,7 +355,7 @@
       "duplication_pct": 0,
       "churn": 3,
       "churnCC": 0,
-      "composite": 18,
+      "composite": 17.8,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/providers/types.ts": {
@@ -355,7 +366,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 18,
+      "composite": 17.8,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/tools/bash.ts": {
@@ -366,7 +377,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 18,
+      "composite": 17.8,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/LiveSection.tsx": {
@@ -377,7 +388,7 @@
       "duplication_pct": 0,
       "churn": 6,
       "churnCC": 0,
-      "composite": 18,
+      "composite": 17.8,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/ToolCallBlock.tsx": {
@@ -388,7 +399,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 18,
+      "composite": 17.8,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/tools/write-file.ts": {
@@ -399,7 +410,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 16.9,
+      "composite": 16.7,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/tools/read-file.ts": {
@@ -410,7 +421,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 16.9,
+      "composite": 16.7,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/tools/edit-file.ts": {
@@ -421,7 +432,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 16.9,
+      "composite": 16.7,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/create-agent.ts": {
@@ -432,7 +443,7 @@
       "duplication_pct": 0,
       "churn": 6,
       "churnCC": 0,
-      "composite": 16,
+      "composite": 15.8,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/stop-conditions.ts": {
@@ -443,7 +454,7 @@
       "duplication_pct": 0,
       "churn": 2,
       "churnCC": 22,
-      "composite": 15.9,
+      "composite": 15.7,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/StatusIndicator.tsx": {
@@ -454,7 +465,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.4,
+      "composite": 15.3,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/human-in-the-loop.ts": {
@@ -465,7 +476,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/test-logger.ts": {
@@ -476,7 +487,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/log-mappers/types.ts": {
@@ -487,7 +498,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/ThinkingBlock.tsx": {
@@ -498,7 +509,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/HotkeyMenu.tsx": {
@@ -509,7 +520,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/SummaryBlock.tsx": {
@@ -520,7 +531,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/PlanBlock.tsx": {
@@ -531,7 +542,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/Header.tsx": {
@@ -542,7 +553,7 @@
       "duplication_pct": 0,
       "churn": 0,
       "churnCC": 0,
-      "composite": 15.1,
+      "composite": 14.9,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/components/InputBar.tsx": {
@@ -553,7 +564,7 @@
       "duplication_pct": 0,
       "churn": 7,
       "churnCC": 0,
-      "composite": 13.5,
+      "composite": 13.3,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/unified-log.ts": {
@@ -564,7 +575,7 @@
       "duplication_pct": 0,
       "churn": 2,
       "churnCC": 0,
-      "composite": 11.2,
+      "composite": 11.1,
       "any_types": 0
     },
     "packages/deep-factor-agent/src/types.ts": {
@@ -575,7 +586,7 @@
       "duplication_pct": 0,
       "churn": 9,
       "churnCC": 0,
-      "composite": 11.2,
+      "composite": 11.1,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/types.ts": {
@@ -586,7 +597,7 @@
       "duplication_pct": 0,
       "churn": 14,
       "churnCC": 0,
-      "composite": 4.5,
+      "composite": 4.4,
       "any_types": 0
     },
     "packages/deep-factor-tui/src/theme.ts": {

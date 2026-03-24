@@ -92,11 +92,23 @@
           "The dedup approach (Pattern 1) should be applied to claude-cli.ts + codex-cli.ts shared utilities in a future audit — they share extractTextFromUnknown, normalizeUsage, createZeroUsage which are exact or near-exact duplicates"
         ]
       }
+    },
+    {
+      "id": "20260323c",
+      "date": "2026-03-23",
+      "branch": "refactor/complexity-audit-20260323c",
+      "patterns_total": 3,
+      "patterns_applied": [1, 2, 3],
+      "patterns_deferred": [],
+      "baseline_cc": 683,
+      "result_cc": 656,
+      "test_count": 440,
+      "verdict": "PASS"
     }
   ],
   "current_baseline": {
     "snapshot": ".audit/benchmarks/snapshots/baseline.json",
-    "total_cc": 683,
+    "total_cc": 656,
     "test_count": 440
   }
 }
