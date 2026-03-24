@@ -103,7 +103,27 @@
       "baseline_cc": 683,
       "result_cc": 656,
       "test_count": 440,
-      "verdict": "PASS"
+      "verdict": "PASS",
+      "reflections": {
+        "what_worked": [
+          "Following prior reflection: CLI provider dedup was the highest-impact pattern (19 of 27 CC reduction). The unified normalizeUsage handles all provider field name variants cleanly.",
+          "Following prior reflection: handler map for events-to-messages.ts was near-identical to the transcript.ts refactor from audit 20260323b — mechanical and error-free.",
+          "Map<string, Kind> is cleaner than Set.has() + if-chains for tool name dispatch — simpler code AND lower CC.",
+          "All three patterns were LOW risk and completed without any test changes or failures."
+        ],
+        "what_failed": [],
+        "surprises": [
+          "The compute_ranking.mjs hardcoded metrics approach means the benchmark suite does not detect CC changes until the script is manually updated. This delayed the verification report from showing the actual reduction.",
+          "claude-cli.ts normalizeUsage was inside a closure (the factory function) even though it had no closure dependencies. This made extraction straightforward but the nesting was misleading.",
+          "codex-cli.ts used a different field name for cache tokens (cached_input_tokens vs cache_read_input_tokens). The unified normalizeUsage checks both field names, which adds 1 CC but handles both providers correctly."
+        ],
+        "next_time": [
+          "Update compute_ranking.mjs IMMEDIATELY after applying patterns, before running the benchmark — otherwise the benchmark shows 0% change.",
+          "buildPrompt() is still duplicated in both CLI providers (3 CC each) but uses closure variables. Refactoring it requires adding parameters — consider this for the next audit cycle.",
+          "Consider adding a dynamic CC counter (e.g., using ts-morph or a simple AST parser) to replace the hardcoded compute_ranking.mjs — this would make benchmarks reflect actual code changes automatically.",
+          "The handler map pattern with `as unknown as Record<string, unknown>` casts is safe but noisy. Consider defining typed helper interfaces (e.g., `{ error: string; toolCallId?: string }`) for each handler to improve readability while keeping the map pattern."
+        ]
+      }
     }
   ],
   "current_baseline": {
