@@ -70,7 +70,28 @@
       "baseline_cc": 700,
       "result_cc": 683,
       "test_count": 440,
-      "verdict": "PASS"
+      "verdict": "PASS",
+      "reflections": {
+        "what_worked": [
+          "Following prior reflection: prioritizing deduplication and handler maps over Extract Method — these patterns actually reduce aggregate CC (17 point reduction vs 0 for prior audit's extract method patterns)",
+          "Shared utility extraction (Pattern 1) was the simplest refactor — just export existing functions and import them. Zero risk, immediate CC reduction",
+          "Handler map pattern (Patterns 2-3) was mechanical and reliable — define a map constant, replace if-chain with lookup + single guard. Required `as unknown as` cast for TS narrowing limitation but functionally safe",
+          "Concentrating all 3 patterns on one file (transcript.ts) was efficient — each pattern built on the previous, and the file's test coverage validated all changes"
+        ],
+        "what_failed": [],
+        "surprises": [
+          "TypeScript cannot narrow discriminated union types through map lookups — `Record<string, V>` always returns `V` (not `V | undefined`) unless `noUncheckedIndexedAccess` is enabled. This required using `{ [key: string]: V | undefined }` instead, and `as unknown as` casts after the map check",
+          "The `isGroupedFileReadSegment` type predicate (`segment is ToolTranscriptSegment`) conflicts with prior narrowing — if TS already knows segment is ToolTranscriptSegment, negating the predicate produces `never`. This is a TS design limitation when combining type guards with discriminated union narrowing",
+          "Handler maps don't reduce CC as much as expected in the metric — replacing 6 if-blocks with 1 map lookup + 1 guard only reduces CC by ~5 per map because the map itself adds a branch. The real win is in cognitive complexity (readability) and maintainability (adding a new kind is one line)"
+        ],
+        "next_time": [
+          "When applying handler map patterns to discriminated unions in TS, type the map as `{ [key: string]: V | undefined }` and expect to use `as unknown as` casts for downstream type narrowing. This is safe because the map guarantees only valid variants reach the cast",
+          "Pattern 4 (claude-agent-sdk option builder extraction) remains pending — it's Extract Method so won't reduce aggregate CC, but will improve readability",
+          "Pattern 5 (log-mapper strategy) remains pending — high effort (5 files), should be attempted in a dedicated audit cycle",
+          "Consider applying the handler map pattern to events-to-messages.ts which has the same switch-case structure as the refactored transcript.ts functions — it would be a near-identical refactor",
+          "The dedup approach (Pattern 1) should be applied to claude-cli.ts + codex-cli.ts shared utilities in a future audit — they share extractTextFromUnknown, normalizeUsage, createZeroUsage which are exact or near-exact duplicates"
+        ]
+      }
     }
   ],
   "current_baseline": {
