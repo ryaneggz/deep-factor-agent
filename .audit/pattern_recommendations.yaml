@@ -1,194 +1,152 @@
-# Pattern Recommendations — Complexity Audit 2026-03-23 (fresh #2)
+# Pattern Recommendations — Complexity Audit 2026-03-23 (fresh #3)
 # Ordered by composite score (highest first)
-# Focus: patterns that genuinely reduce aggregate CC (dedup + handler maps)
-# Prior audit lesson: Extract Method doesn't reduce total CC, only per-method cognitive complexity
+# Focus: shared utility extraction (DRY) + handler maps for event/tool dispatch
+# Prior audit lesson: DRY and handler maps reduce aggregate CC; Extract Method does not
 
 # =============================================================================
-# PATTERN 1 — transcript.ts: Import shared formatting utilities from tool-display.ts
+# PATTERN 1 — CLI providers: Shared utility extraction (DRY)
 # =============================================================================
-- target: packages/deep-factor-tui/src/transcript.ts
-  rank: 5
-  composite_score: 32.1
+- target: packages/deep-factor-agent/src/providers/claude-cli.ts + codex-cli.ts
+  rank: 2+4
+  composite_score: 47.9 / 34.4
   root_cause: >
-    Three functions — truncateInline (lines 23-28), formatPreviewValue (lines 30-46),
-    and formatToolArgsPreview (lines 48-59) — are exact copies of the same functions
-    in packages/deep-factor-agent/src/tool-display.ts (lines 16-52). The TUI package
-    already depends on deep-factor-agent, so these can be imported directly.
+    Six utility functions are duplicated between claude-cli.ts and codex-cli.ts:
+    createZeroUsage (line 111/64), normalizeUsage (line 119/72),
+    extractTextFromUnknown (line 198/111), stripToolCallJsonBlock (line 317/145),
+    toClaudeUsageMetadata/toUsageMetadata (line 178/95), and the TOOL_CALL_FORMAT
+    constant. The normalizeUsage variants differ slightly (claude handles
+    cache_creation_input_tokens and total_tokens from response; codex handles
+    cached_input_tokens) but can be unified into a single superset function.
   pattern: Shared Utility Extraction (DRY)
   description: |
-    1. Export truncateInline and formatPreviewValue from tool-display.ts (currently private)
-    2. Export formatToolArgsPreview from tool-display.ts (currently private)
-    3. In transcript.ts, remove the local copies of all three functions
-    4. Import { truncateInline, formatToolArgsPreview } from "deep-factor-agent"
-    5. Import { formatPreviewValue } from "deep-factor-agent" (used by formatToolArgsPreview)
-    6. Update the agent package's index.ts to re-export these utilities
+    1. Create packages/deep-factor-agent/src/providers/cli-shared.ts
+    2. Move these functions to cli-shared.ts:
+       - TOOL_CALL_FORMAT constant
+       - createZeroUsage(): TokenUsage
+       - normalizeUsage(value: unknown): TokenUsage | undefined
+         (unified superset: check input_tokens, output_tokens, total_tokens,
+          cache_read_input_tokens, cache_creation_input_tokens, AND cached_input_tokens)
+       - extractTextFromUnknown(value: unknown): string
+         (use claude version — checks type === "text" for array items)
+       - stripToolCallJsonBlock(text: string): string
+       - toUsageMetadata(usage: TokenUsage): usage metadata object
+         (unified: include cache_read + cache_creation fields)
+    3. In claude-cli.ts: remove local copies, import from ./cli-shared.js
+       Keep maxUsage (claude-only), buildPrompt (closure), buildStreamMessage, etc.
+    4. In codex-cli.ts: remove local copies, import from ./cli-shared.js
+       Move responseTextToAiMessage to cli-shared.ts as well (uses parseToolCalls).
+    5. Re-export from cli-shared.ts for any downstream use.
 
-    This removes ~37 lines of duplicated code and their associated CC branches.
-    The MAX_TOOL_ARG_PREVIEW constant in transcript.ts should also be removed
-    (it duplicates the same value from tool-display.ts).
+    Note: buildPrompt() is also duplicated but uses closure variables
+    (boundToolDefs, inputEncoding) — skip for now, refactor in a future cycle.
   estimated_impact:
-    cc_reduction: "-20% (transcript.ts: 40 → ~32)"
-    cognitive_reduction: "-15%"
-    coupling_reduction: "0%"
+    cc_reduction: "-2.6% aggregate (18 CC removed: 18 from codex + 20 from claude - 20 in shared)"
+    cognitive_reduction: "-15% for both provider files"
+    coupling_reduction: "0% (new shared module adds 1 import each)"
   files_affected:
-    - packages/deep-factor-agent/src/tool-display.ts (export 3 functions)
-    - packages/deep-factor-agent/src/index.ts (re-export utilities)
-    - packages/deep-factor-tui/src/transcript.ts (remove duplicates, add imports)
-  risk: LOW — exact function copies, identical behavior, existing package dependency
+    - packages/deep-factor-agent/src/providers/cli-shared.ts (new)
+    - packages/deep-factor-agent/src/providers/claude-cli.ts (remove duplicates)
+    - packages/deep-factor-agent/src/providers/codex-cli.ts (remove duplicates)
+  risk: LOW — pure utility functions with identical behavior, existing test coverage validates both providers
   status: applied
 
 # =============================================================================
-# PATTERN 2 — transcript.ts: Handler map for segment kind dispatch
+# PATTERN 2 — events-to-messages.ts: Handler map for simple event types
 # =============================================================================
-- target: packages/deep-factor-tui/src/transcript.ts
-  rank: 5
-  composite_score: 32.1
+- target: packages/deep-factor-tui/src/events-to-messages.ts
+  rank: 11
+  composite_score: 27.2
   root_cause: >
-    buildTranscriptRenderBlocks (lines 162-259) dispatches on segment.kind using
-    6 sequential if-blocks for simple segment types (assistant, thinking, plan,
-    summary, rate_limit, error). Each block creates a RenderBlock with a predictable
-    {kind: X_block, id, segment} shape. This contributes ~10 CC from branches that
-    share identical structure.
-  pattern: Handler Map (Record<string, block_kind>)
+    eventsToChatMessages (lines 122-221) dispatches on event.type using a
+    10-case switch statement. Six of these cases (error, plan, summary,
+    completion, approval, human_input_requested) follow a simple pattern:
+    construct a ChatMessage with predictable fields and push it. The
+    "completion" case is a no-op (skip for display). These 6 cases contribute
+    6 CC from case labels alone.
+  pattern: Handler Map (event type → message builder)
   description: |
-    1. Define a mapping from segment kind to block kind:
-       const SIMPLE_SEGMENT_BLOCK_KINDS: Record<string, TranscriptRenderBlock["kind"]> = {
-         assistant: "assistant_block",
-         thinking: "thinking_block",
-         plan: "plan_block",
-         summary: "summary_block",
-         rate_limit: "rate_limit_block",
-         error: "error_block",
+    1. Define a handler map for simple event types:
+       type SimpleEventHandler = (event: AgentEvent, id: string) => ChatMessage | null;
+       const SIMPLE_EVENT_HANDLERS: Record<string, SimpleEventHandler> = {
+         error: (e, id) => ({ id, role: "error", content: `Error: ${(e as any).error}`, toolCallId: (e as any).toolCallId }),
+         plan: (e, id) => ({ id, role: "plan", content: (e as any).content, planContent: (e as any).content }),
+         summary: (e, id) => ({ id, role: "summary", content: (e as any).summary }),
+         completion: () => null,  // skip for display
+         approval: (e, id) => ({ id, role: "approval", content: `${(e as any).decision}: ${(e as any).toolName}`, toolCallId: (e as any).toolCallId, toolName: (e as any).toolName }),
+         human_input_requested: (e, id) => ({ id, role: "human_input", content: (e as any).question }),
        };
-    2. Replace the 6 if-blocks with a single map lookup:
-       const blockKind = SIMPLE_SEGMENT_BLOCK_KINDS[segment.kind];
-       if (blockKind) {
-         blocks.push({ kind: blockKind, id: segment.id, segment });
+    2. At the top of the for-loop, before the switch:
+       const simpleHandler = SIMPLE_EVENT_HANDLERS[event.type];
+       if (simpleHandler) {
+         const msg = simpleHandler(event, `msg-${messages.length}`);
+         if (msg) messages.push(msg);
          continue;
        }
-    3. Keep the remaining logic for "tool" segments and file_read grouping unchanged.
+    3. Remove the 6 handled cases from the switch statement.
+    4. Keep remaining switch cases (message, human_input_received, tool_call,
+       tool_result) which have unique control flow logic.
 
-    This replaces 6 branches with 1 branch + a map lookup.
+    Per prior audit reflection: handler maps lose TS discriminated union
+    narrowing, so handlers must use `as any` casts for event-specific fields.
+    This is safe because the map key guarantees the correct event type.
   estimated_impact:
-    cc_reduction: "-12% (transcript.ts: ~32 → ~27)"
+    cc_reduction: "-0.6% aggregate (~4 CC removed: 6 case labels removed, 2 ifs added)"
     cognitive_reduction: "-20%"
     coupling_reduction: "0%"
   files_affected:
-    - packages/deep-factor-tui/src/transcript.ts (refactor buildTranscriptRenderBlocks)
-  risk: LOW — mechanical replacement of identical if-blocks with map lookup
+    - packages/deep-factor-tui/src/events-to-messages.ts (refactor eventsToChatMessages)
+  risk: LOW — mechanical replacement of simple switch cases; test coverage verifies behavior
   status: applied
 
 # =============================================================================
-# PATTERN 3 — transcript.ts: Handler map for message role dispatch
+# PATTERN 3 — tool-display.ts: Unified tool name → kind map
 # =============================================================================
-- target: packages/deep-factor-tui/src/transcript.ts
-  rank: 5
-  composite_score: 32.1
+- target: packages/deep-factor-agent/src/tool-display.ts
+  rank: 6
+  composite_score: 29.4
   root_cause: >
-    groupMessagesIntoTurns (lines 309-412) dispatches on message.role using
-    7 sequential if-blocks. Five of these (assistant, thinking, plan, summary,
-    error) share a near-identical pattern: ensure current turn, push a segment
-    with {kind, id, content}. The thinking and plan branches have minor field
-    variations (thinking/planContent fallback).
-  pattern: Handler Map (segment builder registry)
+    normalizeToolKind (lines 54-60) uses 4 sequential Set.has() checks to
+    map tool names to display kinds. Each check is a separate if-block
+    contributing 4 CC. The 4 Set constants (FILE_READ_TOOL_NAMES, etc.)
+    are only used in this one function. A single Map<string, ToolDisplayKind>
+    replaces both the Sets and the if-chain.
+  pattern: Handler Map (tool name → display kind)
   description: |
-    1. Define a segment builder map for simple roles:
-       type SegmentBuilder = (msg: ChatMessage) => TranscriptSegment;
-       const ROLE_SEGMENT_BUILDERS: Record<string, SegmentBuilder> = {
-         assistant: (msg) => ({ kind: "assistant", id: msg.id, content: msg.content }),
-         thinking: (msg) => ({ kind: "thinking", id: msg.id, content: msg.thinking ?? msg.content }),
-         plan: (msg) => ({ kind: "plan", id: msg.id, content: msg.planContent ?? msg.content }),
-         summary: (msg) => ({ kind: "summary", id: msg.id, content: msg.content }),
-         error: (msg) => ({ kind: "error", id: msg.id, content: msg.content }),
-       };
-    2. Replace the 5 if-blocks with a single map lookup:
-       const builder = ROLE_SEGMENT_BUILDERS[message.role];
-       if (builder) {
-         currentTurn = ensureCurrentTurn(turns, currentTurn);
-         currentTurn.segments.push(builder(message));
-         continue;
+    1. Replace the 4 Set constants with a single Map:
+       const TOOL_NAME_TO_KIND = new Map<string, ToolDisplayKind>([
+         ...["Read", "View", "read_file"].map(n => [n, "file_read" as const] as const),
+         ...["Edit", "MultiEdit", "apply_patch", "edit_file"].map(n => [n, "file_edit" as const] as const),
+         ...["Write", "write_file"].map(n => [n, "file_write" as const] as const),
+         ...["Bash", "bash"].map(n => [n, "command" as const] as const),
+       ]);
+    2. Replace normalizeToolKind function body:
+       function normalizeToolKind(toolName: string): ToolDisplayKind {
+         return TOOL_NAME_TO_KIND.get(toolName) ?? "generic";
        }
-    3. Keep the "user", "rate_limit", and "tool_call" / tool_result branches as-is
-       (they have unique logic that doesn't fit the common pattern).
-
-    This replaces 5 branches with 1 branch + a map lookup.
+    3. This removes 4 if-blocks and 4 Set declarations, replacing with
+       1 Map declaration and 0 if-blocks.
   estimated_impact:
-    cc_reduction: "-10% (transcript.ts: ~27 → ~23)"
-    cognitive_reduction: "-15%"
+    cc_reduction: "-0.6% aggregate (~4 CC removed: 4 if-blocks → 0)"
+    cognitive_reduction: "-10%"
     coupling_reduction: "0%"
   files_affected:
-    - packages/deep-factor-tui/src/transcript.ts (refactor groupMessagesIntoTurns)
-  risk: LOW — mechanical replacement; test coverage verifies behavior
+    - packages/deep-factor-agent/src/tool-display.ts (refactor normalizeToolKind)
+  risk: LOW — mechanical replacement; same lookup semantics (Set.has → Map.get)
   status: applied
-
-# =============================================================================
-# PATTERN 4 — claude-agent-sdk.ts: Extract SDK option builder
-# =============================================================================
-- target: packages/deep-factor-agent/src/providers/claude-agent-sdk.ts
-  rank: 3
-  composite_score: 42.5
-  root_cause: >
-    The invoke method (lines 311-426) combines SDK import, option building
-    (12 if-guards for individual options), query execution, timeout management,
-    and response extraction. The option-building section (lines 332-365) is a
-    dense chain of independent if-statements that could be a separate function.
-  pattern: Extract Method
-  description: |
-    Extract lines 332-365 into a private function
-    `buildSdkOptions(options, converted, boundTools)` that returns the
-    fully-built sdkOptions record. This separates concern (what options
-    to set) from control flow (how to run the query).
-
-    NOTE: This is Extract Method — it won't reduce aggregate CC but will
-    improve per-method cognitive complexity and testability.
-  estimated_impact:
-    cc_reduction: "0% (aggregate unchanged)"
-    cognitive_reduction: "-30%"
-    coupling_reduction: "0%"
-  files_affected:
-    - packages/deep-factor-agent/src/providers/claude-agent-sdk.ts (refactor)
-  risk: LOW — internal method extraction, no public API change
-  status: pending
-
-# =============================================================================
-# PATTERN 5 — log-mappers: Strategy pattern for event dispatch
-# =============================================================================
-- target: packages/deep-factor-agent/src/log-mappers/
-  rank: 9-11-13-19
-  composite_score: 28.2 / 28.0 / 27.0 / 22.7 (avg 26.5)
-  root_cause: >
-    Four mapper files (replay.ts, langchain-mapper.ts, claude-mapper.ts,
-    codex-mapper.ts) each implement event-type dispatch via switch/if chains.
-    They share the same structural pattern but for different event source formats.
-  pattern: Strategy Pattern (event handler registry)
-  description: |
-    Per prior reflection: define the MapperStrategy interface type in
-    log-mappers/types.ts BEFORE touching any mapper file.
-
-    1. Define MapperStrategy interface with per-event-type handler methods
-    2. Each mapper implements the strategy for its source format
-    3. A shared dispatch function iterates events and delegates to the strategy
-  estimated_impact:
-    cc_reduction: "-15%"
-    cognitive_reduction: "-20%"
-    coupling_reduction: "-10%"
-  files_affected:
-    - packages/deep-factor-agent/src/log-mappers/replay.ts
-    - packages/deep-factor-agent/src/log-mappers/langchain-mapper.ts
-    - packages/deep-factor-agent/src/log-mappers/claude-mapper.ts
-    - packages/deep-factor-agent/src/log-mappers/codex-mapper.ts
-    - packages/deep-factor-agent/src/log-mappers/types.ts (extend)
-  risk: MEDIUM — touches 5 files, requires careful type alignment
-  status: pending
 # =============================================================================
 # PRIORITIZATION NOTE
 # =============================================================================
-# Patterns 1-3 all target transcript.ts — the #5 ranked file with CC=40.
-# Combined, they should reduce transcript.ts CC from 40 to ~23 (-42%).
-# All three are mechanical refactors with low risk and existing test coverage.
+# Pattern 1 targets the highest CC reduction (~18 CC) via DRY extraction.
+# This was explicitly recommended in prior audit reflections.
 #
-# Pattern 4 targets #3 ranked file but is Extract Method (no aggregate CC change).
-# Pattern 5 is structural but high-risk (5 files).
+# Pattern 2 applies the handler map pattern to events-to-messages.ts,
+# also recommended in prior audit reflections.
 #
-# Recommended execution order: 1 → 2 → 3
-# Patterns 4-5 deferred to next cycle.
+# Pattern 3 consolidates tool name lookups into a single Map.
+#
+# Combined expected reduction: ~26 CC (683 → ~657, ~3.8%)
+#
+# Remaining deferred work for future cycles:
+# - claude-cli.ts + codex-cli.ts buildPrompt() extraction (closure refactor)
+# - claude-agent-sdk.ts option builder extraction (Extract Method, no aggregate CC change)
+# - log-mapper strategy pattern (high effort, 5 files)

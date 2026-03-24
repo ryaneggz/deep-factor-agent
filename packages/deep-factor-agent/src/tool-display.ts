@@ -8,10 +8,14 @@ const MAX_DIFF_PREVIEW_LINES = 3;
 const MAX_DIFF_PREVIEW_WIDTH = 72;
 const MAX_TOOL_ARG_PREVIEW = 48;
 
-const FILE_READ_TOOL_NAMES = new Set(["Read", "View", "read_file"]);
-const FILE_EDIT_TOOL_NAMES = new Set(["Edit", "MultiEdit", "apply_patch", "edit_file"]);
-const FILE_WRITE_TOOL_NAMES = new Set(["Write", "write_file"]);
-const COMMAND_TOOL_NAMES = new Set(["Bash", "bash"]);
+const TOOL_NAME_TO_KIND = new Map<string, ToolDisplayKind>([
+  ...["Read", "View", "read_file"].map((n) => [n, "file_read" as const] as const),
+  ...["Edit", "MultiEdit", "apply_patch", "edit_file"].map(
+    (n) => [n, "file_edit" as const] as const,
+  ),
+  ...["Write", "write_file"].map((n) => [n, "file_write" as const] as const),
+  ...["Bash", "bash"].map((n) => [n, "command" as const] as const),
+]);
 
 export function truncateInline(value: string, maxLength: number): string {
   if (value.length <= maxLength) {
@@ -52,11 +56,7 @@ export function formatToolArgsPreview(toolArgs?: Record<string, unknown>): strin
 }
 
 function normalizeToolKind(toolName: string): ToolDisplayKind {
-  if (FILE_READ_TOOL_NAMES.has(toolName)) return "file_read";
-  if (FILE_EDIT_TOOL_NAMES.has(toolName)) return "file_edit";
-  if (FILE_WRITE_TOOL_NAMES.has(toolName)) return "file_write";
-  if (COMMAND_TOOL_NAMES.has(toolName)) return "command";
-  return "generic";
+  return TOOL_NAME_TO_KIND.get(toolName) ?? "generic";
 }
 
 function resolvePrimaryPath(args?: Record<string, unknown>): string | undefined {

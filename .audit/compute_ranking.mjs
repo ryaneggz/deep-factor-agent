@@ -16,12 +16,22 @@ const files = [
   },
   {
     file: "packages/deep-factor-agent/src/providers/claude-cli.ts",
-    cc: 62,
+    cc: 33,
     nesting: 7,
-    imports: 8,
+    imports: 9,
     churn: 9,
-    loc: 678,
+    loc: 548,
     any: 1,
+    duplication: 0,
+  },
+  {
+    file: "packages/deep-factor-agent/src/providers/cli-shared.ts",
+    cc: 32,
+    nesting: 5,
+    imports: 3,
+    churn: 0,
+    loc: 130,
+    any: 0,
     duplication: 0,
   },
   {
@@ -36,7 +46,7 @@ const files = [
   },
   {
     file: "packages/deep-factor-agent/src/tool-display.ts",
-    cc: 44,
+    cc: 40,
     nesting: 4,
     imports: 1,
     churn: 3,
@@ -56,11 +66,11 @@ const files = [
   },
   {
     file: "packages/deep-factor-agent/src/providers/codex-cli.ts",
-    cc: 29,
+    cc: 7,
     nesting: 8,
-    imports: 8,
+    imports: 9,
     churn: 5,
-    loc: 406,
+    loc: 290,
     any: 1,
     duplication: 0,
   },
@@ -267,7 +277,7 @@ const files = [
   },
   {
     file: "packages/deep-factor-tui/src/events-to-messages.ts",
-    cc: 27,
+    cc: 23,
     nesting: 7,
     imports: 2,
     churn: 1,
@@ -654,7 +664,7 @@ import { writeFileSync } from "fs";
 const snapshot = {
   timestamp: new Date().toISOString(),
   git_sha: "HEAD",
-  git_message: "baseline — before refactoring",
+  git_message: "fresh audit #3 — post refactoring",
   totals: {
     files_analyzed: files.length,
     total_cc: files.reduce((s, f) => s + f.cc, 0),

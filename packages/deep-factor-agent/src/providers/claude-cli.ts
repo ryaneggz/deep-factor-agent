@@ -11,6 +11,14 @@ import {
   messagesToPrompt,
   parseToolCalls,
 } from "./messages-to-xml.js";
+import {
+  TOOL_CALL_FORMAT,
+  createZeroUsage,
+  normalizeUsage,
+  extractTextFromUnknown,
+  stripToolCallJsonBlock,
+  toUsageMetadata as toClaudeUsageMetadata,
+} from "./cli-shared.js";
 
 export interface ClaudeCliProviderOptions {
   /** Claude model to use (e.g. "sonnet", "opus"). Passed as `--model <model>`. */
@@ -66,23 +74,6 @@ interface ClaudeCliStreamState {
   sawFinalEvent: boolean;
 }
 
-/** Prompt-engineered instruction telling the CLI model how to format tool calls. */
-const TOOL_CALL_FORMAT = `When you need to call a tool, respond with ONLY a JSON block in this exact format:
-
-\`\`\`json
-{
-  "tool_calls": [
-    {
-      "name": "tool_name",
-      "args": { "param": "value" },
-      "id": "call_1"
-    }
-  ]
-}
-\`\`\`
-
-If you do not need to call any tools, respond with plain text (no JSON block).`;
-
 /**
  * Create a Claude CLI model adapter.
  *
@@ -108,57 +99,6 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
 
   let boundToolDefs: StructuredToolInterface[] = [];
 
-  function createZeroUsage(): TokenUsage {
-    return {
-      inputTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0,
-    };
-  }
-
-  function normalizeUsage(value: unknown): TokenUsage | undefined {
-    if (typeof value !== "object" || value === null) {
-      return undefined;
-    }
-
-    const record = value as Record<string, unknown>;
-    const inputTokens = typeof record.input_tokens === "number" ? record.input_tokens : undefined;
-    const outputTokens =
-      typeof record.output_tokens === "number" ? record.output_tokens : undefined;
-    const totalTokens =
-      typeof record.total_tokens === "number"
-        ? record.total_tokens
-        : inputTokens !== undefined || outputTokens !== undefined
-          ? (inputTokens ?? 0) + (outputTokens ?? 0)
-          : undefined;
-    const cacheReadTokens =
-      typeof record.cache_read_input_tokens === "number"
-        ? record.cache_read_input_tokens
-        : undefined;
-    const cacheWriteTokens =
-      typeof record.cache_creation_input_tokens === "number"
-        ? record.cache_creation_input_tokens
-        : undefined;
-
-    if (
-      inputTokens === undefined &&
-      outputTokens === undefined &&
-      totalTokens === undefined &&
-      cacheReadTokens === undefined &&
-      cacheWriteTokens === undefined
-    ) {
-      return undefined;
-    }
-
-    return {
-      inputTokens: inputTokens ?? 0,
-      outputTokens: outputTokens ?? 0,
-      totalTokens: totalTokens ?? 0,
-      cacheReadTokens,
-      cacheWriteTokens,
-    };
-  }
-
   function maxUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
     return {
       inputTokens: Math.max(a.inputTokens, b.inputTokens),
@@ -173,64 +113,6 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
           ? Math.max(a.cacheWriteTokens ?? 0, b.cacheWriteTokens ?? 0)
           : undefined,
     };
-  }
-
-  function toClaudeUsageMetadata(usage: TokenUsage): {
-    input_tokens: number;
-    output_tokens: number;
-    total_tokens: number;
-    cache_read_input_tokens?: number;
-    cache_creation_input_tokens?: number;
-  } {
-    return {
-      input_tokens: usage.inputTokens,
-      output_tokens: usage.outputTokens,
-      total_tokens: usage.totalTokens,
-      ...(usage.cacheReadTokens !== undefined
-        ? { cache_read_input_tokens: usage.cacheReadTokens }
-        : {}),
-      ...(usage.cacheWriteTokens !== undefined
-        ? { cache_creation_input_tokens: usage.cacheWriteTokens }
-        : {}),
-    };
-  }
-
-  function extractTextFromUnknown(value: unknown): string {
-    if (typeof value === "string") {
-      return value;
-    }
-
-    if (Array.isArray(value)) {
-      return value
-        .map((item) => {
-          if (typeof item === "string") {
-            return item;
-          }
-          if (
-            typeof item === "object" &&
-            item !== null &&
-            "type" in item &&
-            (item as { type?: unknown }).type === "text" &&
-            "text" in item &&
-            typeof (item as { text?: unknown }).text === "string"
-          ) {
-            return (item as { text: string }).text;
-          }
-          return "";
-        })
-        .join("");
-    }
-
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "text" in value &&
-      typeof (value as { text?: unknown }).text === "string"
-    ) {
-      return (value as { text: string }).text;
-    }
-
-    return "";
   }
 
   function buildPrompt(messages: BaseMessage[]): string {
@@ -312,10 +194,6 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
       sawAssistantBlock: false,
       sawFinalEvent: false,
     };
-  }
-
-  function stripToolCallJsonBlock(text: string): string {
-    return text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
   }
 
   function addToolCallFromParsed(

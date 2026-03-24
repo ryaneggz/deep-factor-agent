@@ -11,6 +11,14 @@ import {
   messagesToPrompt,
   parseToolCalls,
 } from "./messages-to-xml.js";
+import {
+  TOOL_CALL_FORMAT,
+  createZeroUsage,
+  normalizeUsage,
+  extractTextFromUnknown,
+  stripToolCallJsonBlock,
+  responseTextToAiMessage,
+} from "./cli-shared.js";
 
 export interface CodexCliProviderOptions {
   /** Codex model to use (e.g. "gpt-5.4"). Passed as `--model <model>`. */
@@ -42,119 +50,6 @@ interface CodexJsonlEvent {
 interface CodexStreamState {
   lastAgentMessageText: string;
   usage: TokenUsage;
-}
-
-/** Prompt-engineered instruction telling the CLI model how to format tool calls. */
-const TOOL_CALL_FORMAT = `When you need to call a tool, respond with ONLY a JSON block in this exact format:
-
-\`\`\`json
-{
-  "tool_calls": [
-    {
-      "name": "tool_name",
-      "args": { "param": "value" },
-      "id": "call_1"
-    }
-  ]
-}
-\`\`\`
-
-If you do not need to call any tools, respond with plain text (no JSON block).`;
-
-function createZeroUsage(): TokenUsage {
-  return {
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
-  };
-}
-
-function normalizeUsage(value: unknown): TokenUsage | undefined {
-  if (typeof value !== "object" || value === null) {
-    return undefined;
-  }
-
-  const record = value as Record<string, unknown>;
-  const inputTokens = typeof record.input_tokens === "number" ? record.input_tokens : undefined;
-  const outputTokens = typeof record.output_tokens === "number" ? record.output_tokens : undefined;
-  const cacheReadTokens =
-    typeof record.cached_input_tokens === "number" ? record.cached_input_tokens : undefined;
-
-  if (inputTokens === undefined && outputTokens === undefined && cacheReadTokens === undefined) {
-    return undefined;
-  }
-
-  return {
-    inputTokens: inputTokens ?? 0,
-    outputTokens: outputTokens ?? 0,
-    totalTokens: (inputTokens ?? 0) + (outputTokens ?? 0),
-    cacheReadTokens,
-  };
-}
-
-function toUsageMetadata(usage: TokenUsage): {
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  cache_read_input_tokens?: number;
-} {
-  return {
-    input_tokens: usage.inputTokens,
-    output_tokens: usage.outputTokens,
-    total_tokens: usage.totalTokens,
-    ...(usage.cacheReadTokens !== undefined
-      ? { cache_read_input_tokens: usage.cacheReadTokens }
-      : {}),
-  };
-}
-
-function extractTextFromUnknown(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (typeof item === "string") return item;
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          "text" in item &&
-          typeof (item as { text?: unknown }).text === "string"
-        ) {
-          return (item as { text: string }).text;
-        }
-        return "";
-      })
-      .join("");
-  }
-
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "text" in value &&
-    typeof (value as { text?: unknown }).text === "string"
-  ) {
-    return (value as { text: string }).text;
-  }
-
-  return "";
-}
-
-function stripToolCallJsonBlock(text: string): string {
-  return text.replace(/```json\s*\n?[\s\S]*?\n?\s*```/, "").trim();
-}
-
-function responseTextToAiMessage(text: string, usage?: TokenUsage): AIMessage {
-  const toolCalls = parseToolCalls(text);
-  const content = toolCalls.length > 0 ? stripToolCallJsonBlock(text) : text.trim();
-
-  return new AIMessage({
-    content,
-    tool_calls: toolCalls,
-    ...(usage ? { usage_metadata: toUsageMetadata(usage) } : {}),
-  });
 }
 
 /**

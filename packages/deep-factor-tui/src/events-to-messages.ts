@@ -119,6 +119,46 @@ export function buildPendingUiState(
   };
 }
 
+// --- Handler map for simple event types ---
+// Each handler builds a ChatMessage from an event, or returns null to skip.
+// Uses Record<string, unknown> casts because map lookups lose TS discriminated
+// union narrowing (safe: the map key guarantees the correct event shape).
+
+type SimpleEventBuilder = (event: Record<string, unknown>, id: string) => ChatMessage | null;
+
+const SIMPLE_EVENT_BUILDERS: { [key: string]: SimpleEventBuilder | undefined } = {
+  error: (e, id) => ({
+    id,
+    role: "error",
+    content: `Error: ${e.error as string}`,
+    toolCallId: e.toolCallId as string | undefined,
+  }),
+  plan: (e, id) => ({
+    id,
+    role: "plan",
+    content: e.content as string,
+    planContent: e.content as string,
+  }),
+  summary: (e, id) => ({
+    id,
+    role: "summary",
+    content: e.summary as string,
+  }),
+  completion: () => null,
+  approval: (e, id) => ({
+    id,
+    role: "approval",
+    content: `${e.decision as string}: ${e.toolName as string}`,
+    toolCallId: e.toolCallId as string,
+    toolName: e.toolName as string,
+  }),
+  human_input_requested: (e, id) => ({
+    id,
+    role: "human_input",
+    content: e.question as string,
+  }),
+};
+
 export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
   // Collect tool_call IDs whose results contain "blocked in plan mode" so we can skip both
@@ -134,6 +174,18 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   }
 
   for (const event of events) {
+    // Dispatch simple event types via handler map
+    const simpleBuilder = SIMPLE_EVENT_BUILDERS[event.type];
+    if (simpleBuilder) {
+      const msg = simpleBuilder(
+        event as unknown as Record<string, unknown>,
+        `msg-${messages.length}`,
+      );
+      if (msg) messages.push(msg);
+      continue;
+    }
+
+    // Handle complex event types with unique control flow
     switch (event.type) {
       case "message":
         if (event.role === "user" && isSyntheticUserMessage(event.content)) break;
@@ -171,48 +223,6 @@ export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
           durationMs: event.durationMs,
           parallelGroup: event.parallelGroup,
           toolDisplay: event.display,
-        });
-        break;
-      case "error":
-        messages.push({
-          id: `msg-${messages.length}`,
-          role: "error",
-          content: `Error: ${event.error}`,
-          toolCallId: event.toolCallId,
-        });
-        break;
-      case "plan":
-        messages.push({
-          id: `msg-${messages.length}`,
-          role: "plan",
-          content: event.content,
-          planContent: event.content,
-        });
-        break;
-      case "summary":
-        messages.push({
-          id: `msg-${messages.length}`,
-          role: "summary",
-          content: event.summary,
-        });
-        break;
-      case "completion":
-        // completion events duplicate the final assistant message — skip for display
-        break;
-      case "approval":
-        messages.push({
-          id: `msg-${messages.length}`,
-          role: "approval",
-          content: `${event.decision}: ${event.toolName}`,
-          toolCallId: event.toolCallId,
-          toolName: event.toolName,
-        });
-        break;
-      case "human_input_requested":
-        messages.push({
-          id: `msg-${messages.length}`,
-          role: "human_input",
-          content: event.question,
         });
         break;
     }

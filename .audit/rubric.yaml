@@ -1,6 +1,6 @@
 # Complexity Scoring Rubric
 # Project: deep-factor-agent + deep-factor-tui
-# Date: 2026-03-23 (fresh audit #2)
+# Date: 2026-03-23 (fresh audit #3)
 # Methodology: McCabe CC (control-flow decision points only)
 
 project: deep-factor-agent
@@ -32,7 +32,7 @@ metrics:
   duplication:
     weight: 0.10
     method: "Manual cross-file comparison; structural clone detection"
-    justification: "Key duplication found: transcript.ts duplicates 3 functions from tool-display.ts; Claude/Codex CLI providers share utility functions"
+    justification: "Key duplication: claude-cli.ts and codex-cli.ts share 6 utility functions (createZeroUsage, normalizeUsage, extractTextFromUnknown, stripToolCallJsonBlock, toUsageMetadata, TOOL_CALL_FORMAT)"
 
 composite_formula: "SUM(metric_normalized * weight)"
 normalization: "Divide by max value across all scanned files (0-100 scale)"
