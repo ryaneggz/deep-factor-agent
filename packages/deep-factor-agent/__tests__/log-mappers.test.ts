@@ -37,7 +37,7 @@ describe("claude-mapper", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].type).toBe("init");
     const init = entries[0] as Extract<UnifiedLogEntry, { type: "init" }>;
-    expect(init.provider).toBe("claude");
+    expect(init.provider).toBe("anthropic");
     expect(init.model).toBe("claude-opus-4-6");
     expect(init.cwd).toBe("/home/user/project");
     expect(init.tools).toEqual(["Bash", "Read"]);
@@ -166,7 +166,7 @@ describe("codex-mapper", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].type).toBe("init");
     const init = entries[0] as Extract<UnifiedLogEntry, { type: "init" }>;
-    expect(init.provider).toBe("codex");
+    expect(init.provider).toBe("openai");
     expect(init.model).toBe("gpt-5.4");
   });
 

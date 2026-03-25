@@ -12,6 +12,7 @@ export type {
   CompletionEvent,
   PlanEvent,
   SummaryEvent,
+  ThinkingEvent,
   AgentEvent,
   AgentThread,
   TokenUsage,
@@ -153,30 +154,35 @@ export type { XmlSerializerOptions } from "./xml-serializer.js";
 // Providers
 export type { ModelAdapter, ModelInvocationUpdate } from "./providers/types.js";
 export { isModelAdapter } from "./providers/types.js";
-export { createClaudeCliProvider } from "./providers/claude-cli.js";
-export type { ClaudeCliProviderOptions } from "./providers/claude-cli.js";
-export { createCodexCliProvider } from "./providers/codex-cli.js";
-export type { CodexCliProviderOptions } from "./providers/codex-cli.js";
+
+// SDK Providers
+export { createAnthropicProvider } from "./providers/anthropic-sdk.js";
+export type { AnthropicProviderOptions } from "./providers/anthropic-sdk.js";
+export { createOpenAIProvider } from "./providers/openai-sdk.js";
+export type { OpenAIProviderOptions } from "./providers/openai-sdk.js";
+
+// Shared provider utilities
 export {
-  createClaudeAgentSdkProvider,
-  extractSystemPrompt,
-  convertMessagesToPrompt,
-  convertMessages,
-  parseResponseText,
-  parseToolUseBlocks,
-  parseUsageMetadata,
-  throwOnSdkError,
-  parseSdkResponse,
-  formatToolDefinitions,
-} from "./providers/claude-agent-sdk.js";
+  toAIMessage,
+  extractText,
+  extractToolCalls,
+  extractThinking,
+  createZeroUsage,
+} from "./providers/provider-response.js";
 export type {
-  ClaudeAgentSdkProviderOptions,
-  ConvertedMessages,
-  SdkTextBlock,
-  SdkToolUseBlock,
-  SdkContentBlock,
-  SdkUsage,
-  SdkResponseMessage,
-  SdkErrorType,
-  SdkErrorResult,
-} from "./providers/claude-agent-sdk.js";
+  ProviderResponse,
+  ContentBlock,
+  TextBlock,
+  ThinkingBlock,
+  ToolUseBlock,
+} from "./providers/provider-response.js";
+export {
+  toolToDefinition,
+  toolsToAnthropicFormat,
+  toolsToOpenAIFormat,
+} from "./providers/tool-schema.js";
+export type {
+  ToolDefinition,
+  AnthropicToolParam,
+  OpenAIChatCompletionTool,
+} from "./providers/tool-schema.js";

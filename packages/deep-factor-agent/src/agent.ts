@@ -1486,6 +1486,22 @@ export class DeepFactorAgent<TTools extends StructuredToolInterface[] = Structur
                       case "assistant_message":
                         appendAssistantOrPlanEvent(update.content);
                         break;
+                      case "thinking":
+                        this.appendEvent(
+                          thread,
+                          {
+                            type: "thinking" as const,
+                            content: update.content,
+                            timestamp: Date.now(),
+                            iteration,
+                          },
+                          {
+                            usage: currentUsageSnapshot(),
+                            iterations: iteration,
+                            status: "running",
+                          },
+                        );
+                        break;
                       case "usage":
                         currentStepUsage = maxUsageSnapshot(currentStepUsage, update.usage);
                         this.emitUsageUpdate(thread, currentUsageSnapshot(), iteration, "running");

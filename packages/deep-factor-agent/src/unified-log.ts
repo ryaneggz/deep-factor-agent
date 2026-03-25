@@ -20,7 +20,7 @@ export type UnifiedLogType =
   | "completion"
   | "result";
 
-export type ProviderType = "langchain" | "claude" | "codex";
+export type ProviderType = "langchain" | "anthropic" | "openai";
 
 export interface UnifiedLogBase {
   type: UnifiedLogType;

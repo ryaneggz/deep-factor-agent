@@ -10,7 +10,7 @@ describe("resolveSessionSettings", () => {
         sessionId: "abc",
         timestamp: new Date("2026-03-08T10:00:00.000Z").getTime(),
         sequence: 0,
-        provider: "claude",
+        provider: "anthropic",
         model: "sonnet",
         mode: "agentic",
       },
@@ -22,7 +22,7 @@ describe("resolveSessionSettings", () => {
         hasModelFlag: false,
       }),
     ).toEqual({
-      provider: "claude",
+      provider: "anthropic",
       model: "sonnet",
     });
   });
@@ -47,7 +47,7 @@ describe("resolveSessionSettings", () => {
       }),
     ).toEqual({
       provider: "langchain",
-      model: "gpt-4.1-mini",
+      model: "gpt-5.4-mini",
     });
   });
 
@@ -58,7 +58,7 @@ describe("resolveSessionSettings", () => {
         sessionId: "abc",
         timestamp: new Date("2026-03-08T10:00:00.000Z").getTime(),
         sequence: 0,
-        provider: "claude",
+        provider: "anthropic",
         model: "sonnet",
         mode: "agentic",
       },
@@ -72,7 +72,7 @@ describe("resolveSessionSettings", () => {
       }),
     ).toEqual({
       provider: "langchain",
-      model: "gpt-4.1-mini",
+      model: "gpt-5.4-mini",
     });
   });
 
@@ -83,7 +83,7 @@ describe("resolveSessionSettings", () => {
         sessionId: "abc",
         timestamp: new Date("2026-03-08T10:00:00.000Z").getTime(),
         sequence: 0,
-        provider: "codex",
+        provider: "openai",
         model: "gpt-5.4",
         mode: "agentic",
       },
@@ -95,7 +95,7 @@ describe("resolveSessionSettings", () => {
         hasModelFlag: false,
       }),
     ).toEqual({
-      provider: "codex",
+      provider: "openai",
       model: "gpt-5.4",
     });
   });

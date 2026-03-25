@@ -48,8 +48,6 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
     const resolvedModel = resolveProviderModel({
       provider,
       model,
-      mode,
-      liveUpdates: isStreamJson,
     });
 
     const sessionId = randomUUID();
@@ -58,7 +56,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
       sessionId,
       sequence: 0,
       currentIteration: 0,
-      provider: provider as "langchain" | "claude" | "codex",
+      provider: provider as "langchain" | "anthropic" | "openai",
       model,
       mode,
     };
@@ -108,7 +106,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<void> {
     if (isStreamJson) {
       writeUnifiedLine(
         buildEntry("init", {
-          provider: provider as "langchain" | "claude" | "codex",
+          provider: provider as "langchain" | "anthropic" | "openai",
           model,
           mode,
           settings: { maxIter, sandbox },

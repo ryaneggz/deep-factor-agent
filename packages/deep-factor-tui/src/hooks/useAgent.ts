@@ -325,8 +325,8 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
   const shouldStreamUpdates =
     options.provider === "langchain" ||
-    options.provider === "claude" ||
-    options.provider === "codex";
+    options.provider === "anthropic" ||
+    options.provider === "openai";
 
   const sendPrompt = useCallback(
     (prompt: string) => {

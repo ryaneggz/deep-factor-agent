@@ -14,7 +14,8 @@ export type AgentEventType =
   | "message"
   | "completion"
   | "plan"
-  | "summary";
+  | "summary"
+  | "thinking";
 
 export type AgentMode = "plan" | "approve" | "yolo";
 export type ApprovalDecision = "approve" | "reject" | "edit";
@@ -143,6 +144,11 @@ export interface SummaryEvent extends BaseEvent {
   summary: string;
 }
 
+export interface ThinkingEvent extends BaseEvent {
+  type: "thinking";
+  content: string;
+}
+
 export type AgentEvent =
   | ApprovalEvent
   | ToolCallEvent
@@ -153,7 +159,8 @@ export type AgentEvent =
   | MessageEvent
   | CompletionEvent
   | PlanEvent
-  | SummaryEvent;
+  | SummaryEvent
+  | ThinkingEvent;
 
 // --- Thread ---
 

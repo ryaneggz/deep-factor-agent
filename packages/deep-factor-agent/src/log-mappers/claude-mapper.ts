@@ -30,7 +30,7 @@ export function mapClaudeEvent(
           ...base,
           type: "init",
           sequence: nextSequence(ctx),
-          provider: "claude",
+          provider: "anthropic",
           model: (raw.model as string) ?? ctx.model ?? "unknown",
           mode: ctx.mode ?? "yolo",
           cwd: raw.cwd as string | undefined,

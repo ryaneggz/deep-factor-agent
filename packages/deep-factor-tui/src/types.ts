@@ -11,27 +11,27 @@ import type {
 export type AgentTools = NonNullable<DeepFactorAgentSettings["tools"]>;
 
 export type AgentStatus = "idle" | "running" | "done" | "error" | "pending_input";
-export type ProviderType = "langchain" | "claude" | "codex";
-export type LegacyProviderType = "claude-sdk";
+export type ProviderType = "langchain" | "anthropic" | "openai";
+export type LegacyProviderType = "claude" | "claude-sdk" | "codex";
 export type ProviderInput = ProviderType | LegacyProviderType;
 
 export const DEFAULT_PROVIDER: ProviderType = "langchain";
 
 export const DEFAULT_MODELS: Record<ProviderType, string> = {
-  langchain: "gpt-4.1-mini",
-  claude: "sonnet",
-  codex: "gpt-5.4",
+  langchain: "gpt-5.4-mini",
+  anthropic: "claude-sonnet-4-20250514",
+  openai: "gpt-4.1",
 };
 
 export function isProviderType(value: string): value is ProviderType {
-  return value === "langchain" || value === "claude" || value === "codex";
+  return value === "langchain" || value === "anthropic" || value === "openai";
 }
 
 export function normalizeProvider(value: string | undefined): ProviderType | undefined {
   if (!value) return undefined;
   if (value === "langchain") return "langchain";
-  if (value === "claude" || value === "claude-sdk") return "claude";
-  if (value === "codex") return "codex";
+  if (value === "anthropic" || value === "claude" || value === "claude-sdk") return "anthropic";
+  if (value === "openai" || value === "codex") return "openai";
   return undefined;
 }
 

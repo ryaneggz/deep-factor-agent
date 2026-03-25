@@ -408,7 +408,7 @@ describe("useAgent", () => {
           model: "sonnet",
           modelLabel: "sonnet",
           maxIter: 10,
-          provider: "claude",
+          provider: "anthropic",
         }}
       />,
     );
@@ -502,7 +502,7 @@ describe("useAgent", () => {
           model: { invoke: vi.fn(), invokeWithUpdates: vi.fn(), bindTools: vi.fn() } as any,
           modelLabel: "gpt-5.4",
           maxIter: 10,
-          provider: "codex",
+          provider: "openai",
         }}
       />,
     );
@@ -610,7 +610,7 @@ describe("useAgent", () => {
           model: "sonnet",
           modelLabel: "sonnet",
           maxIter: 10,
-          provider: "claude",
+          provider: "anthropic",
         }}
       />,
     );

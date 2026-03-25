@@ -46,7 +46,7 @@ describe("CLI e2e", () => {
     const output = result.stdout + result.stderr;
     expect(output).toContain("--print");
     expect(output).toContain("--sandbox");
-    expect(output).toContain("langchain, claude, codex");
+    expect(output).toContain("langchain, anthropic, openai");
     expect(output).not.toContain("--parallel");
   });
 
@@ -56,25 +56,24 @@ describe("CLI e2e", () => {
     expect(result.stderr).toContain("requires a prompt");
   });
 
-  it("--provider codex is accepted by CLI validation", async () => {
-    const result = await run(["--provider", "codex", "-p"]);
+  it("--provider openai is accepted by CLI validation", async () => {
+    const result = await run(["--provider", "openai", "-p"]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("requires a prompt");
-    expect(result.stderr).not.toContain('Provider "codex" is not supported yet');
-    expect(result.stderr).not.toContain('Invalid provider "codex"');
+    expect(result.stderr).not.toContain('Invalid provider "openai"');
   });
 
-  it("--provider claude-sdk remains accepted as a compatibility alias", async () => {
+  it("--provider claude-sdk remains accepted as a compatibility alias for anthropic", async () => {
     const result = await run(["--provider", "claude-sdk", "-p"]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("requires a prompt");
     expect(result.stderr).not.toContain('Invalid provider "claude-sdk"');
   });
 
-  it("invalid provider errors include codex in the allowed list", async () => {
+  it("invalid provider errors include openai in the allowed list", async () => {
     const result = await run(["--provider", "nope", "-p"]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('Invalid provider "nope"');
-    expect(result.stderr).toContain("langchain, claude, codex");
+    expect(result.stderr).toContain("langchain, anthropic, openai");
   });
 });

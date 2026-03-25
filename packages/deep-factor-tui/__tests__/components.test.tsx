@@ -30,8 +30,8 @@ describe("Header", () => {
   });
 
   it("renders the provider and model", () => {
-    const { lastFrame } = render(<Header provider="claude" model="sonnet" />);
-    expect(lastFrame()).toContain("claude");
+    const { lastFrame } = render(<Header provider="anthropic" model="claude-sonnet-4-20250514" />);
+    expect(lastFrame()).toContain("anthropic");
     expect(lastFrame()).toContain("sonnet");
   });
 });

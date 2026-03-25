@@ -19,6 +19,10 @@ export type ModelInvocationUpdate =
       content: string;
     }
   | {
+      type: "thinking";
+      content: string;
+    }
+  | {
       type: "usage";
       usage: TokenUsage;
       rawStopReason?: string;
@@ -38,8 +42,7 @@ export type ModelInvocationUpdate =
 /**
  * Lightweight model adapter interface matching the two methods the agent loop
  * actually uses: `invoke()` and `bindTools()`. This avoids requiring the full
- * `BaseChatModel` abstract class for CLI-based providers that shell out to
- * external processes.
+ * `BaseChatModel` abstract class for SDK-based or CLI-based providers.
  */
 export interface ModelAdapter {
   invoke(messages: BaseMessage[]): Promise<AIMessage>;

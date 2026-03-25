@@ -25,7 +25,7 @@ export function mapCodexEvent(raw: Record<string, unknown>, ctx: MapperContext):
         ...base,
         type: "init",
         sequence: nextSequence(ctx),
-        provider: "codex",
+        provider: "openai",
         model: ctx.model ?? "unknown",
         mode: ctx.mode ?? "yolo",
         settings: {

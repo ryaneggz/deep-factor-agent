@@ -22,10 +22,10 @@ let mockUseAgent: UseAgentReturn = {
   submitPendingInput: vi.fn(),
   pendingUiState: null,
 };
-const mockClaudeCliProvider = { invoke: vi.fn(), bindTools: vi.fn() };
-const createClaudeCliProviderMock = vi.fn(() => mockClaudeCliProvider);
-const mockCodexCliProvider = { invoke: vi.fn(), invokeWithUpdates: vi.fn(), bindTools: vi.fn() };
-const createCodexCliProviderMock = vi.fn(() => mockCodexCliProvider);
+const mockAnthropicProvider = { invoke: vi.fn(), invokeWithUpdates: vi.fn(), bindTools: vi.fn() };
+const createAnthropicProviderMock = vi.fn(() => mockAnthropicProvider);
+const mockOpenAIProvider = { invoke: vi.fn(), invokeWithUpdates: vi.fn(), bindTools: vi.fn() };
+const createOpenAIProviderMock = vi.fn(() => mockOpenAIProvider);
 const useAgentMock = vi.fn(() => mockUseAgent);
 
 vi.mock("../src/hooks/useAgent.js", () => ({
@@ -37,8 +37,8 @@ vi.mock("../src/tools/default-tools.js", () => ({
 }));
 
 vi.mock("deep-factor-agent", () => ({
-  createClaudeCliProvider: createClaudeCliProviderMock,
-  createCodexCliProvider: createCodexCliProviderMock,
+  createAnthropicProvider: createAnthropicProviderMock,
+  createOpenAIProvider: createOpenAIProviderMock,
 }));
 
 vi.mock("../src/session-logger.js", () => ({}));
@@ -85,8 +85,8 @@ describe("TuiApp integration", () => {
       pendingUiState: null,
     };
     useAgentMock.mockClear();
-    createClaudeCliProviderMock.mockClear();
-    createCodexCliProviderMock.mockClear();
+    createAnthropicProviderMock.mockClear();
+    createOpenAIProviderMock.mockClear();
   });
 
   it("renders live section in idle state", () => {
@@ -126,7 +126,6 @@ describe("TuiApp integration", () => {
     stdin.write("a");
 
     expect(submitPendingInput).toHaveBeenCalledWith({ kind: "approve" });
-    // User message logging now happens inside useAgent (not app.tsx)
   });
 
   it("logs the initial prompt with provider and model", () => {
@@ -136,15 +135,14 @@ describe("TuiApp integration", () => {
       <TuiApp prompt="Hello" provider="langchain" model="gpt-4" maxIter={10} sandbox="workspace" />,
     );
 
-    // User message logging now happens inside useAgent.ts sendPrompt()
     expect(sendPrompt).toHaveBeenCalledWith("Hello");
   });
 
-  it("does not resolve the Claude CLI provider for langchain runs", () => {
+  it("does not resolve SDK providers for langchain runs", () => {
     render(<TuiApp provider="langchain" model="gpt-4" maxIter={10} sandbox="workspace" />);
 
-    expect(createClaudeCliProviderMock).not.toHaveBeenCalled();
-    expect(createCodexCliProviderMock).not.toHaveBeenCalled();
+    expect(createAnthropicProviderMock).not.toHaveBeenCalled();
+    expect(createOpenAIProviderMock).not.toHaveBeenCalled();
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: "langchain",
@@ -153,77 +151,52 @@ describe("TuiApp integration", () => {
     );
   });
 
-  it("resolves the Claude CLI provider once at startup", () => {
-    render(<TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" />);
+  it("resolves the Anthropic SDK provider at startup", () => {
+    render(
+      <TuiApp
+        provider="anthropic"
+        model="claude-sonnet-4-20250514"
+        maxIter={10}
+        sandbox="workspace"
+      />,
+    );
 
-    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
-      model: "sonnet",
-      permissionMode: "bypassPermissions",
-      disableBuiltInTools: true,
-      outputFormat: "stream-json",
-      verbose: true,
-      includePartialMessages: true,
+    expect(createAnthropicProviderMock).toHaveBeenCalledWith({
+      model: "claude-sonnet-4-20250514",
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        provider: "claude",
-        model: mockClaudeCliProvider,
-        modelLabel: "sonnet",
+        provider: "anthropic",
+        model: mockAnthropicProvider,
+        modelLabel: "claude-sonnet-4-20250514",
       }),
     );
   });
 
-  it("resolves the Codex CLI provider once at startup in jsonl mode", () => {
-    render(<TuiApp provider="codex" model="gpt-5.4" maxIter={10} sandbox="workspace" />);
+  it("resolves the OpenAI SDK provider at startup", () => {
+    render(<TuiApp provider="openai" model="gpt-4.1" maxIter={10} sandbox="workspace" />);
 
-    expect(createCodexCliProviderMock).toHaveBeenCalledWith({
-      model: "gpt-5.4",
-      outputFormat: "jsonl",
-      sandbox: "read-only",
-      skipGitRepoCheck: true,
+    expect(createOpenAIProviderMock).toHaveBeenCalledWith({
+      model: "gpt-4.1",
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        provider: "codex",
-        model: mockCodexCliProvider,
-        modelLabel: "gpt-5.4",
+        provider: "openai",
+        model: mockOpenAIProvider,
+        modelLabel: "gpt-4.1",
       }),
     );
   });
 
-  it("maps approve mode to Claude acceptEdits permission mode", () => {
-    render(
-      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="approve" />,
-    );
-
-    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
-      model: "sonnet",
-      permissionMode: "acceptEdits",
-      disableBuiltInTools: true,
-      outputFormat: "stream-json",
-      verbose: true,
-      includePartialMessages: true,
-    });
-  });
-
-  it("maps plan mode to Claude plan permission mode", () => {
-    render(
-      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
-    );
-
-    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
-      model: "sonnet",
-      permissionMode: "plan",
-      disableBuiltInTools: true,
-      outputFormat: "stream-json",
-      verbose: true,
-      includePartialMessages: true,
-    });
-  });
-
-  it("cycles modes with Shift+Tab in the idle composer and re-resolves Claude permissions", async () => {
+  it("cycles modes with Shift+Tab in the idle composer", async () => {
     const { stdin, lastFrame } = render(
-      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+      <TuiApp
+        provider="anthropic"
+        model="claude-sonnet-4-20250514"
+        maxIter={10}
+        sandbox="workspace"
+        mode="plan"
+      />,
     );
 
     expect(lastFrame()).toContain("▸▸ plan mode (shift+tab to cycle)");
@@ -240,12 +213,6 @@ describe("TuiApp integration", () => {
     await flush();
     expect(lastFrame()).toContain("▸▸ plan mode (shift+tab to cycle)");
 
-    expect(createClaudeCliProviderMock.mock.calls.map(([args]) => args.permissionMode)).toEqual([
-      "plan",
-      "acceptEdits",
-      "bypassPermissions",
-      "plan",
-    ]);
     expect(useAgentMock.mock.calls.map(([args]) => args.mode)).toEqual([
       "plan",
       "approve",
@@ -258,13 +225,19 @@ describe("TuiApp integration", () => {
     mockUseAgent = { ...mockUseAgent, status: "running" };
 
     const { stdin, lastFrame } = render(
-      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+      <TuiApp
+        provider="anthropic"
+        model="claude-sonnet-4-20250514"
+        maxIter={10}
+        sandbox="workspace"
+        mode="plan"
+      />,
     );
 
     stdin.write("\u001b[Z");
     await flush();
 
-    expect(createClaudeCliProviderMock).toHaveBeenCalledTimes(1);
+    expect(createAnthropicProviderMock).toHaveBeenCalledTimes(1);
     expect(lastFrame()).toContain("▸▸ plan mode");
   });
 
@@ -282,19 +255,31 @@ describe("TuiApp integration", () => {
     };
 
     const { stdin, lastFrame } = render(
-      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+      <TuiApp
+        provider="anthropic"
+        model="claude-sonnet-4-20250514"
+        maxIter={10}
+        sandbox="workspace"
+        mode="plan"
+      />,
     );
 
     stdin.write("\u001b[Z");
     await flush();
 
-    expect(createClaudeCliProviderMock).toHaveBeenCalledTimes(1);
+    expect(createAnthropicProviderMock).toHaveBeenCalledTimes(1);
     expect(lastFrame()).toContain("▸▸ plan mode");
   });
 
   it("ignores Shift+Tab while the hotkey menu is open", async () => {
     const { stdin, lastFrame } = render(
-      <TuiApp provider="claude" model="sonnet" maxIter={10} sandbox="workspace" mode="plan" />,
+      <TuiApp
+        provider="anthropic"
+        model="claude-sonnet-4-20250514"
+        maxIter={10}
+        sandbox="workspace"
+        mode="plan"
+      />,
     );
 
     stdin.write("\x1f");
@@ -312,8 +297,8 @@ describe("TuiApp integration", () => {
   it("does not restore a previously toggled mode on resume", async () => {
     const firstRender = render(
       <TuiApp
-        provider="claude"
-        model="sonnet"
+        provider="anthropic"
+        model="claude-sonnet-4-20250514"
         maxIter={10}
         sandbox="workspace"
         resumeMessages={[{ id: "resume-0", role: "assistant", content: "Earlier reply" }]}
@@ -326,13 +311,13 @@ describe("TuiApp integration", () => {
     expect(firstRender.lastFrame()).toContain("▸▸ plan mode (shift+tab to cycle)");
     firstRender.unmount();
 
-    createClaudeCliProviderMock.mockClear();
+    createAnthropicProviderMock.mockClear();
     useAgentMock.mockClear();
 
     const secondRender = render(
       <TuiApp
-        provider="claude"
-        model="sonnet"
+        provider="anthropic"
+        model="claude-sonnet-4-20250514"
         maxIter={10}
         sandbox="workspace"
         resumeMessages={[{ id: "resume-0", role: "assistant", content: "Earlier reply" }]}
@@ -341,13 +326,8 @@ describe("TuiApp integration", () => {
     );
 
     expect(secondRender.lastFrame()).toContain("▸▸ bypass permissions (shift+tab to cycle)");
-    expect(createClaudeCliProviderMock).toHaveBeenCalledWith({
-      model: "sonnet",
-      permissionMode: "bypassPermissions",
-      disableBuiltInTools: true,
-      outputFormat: "stream-json",
-      verbose: true,
-      includePartialMessages: true,
+    expect(createAnthropicProviderMock).toHaveBeenCalledWith({
+      model: "claude-sonnet-4-20250514",
     });
   });
 
