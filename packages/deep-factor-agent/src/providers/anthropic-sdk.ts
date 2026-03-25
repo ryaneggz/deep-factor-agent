@@ -33,9 +33,9 @@ export interface AnthropicProviderOptions {
   /** API key (X-Api-Key header). Falls back to ANTHROPIC_API_KEY env var. */
   apiKey?: string;
   /**
-   * OAuth/bearer token (Authorization header). Falls back to
-   * ANTHROPIC_AUTH_TOKEN or CLAUDE_CODE_OAUTH_TOKEN env vars.
-   * Use this to authenticate with a Claude subscription instead of an API key.
+   * Bearer token (Authorization header). Falls back to ANTHROPIC_AUTH_TOKEN env var.
+   * Note: Claude subscription OAuth tokens (CLAUDE_CODE_OAUTH_TOKEN) are NOT
+   * supported by the Messages API — use an API key from console.anthropic.com.
    */
   authToken?: string;
   /** Base URL for the API. Falls back to ANTHROPIC_BASE_URL env var. */
@@ -246,17 +246,15 @@ export function createAnthropicProvider(opts?: AnthropicProviderOptions): ModelA
     }
     const Anthropic = mod.default ?? mod.Anthropic;
 
-    // Resolve auth: explicit options > ANTHROPIC_* env > CLAUDE_CODE_OAUTH_TOKEN env
-    const authToken =
-      options.authToken ??
-      process.env.ANTHROPIC_AUTH_TOKEN ??
-      process.env.CLAUDE_CODE_OAUTH_TOKEN ??
-      undefined;
+    // Resolve auth: explicit options > ANTHROPIC_AUTH_TOKEN env.
+    // Note: CLAUDE_CODE_OAUTH_TOKEN is NOT used — the Messages API
+    // does not support OAuth. Users need an ANTHROPIC_API_KEY.
+    const authToken = options.authToken ?? undefined;
 
     client = new Anthropic({
-      apiKey: options.apiKey ?? (authToken ? null : undefined),
-      authToken: authToken ?? undefined,
-      baseURL: options.baseURL,
+      ...(options.apiKey ? { apiKey: options.apiKey } : authToken ? { apiKey: null } : {}),
+      ...(authToken ? { authToken } : {}),
+      ...(options.baseURL ? { baseURL: options.baseURL } : {}),
       timeout: options.timeout ?? 120_000,
     });
     return client;

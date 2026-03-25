@@ -16,7 +16,11 @@ export function resolveProviderModel(args: {
   }
 
   if (provider === "openai") {
-    return createOpenAIProvider({ model, reasoningEffort: "high" });
+    // Note: reasoning_effort is NOT passed by default because it's
+    // incompatible with function tools on /v1/chat/completions for
+    // reasoning models (gpt-5.4, o3, etc). The model still reasons
+    // internally — the parameter just can't be combined with tools.
+    return createOpenAIProvider({ model });
   }
 
   // "langchain" — return string model ID for lazy LangChain resolution
