@@ -30,8 +30,14 @@ import type { AnthropicToolParam } from "./tool-schema.js";
 export interface AnthropicProviderOptions {
   /** Model ID (e.g. "claude-sonnet-4-20250514", "claude-opus-4-6"). */
   model?: string;
-  /** API key. Falls back to ANTHROPIC_API_KEY env var. */
+  /** API key (X-Api-Key header). Falls back to ANTHROPIC_API_KEY env var. */
   apiKey?: string;
+  /**
+   * OAuth/bearer token (Authorization header). Falls back to
+   * ANTHROPIC_AUTH_TOKEN or CLAUDE_CODE_OAUTH_TOKEN env vars.
+   * Use this to authenticate with a Claude subscription instead of an API key.
+   */
+  authToken?: string;
   /** Base URL for the API. Falls back to ANTHROPIC_BASE_URL env var. */
   baseURL?: string;
   /** Max tokens for the response. Default: 16384. */
@@ -239,8 +245,17 @@ export function createAnthropicProvider(opts?: AnthropicProviderOptions): ModelA
       );
     }
     const Anthropic = mod.default ?? mod.Anthropic;
+
+    // Resolve auth: explicit options > ANTHROPIC_* env > CLAUDE_CODE_OAUTH_TOKEN env
+    const authToken =
+      options.authToken ??
+      process.env.ANTHROPIC_AUTH_TOKEN ??
+      process.env.CLAUDE_CODE_OAUTH_TOKEN ??
+      undefined;
+
     client = new Anthropic({
-      apiKey: options.apiKey,
+      apiKey: options.apiKey ?? (authToken ? null : undefined),
+      authToken: authToken ?? undefined,
       baseURL: options.baseURL,
       timeout: options.timeout ?? 120_000,
     });
