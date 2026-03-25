@@ -15,11 +15,11 @@ export type ProviderType = "langchain" | "claude" | "codex";
 export type LegacyProviderType = "claude-sdk";
 export type ProviderInput = ProviderType | LegacyProviderType;
 
-export const DEFAULT_PROVIDER: ProviderType = "langchain";
+export const DEFAULT_PROVIDER: ProviderType = "claude";
 
 export const DEFAULT_MODELS: Record<ProviderType, string> = {
-  langchain: "gpt-4.1-mini",
-  claude: "sonnet",
+  langchain: "claude-sonnet-4-6",
+  claude: "opus",
   codex: "gpt-5.4",
 };
 

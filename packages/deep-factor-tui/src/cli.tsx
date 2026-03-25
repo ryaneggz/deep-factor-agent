@@ -19,7 +19,7 @@ const cli = meow(
     $ deepfactor [prompt]
 
   Options
-    --provider       Provider: langchain, claude, codex (default: langchain)
+    --provider       Provider: langchain, claude, codex (default: claude)
     --model, -m      Model identifier (default depends on provider)
     --max-iter, -i   Maximum agent iterations (default: 10)
     --mode           Execution mode: plan, approve, yolo (default: yolo)

@@ -239,6 +239,7 @@ describe("runPrintMode", () => {
       model: "sonnet",
       permissionMode: "bypassPermissions",
       disableBuiltInTools: true,
+      effort: "high",
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({ model: mockClaudeCliProvider }),
@@ -293,6 +294,7 @@ describe("runPrintMode", () => {
       model: "sonnet",
       permissionMode: "plan",
       disableBuiltInTools: true,
+      effort: "high",
     });
   });
 
@@ -317,6 +319,7 @@ describe("runPrintMode", () => {
       model: "sonnet",
       permissionMode: "acceptEdits",
       disableBuiltInTools: true,
+      effort: "high",
     });
   });
 

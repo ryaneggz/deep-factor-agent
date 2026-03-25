@@ -34,6 +34,7 @@ export function resolveProviderModel(args: {
       model,
       permissionMode: resolveClaudePermissionMode(mode),
       disableBuiltInTools: true,
+      effort: "high",
       ...(liveUpdates
         ? {
             outputFormat: "stream-json" as const,

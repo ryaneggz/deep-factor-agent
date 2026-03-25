@@ -10,7 +10,7 @@ const localEnv = resolve(process.cwd(), ".env");
 config({ path: existsSync(globalEnv) ? globalEnv : localEnv });
 
 // Default model if MODEL_ID env var is not set
-export const MODEL_ID = process.env.MODEL_ID ?? "gpt-4.1-mini";
+export const MODEL_ID = process.env.MODEL_ID ?? "claude-sonnet-4-6";
 
 // Validate that at least one provider key is present
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;

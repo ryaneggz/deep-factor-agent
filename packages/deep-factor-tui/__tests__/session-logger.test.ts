@@ -46,8 +46,8 @@ describe("resolveSessionSettings", () => {
         hasModelFlag: false,
       }),
     ).toEqual({
-      provider: "langchain",
-      model: "gpt-4.1-mini",
+      provider: "claude",
+      model: "opus",
     });
   });
 
@@ -72,7 +72,7 @@ describe("resolveSessionSettings", () => {
       }),
     ).toEqual({
       provider: "langchain",
-      model: "gpt-4.1-mini",
+      model: "claude-sonnet-4-6",
     });
   });
 

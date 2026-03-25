@@ -41,6 +41,8 @@ export interface ClaudeCliProviderOptions {
   verbose?: boolean;
   /** Includes partial assistant-message deltas when using `stream-json`. Default: false. */
   includePartialMessages?: boolean;
+  /** Effort level for output quality (e.g. "low", "medium", "high", "max"). */
+  effort?: "low" | "medium" | "high" | "max";
 }
 
 interface ClaudeCliJsonResponse {
@@ -96,6 +98,7 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
   const outputFormat = opts?.outputFormat ?? "json";
   const verbose = opts?.verbose ?? false;
   const includePartialMessages = opts?.includePartialMessages ?? false;
+  const effort = opts?.effort;
 
   let boundToolDefs: StructuredToolInterface[] = [];
 
@@ -151,6 +154,9 @@ export function createClaudeCliProvider(opts?: ClaudeCliProviderOptions): ModelA
     args.push("--permission-mode", permissionMode);
     if (model) {
       args.push("--model", model);
+    }
+    if (effort) {
+      args.push("--effort", effort);
     }
     args.push(prompt);
     return args;
