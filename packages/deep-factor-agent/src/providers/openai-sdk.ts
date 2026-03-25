@@ -247,9 +247,11 @@ export function createOpenAIProvider(opts?: OpenAIProviderOptions): ModelAdapter
       throw new Error(`openai SDK is not installed. Install it with: pnpm add openai`);
     }
     const OpenAI = mod.default ?? mod.OpenAI;
+    // Only pass fields with actual values — passing undefined explicitly
+    // prevents the SDK from reading its own env var fallbacks.
     client = new OpenAI({
-      apiKey: options.apiKey,
-      baseURL: options.baseURL,
+      ...(options.apiKey ? { apiKey: options.apiKey } : {}),
+      ...(options.baseURL ? { baseURL: options.baseURL } : {}),
       timeout: options.timeout ?? 120_000,
     });
     return client;
