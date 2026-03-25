@@ -110,8 +110,8 @@ describe("unified-log", () => {
 
     it("skips empty lines", () => {
       const e1 = createLogEntry("s1", "init", {
-        provider: "claude",
-        model: "sonnet",
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
         mode: "approve",
       });
 

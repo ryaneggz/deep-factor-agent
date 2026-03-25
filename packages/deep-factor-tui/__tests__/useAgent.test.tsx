@@ -325,7 +325,7 @@ describe("useAgent", () => {
     expect(stateRef.current?.status).toBe("pending_input");
   });
 
-  it("streams Claude inline runs through the same update path as LangChain", async () => {
+  it("streams Anthropic inline runs through the same update path as LangChain", async () => {
     let resolveLoop: ((result: AgentResult) => void) | undefined;
     const userEvent: AgentEvent = {
       type: "message",
@@ -440,7 +440,7 @@ describe("useAgent", () => {
     await flush();
   });
 
-  it("streams Codex inline runs through the same update path as Claude", async () => {
+  it("streams OpenAI inline runs through the same update path as Anthropic", async () => {
     let resolveLoop: ((result: AgentResult) => void) | undefined;
     const assistantEvent: AgentEvent = {
       type: "message",

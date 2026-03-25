@@ -347,6 +347,9 @@ export function createOpenAIProvider(opts?: OpenAIProviderOptions): ModelAdapter
               args: tc.function?.arguments ?? "",
             });
           } else {
+            // Later chunks may carry id/name that weren't in the first delta
+            if (tc.id) existing.id = tc.id;
+            if (tc.function?.name) existing.name = tc.function.name;
             if (tc.function?.arguments) {
               existing.args += tc.function.arguments;
             }

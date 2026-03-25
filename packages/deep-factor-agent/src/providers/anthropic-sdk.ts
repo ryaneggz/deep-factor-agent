@@ -342,7 +342,14 @@ export function createAnthropicProvider(opts?: AnthropicProviderOptions): ModelA
       if (!acc) return;
 
       // Emit completed tool calls
-      if (acc.type === "tool_use" && acc.id && acc.name) {
+      if (acc.type === "tool_use") {
+        if (!acc.id || !acc.name) {
+          onUpdate({
+            type: "error",
+            error: `Tool call block missing id or name (index ${event.index})`,
+          });
+          return;
+        }
         let args: Record<string, unknown> = {};
         try {
           args = JSON.parse(acc.inputJson || "{}");
