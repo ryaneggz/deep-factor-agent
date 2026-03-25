@@ -229,21 +229,22 @@ export function createAnthropicProvider(opts?: AnthropicProviderOptions): ModelA
     if (client) return client;
 
     const sdkModuleId = "@anthropic-ai/sdk";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mod: any;
     try {
-      // Dynamic import — avoids hard dependency
-      const mod = await import(/* webpackIgnore: true */ sdkModuleId);
-      const Anthropic = mod.default ?? mod.Anthropic;
-      client = new Anthropic({
-        apiKey: options.apiKey,
-        baseURL: options.baseURL,
-        timeout: options.timeout ?? 120_000,
-      });
-      return client;
+      mod = await import(/* webpackIgnore: true */ sdkModuleId);
     } catch {
       throw new Error(
         `@anthropic-ai/sdk is not installed. Install it with: pnpm add @anthropic-ai/sdk`,
       );
     }
+    const Anthropic = mod.default ?? mod.Anthropic;
+    client = new Anthropic({
+      apiKey: options.apiKey,
+      baseURL: options.baseURL,
+      timeout: options.timeout ?? 120_000,
+    });
+    return client;
   }
 
   // -------------------------------------------------------------------------

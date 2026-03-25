@@ -239,18 +239,20 @@ export function createOpenAIProvider(opts?: OpenAIProviderOptions): ModelAdapter
     if (client) return client;
 
     const sdkModuleId = "openai";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mod: any;
     try {
-      const mod = await import(/* webpackIgnore: true */ sdkModuleId);
-      const OpenAI = mod.default ?? mod.OpenAI;
-      client = new OpenAI({
-        apiKey: options.apiKey,
-        baseURL: options.baseURL,
-        timeout: options.timeout ?? 120_000,
-      });
-      return client;
+      mod = await import(/* webpackIgnore: true */ sdkModuleId);
     } catch {
       throw new Error(`openai SDK is not installed. Install it with: pnpm add openai`);
     }
+    const OpenAI = mod.default ?? mod.OpenAI;
+    client = new OpenAI({
+      apiKey: options.apiKey,
+      baseURL: options.baseURL,
+      timeout: options.timeout ?? 120_000,
+    });
+    return client;
   }
 
   // -------------------------------------------------------------------------
