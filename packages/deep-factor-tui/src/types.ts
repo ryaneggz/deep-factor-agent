@@ -19,8 +19,8 @@ export const DEFAULT_PROVIDER: ProviderType = "langchain";
 
 export const DEFAULT_MODELS: Record<ProviderType, string> = {
   langchain: "gpt-5.4-mini",
-  anthropic: "claude-sonnet-4-20250514",
-  openai: "gpt-4.1",
+  anthropic: "claude-opus-4-6",
+  openai: "gpt-5.4",
 };
 
 export function isProviderType(value: string): value is ProviderType {

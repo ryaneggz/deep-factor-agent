@@ -255,7 +255,7 @@ export function createAnthropicProvider(opts?: AnthropicProviderOptions): ModelA
     const { system, messages: anthropicMessages } = convertToAnthropicMessages(messages);
 
     const requestParams: Record<string, unknown> = {
-      model: options.model ?? "claude-sonnet-4-20250514",
+      model: options.model ?? "claude-opus-4-6",
       max_tokens: options.maxTokens ?? 16384,
       messages: anthropicMessages,
       ...(system ? { system } : {}),
@@ -281,7 +281,7 @@ export function createAnthropicProvider(opts?: AnthropicProviderOptions): ModelA
     const { system, messages: anthropicMessages } = convertToAnthropicMessages(messages);
 
     const requestParams: Record<string, unknown> = {
-      model: options.model ?? "claude-sonnet-4-20250514",
+      model: options.model ?? "claude-opus-4-6",
       max_tokens: options.maxTokens ?? 16384,
       messages: anthropicMessages,
       ...(system ? { system } : {}),

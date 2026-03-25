@@ -261,6 +261,7 @@ describe("runPrintMode", () => {
 
     expect(mockCreateOpenAIProvider).toHaveBeenCalledWith({
       model: "gpt-4.1",
+      reasoningEffort: "high",
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({ model: mockOpenAIProvider }),

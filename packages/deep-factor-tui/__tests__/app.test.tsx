@@ -178,6 +178,7 @@ describe("TuiApp integration", () => {
 
     expect(createOpenAIProviderMock).toHaveBeenCalledWith({
       model: "gpt-4.1",
+      reasoningEffort: "high",
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({

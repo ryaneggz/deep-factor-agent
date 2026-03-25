@@ -13,7 +13,7 @@ export function resolveProviderModel(args: {
   }
 
   if (provider === "openai") {
-    return createOpenAIProvider({ model });
+    return createOpenAIProvider({ model, reasoningEffort: "high" });
   }
 
   // "langchain" — return string model ID for lazy LangChain resolution

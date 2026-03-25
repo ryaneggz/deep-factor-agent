@@ -22,7 +22,7 @@ import type { OpenAIChatCompletionTool } from "./tool-schema.js";
 // ---------------------------------------------------------------------------
 
 export interface OpenAIProviderOptions {
-  /** Model ID (e.g. "gpt-4.1", "o3-mini"). */
+  /** Model ID (e.g. "gpt-5.4", "o3-mini"). */
   model?: string;
   /** API key. Falls back to OPENAI_API_KEY env var. */
   apiKey?: string;
@@ -32,6 +32,8 @@ export interface OpenAIProviderOptions {
   maxCompletionTokens?: number;
   /** Temperature. Default: undefined (use model default). */
   temperature?: number;
+  /** Reasoning effort for thinking models (e.g. "low", "medium", "high"). */
+  reasoningEffort?: "low" | "medium" | "high";
   /** System prompt prepended before converted messages. */
   systemPrompt?: string;
   /** Timeout in milliseconds. Default: 120000. */
@@ -265,11 +267,12 @@ export function createOpenAIProvider(opts?: OpenAIProviderOptions): ModelAdapter
     }
 
     const requestParams: Record<string, unknown> = {
-      model: options.model ?? "gpt-4.1",
+      model: options.model ?? "gpt-5.4",
       messages: openaiMessages,
       max_completion_tokens: options.maxCompletionTokens ?? 16384,
       ...(boundTools.length > 0 ? { tools: boundTools } : {}),
       ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
     };
 
     const response: OpenAIChatCompletionResponse =
@@ -300,11 +303,12 @@ export function createOpenAIProvider(opts?: OpenAIProviderOptions): ModelAdapter
     }
 
     const requestParams: Record<string, unknown> = {
-      model: options.model ?? "gpt-4.1",
+      model: options.model ?? "gpt-5.4",
       messages: openaiMessages,
       max_completion_tokens: options.maxCompletionTokens ?? 16384,
       ...(boundTools.length > 0 ? { tools: boundTools } : {}),
       ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
       stream: true,
       stream_options: { include_usage: true },
     };
