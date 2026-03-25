@@ -133,9 +133,8 @@ if (cli.flags.print) {
     process.exit(1);
   }
 
-  if (provider === "langchain") {
-    loadEnv();
-  }
+  // Load env vars for all providers — SDKs read API keys from env
+  loadEnv();
 
   const { runPrintMode } = await import("./print.js");
   await runPrintMode({
@@ -236,9 +235,8 @@ if (cli.flags.print) {
     process.stderr.write(`Resuming session: ${resumeId}\n`);
   }
 
-  if (provider === "langchain") {
-    loadEnv();
-  }
+  // Load env vars for all providers — SDKs read API keys from env
+  loadEnv();
 
   const instance = render(
     React.createElement(TuiApp, {
