@@ -9,7 +9,10 @@ export function resolveProviderModel(args: {
   const { provider, model } = args;
 
   if (provider === "anthropic") {
-    return createAnthropicProvider({ model });
+    return createAnthropicProvider({
+      model,
+      thinking: { type: "enabled", budget_tokens: 10000 },
+    });
   }
 
   if (provider === "openai") {

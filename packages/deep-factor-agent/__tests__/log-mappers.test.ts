@@ -20,7 +20,7 @@ function createCtx(overrides?: Partial<MapperContext>): MapperContext {
 
 describe("claude-mapper", () => {
   it("maps system init to init entry", () => {
-    const ctx = createCtx({ provider: "claude" });
+    const ctx = createCtx({ provider: "anthropic" });
     const entries = mapClaudeEvent(
       {
         type: "system",
@@ -44,7 +44,7 @@ describe("claude-mapper", () => {
   });
 
   it("maps assistant message with text and tool_use blocks", () => {
-    const ctx = createCtx({ provider: "claude" });
+    const ctx = createCtx({ provider: "anthropic" });
     const entries = mapClaudeEvent(
       {
         type: "assistant",
@@ -73,7 +73,7 @@ describe("claude-mapper", () => {
   });
 
   it("maps thinking blocks", () => {
-    const ctx = createCtx({ provider: "claude" });
+    const ctx = createCtx({ provider: "anthropic" });
     const entries = mapClaudeEvent(
       {
         type: "assistant",
@@ -91,7 +91,7 @@ describe("claude-mapper", () => {
   });
 
   it("maps user tool_result blocks", () => {
-    const ctx = createCtx({ provider: "claude" });
+    const ctx = createCtx({ provider: "anthropic" });
     const entries = mapClaudeEvent(
       {
         type: "user",
@@ -112,7 +112,7 @@ describe("claude-mapper", () => {
   });
 
   it("maps result event to status + result entries", () => {
-    const ctx = createCtx({ provider: "claude", currentIteration: 3 });
+    const ctx = createCtx({ provider: "anthropic", currentIteration: 3 });
     const entries = mapClaudeEvent(
       {
         type: "result",
@@ -135,7 +135,7 @@ describe("claude-mapper", () => {
   });
 
   it("maps rate_limit_event", () => {
-    const ctx = createCtx({ provider: "claude" });
+    const ctx = createCtx({ provider: "anthropic" });
     const entries = mapClaudeEvent(
       {
         type: "rate_limit_event",
@@ -154,7 +154,7 @@ describe("claude-mapper", () => {
 
 describe("codex-mapper", () => {
   it("maps thread.started to init", () => {
-    const ctx = createCtx({ provider: "codex", model: "gpt-5.4" });
+    const ctx = createCtx({ provider: "openai", model: "gpt-5.4" });
     const entries = mapCodexEvent(
       {
         type: "thread.started",
@@ -171,13 +171,13 @@ describe("codex-mapper", () => {
   });
 
   it("increments iteration on turn.started", () => {
-    const ctx = createCtx({ provider: "codex", currentIteration: 0 });
+    const ctx = createCtx({ provider: "openai", currentIteration: 0 });
     mapCodexEvent({ type: "turn.started" }, ctx);
     expect(ctx.currentIteration).toBe(1);
   });
 
   it("maps item.started command_execution to tool_call", () => {
-    const ctx = createCtx({ provider: "codex" });
+    const ctx = createCtx({ provider: "openai" });
     const entries = mapCodexEvent(
       {
         type: "item.started",
@@ -202,7 +202,7 @@ describe("codex-mapper", () => {
   });
 
   it("maps item.completed command_execution to tool_result", () => {
-    const ctx = createCtx({ provider: "codex" });
+    const ctx = createCtx({ provider: "openai" });
     const entries = mapCodexEvent(
       {
         type: "item.completed",
@@ -227,7 +227,7 @@ describe("codex-mapper", () => {
   });
 
   it("marks non-zero exit code as error", () => {
-    const ctx = createCtx({ provider: "codex" });
+    const ctx = createCtx({ provider: "openai" });
     const entries = mapCodexEvent(
       {
         type: "item.completed",
@@ -248,7 +248,7 @@ describe("codex-mapper", () => {
   });
 
   it("maps item.completed agent_message to message", () => {
-    const ctx = createCtx({ provider: "codex" });
+    const ctx = createCtx({ provider: "openai" });
     const entries = mapCodexEvent(
       {
         type: "item.completed",
@@ -269,7 +269,7 @@ describe("codex-mapper", () => {
   });
 
   it("maps item.completed file_change to file_change", () => {
-    const ctx = createCtx({ provider: "codex" });
+    const ctx = createCtx({ provider: "openai" });
     const entries = mapCodexEvent(
       {
         type: "item.completed",
@@ -292,7 +292,7 @@ describe("codex-mapper", () => {
   });
 
   it("maps turn.completed to status with usage", () => {
-    const ctx = createCtx({ provider: "codex", currentIteration: 2 });
+    const ctx = createCtx({ provider: "openai", currentIteration: 2 });
     const entries = mapCodexEvent(
       {
         type: "turn.completed",

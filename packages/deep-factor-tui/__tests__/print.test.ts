@@ -237,6 +237,7 @@ describe("runPrintMode", () => {
 
     expect(mockCreateAnthropicProvider).toHaveBeenCalledWith({
       model: "claude-sonnet-4-20250514",
+      thinking: { type: "enabled", budget_tokens: 10000 },
     });
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({ model: mockAnthropicProvider }),

@@ -163,6 +163,7 @@ describe("TuiApp integration", () => {
 
     expect(createAnthropicProviderMock).toHaveBeenCalledWith({
       model: "claude-sonnet-4-20250514",
+      thinking: { type: "enabled", budget_tokens: 10000 },
     });
     expect(useAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -329,6 +330,7 @@ describe("TuiApp integration", () => {
     expect(secondRender.lastFrame()).toContain("▸▸ bypass permissions (shift+tab to cycle)");
     expect(createAnthropicProviderMock).toHaveBeenCalledWith({
       model: "claude-sonnet-4-20250514",
+      thinking: { type: "enabled", budget_tokens: 10000 },
     });
   });
 
